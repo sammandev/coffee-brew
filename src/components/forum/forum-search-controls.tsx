@@ -10,11 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 
 interface ForumSearchControlsProps {
+	basePath?: string;
 	initialAuthor: string;
+	initialFrom?: string;
 	initialMinReactions: string;
 	initialQuery: string;
 	initialSort: string;
 	initialTag: string;
+	initialTo?: string;
 	locale: "en" | "id";
 	popularTags: string[];
 }
@@ -31,11 +34,14 @@ function toQueryString(entries: Record<string, string>) {
 }
 
 export function ForumSearchControls({
+	basePath = "/forum",
 	initialAuthor,
+	initialFrom = "",
 	initialMinReactions,
 	initialQuery,
 	initialSort,
 	initialTag,
+	initialTo = "",
 	locale,
 	popularTags,
 }: ForumSearchControlsProps) {
@@ -46,6 +52,8 @@ export function ForumSearchControls({
 	const [author, setAuthor] = useState(initialAuthor);
 	const [minReactions, setMinReactions] = useState(initialMinReactions);
 	const [sort, setSort] = useState(initialSort);
+	const [from, setFrom] = useState(initialFrom);
+	const [to, setTo] = useState(initialTo);
 
 	const labels = useMemo(
 		() => ({
@@ -65,6 +73,8 @@ export function ForumSearchControls({
 			sortMostReacted: locale === "id" ? "Reaksi Terbanyak" : "Most Reacted",
 			sortMostDiscussed: locale === "id" ? "Komentar Terbanyak" : "Most Discussed",
 			sortOldest: locale === "id" ? "Terlama" : "Oldest",
+			from: locale === "id" ? "Dari tanggal" : "From date",
+			to: locale === "id" ? "Sampai tanggal" : "To date",
 			reset: locale === "id" ? "Reset" : "Reset",
 			apply: locale === "id" ? "Terapkan" : "Apply",
 			popularTags: locale === "id" ? "Tag Populer" : "Popular Tags",
@@ -73,7 +83,7 @@ export function ForumSearchControls({
 	);
 
 	function pushWithFilters(next: Record<string, string>) {
-		router.push(`/forum${toQueryString(next)}`);
+		router.push(`${basePath}${toQueryString(next)}`);
 	}
 
 	function onSearchSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -84,6 +94,8 @@ export function ForumSearchControls({
 			author,
 			minReactions,
 			sort,
+			from,
+			to,
 		});
 	}
 
@@ -94,6 +106,8 @@ export function ForumSearchControls({
 			author,
 			minReactions,
 			sort,
+			from,
+			to,
 		});
 		setAdvancedOpen(false);
 	}
@@ -104,7 +118,9 @@ export function ForumSearchControls({
 		setAuthor("");
 		setMinReactions("");
 		setSort("latest");
-		router.push("/forum");
+		setFrom("");
+		setTo("");
+		router.push(basePath);
 		setAdvancedOpen(false);
 	}
 
@@ -160,6 +176,8 @@ export function ForumSearchControls({
 								author,
 								minReactions,
 								sort,
+								from,
+								to,
 							});
 						}}
 						className="rounded-full border px-2.5 py-1 text-xs font-semibold text-(--muted) transition hover:bg-(--sand)/20"
@@ -223,6 +241,19 @@ export function ForumSearchControls({
 							<option value="most_discussed">{labels.sortMostDiscussed}</option>
 							<option value="oldest">{labels.sortOldest}</option>
 						</Select>
+					</div>
+					<div>
+						<Label htmlFor="forum-advanced-from">{labels.from}</Label>
+						<Input
+							id="forum-advanced-from"
+							type="date"
+							value={from}
+							onChange={(event) => setFrom(event.currentTarget.value)}
+						/>
+					</div>
+					<div>
+						<Label htmlFor="forum-advanced-to">{labels.to}</Label>
+						<Input id="forum-advanced-to" type="date" value={to} onChange={(event) => setTo(event.currentTarget.value)} />
 					</div>
 				</div>
 			</FormModal>

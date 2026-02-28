@@ -2,6 +2,7 @@ import { CalendarDays, Lock, ShieldCheck, Star, UserRoundCheck, UserRoundX } fro
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PublicProfileTabs } from "@/components/profile/public-profile-tabs";
+import { StartMessageButton } from "@/components/profile/start-message-button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { getSessionContext } from "@/lib/auth";
@@ -27,12 +28,12 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
 		supabaseAdmin
 			.from("profiles")
 			.select(
-				"id, email, display_name, avatar_url, created_at, is_profile_private, show_online_status, last_active_at, mention_handle, karma_points, is_verified",
+				"id, email, display_name, avatar_url, created_at, status, dm_privacy, is_profile_private, show_online_status, last_active_at, mention_handle, karma_points, is_verified",
 			)
 			.eq("id", userId)
 			.maybeSingle(),
 		session
-			? supabaseAdmin.from("profiles").select("show_online_status").eq("id", session.userId).maybeSingle()
+			? supabaseAdmin.from("profiles").select("show_online_status, is_verified").eq("id", session.userId).maybeSingle()
 			: Promise.resolve({ data: null }),
 	]);
 
@@ -48,6 +49,48 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
 	const canSeeTargetOnlineStatus =
 		canBypassPrivacy || (viewerAllowsOnlineStatus && Boolean(targetProfile.show_online_status));
 	const isPrivateForViewer = Boolean(targetProfile.is_profile_private) && !canBypassPrivacy;
+	const viewerVerified = Boolean(viewerProfileResult.data?.is_verified);
+
+	const { data: blockRows } =
+		session && !isSelf
+			? await supabaseAdmin
+					.from("user_blocks")
+					.select("blocker_id, blocked_id")
+					.or(
+						`and(blocker_id.eq.${session.userId},blocked_id.eq.${targetProfile.id}),and(blocker_id.eq.${targetProfile.id},blocked_id.eq.${session.userId})`,
+					)
+			: { data: [] as Array<{ blocker_id: string; blocked_id: string }> };
+
+	const blockedEitherDirection = (blockRows ?? []).length > 0;
+	const dmBlockedByPrivacy =
+		targetProfile.dm_privacy === "nobody" || (targetProfile.dm_privacy === "verified_only" && !viewerVerified);
+	const canStartMessage =
+		Boolean(session) && !isSelf && targetProfile.status === "active" && !blockedEitherDirection && !dmBlockedByPrivacy;
+	const messageDisabledReason = !session
+		? locale === "id"
+			? "Masuk untuk mengirim pesan."
+			: "Sign in to send a message."
+		: isSelf
+			? locale === "id"
+				? "Ini adalah profil Anda."
+				: "This is your profile."
+			: blockedEitherDirection
+				? locale === "id"
+					? "Pesan dinonaktifkan karena salah satu akun memblokir akun lain."
+					: "Messaging is unavailable because one account has blocked the other."
+				: targetProfile.status !== "active"
+					? locale === "id"
+						? "Akun ini tidak tersedia untuk pesan langsung."
+						: "This account is not available for direct messages."
+					: targetProfile.dm_privacy === "nobody"
+						? locale === "id"
+							? "Pengguna ini menonaktifkan direct message."
+							: "This user has disabled direct messages."
+						: targetProfile.dm_privacy === "verified_only" && !viewerVerified
+							? locale === "id"
+								? "Hanya akun terverifikasi yang dapat mengirim pesan."
+								: "Only verified accounts can send messages."
+							: undefined;
 
 	const displayName = fallbackDisplayName(targetProfile.email, targetProfile.display_name);
 	const initial = displayName.charAt(0).toUpperCase() || "U";
@@ -214,6 +257,13 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
 						</div>
 					</div>
 					<div className="flex flex-wrap items-center gap-2">
+						{session && !isSelf ? (
+							<StartMessageButton
+								recipientId={targetProfile.id}
+								disabled={!canStartMessage}
+								disabledReason={messageDisabledReason}
+							/>
+						) : null}
 						{isPrivateForViewer ? (
 							<Badge className="inline-flex items-center gap-1">
 								<Lock size={12} />

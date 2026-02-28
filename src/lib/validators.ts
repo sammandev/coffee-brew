@@ -300,6 +300,63 @@ export const profilePreferencesSchema = z
 			.optional(),
 		is_profile_private: z.boolean().optional(),
 		show_online_status: z.boolean().optional(),
+		dm_privacy: z.enum(["everyone", "verified_only", "nobody"]).optional(),
+	})
+	.strict();
+
+export const dmConversationStartSchema = z
+	.object({
+		recipientId: z.string().uuid(),
+	})
+	.strict();
+
+export const dmConversationListQuerySchema = z
+	.object({
+		view: z.enum(["active", "archived"]).optional().default("active"),
+		q: z.string().trim().max(120).optional(),
+		limit: z.coerce.number().int().min(1).max(50).optional().default(20),
+		cursor: z.string().datetime().optional(),
+	})
+	.strict();
+
+export const dmMessageListQuerySchema = z
+	.object({
+		limit: z.coerce.number().int().min(1).max(100).optional().default(40),
+		cursor: z.string().datetime().optional(),
+	})
+	.strict();
+
+export const dmMessageCreateSchema = z
+	.object({
+		body_html: z.string().trim().max(120000).optional(),
+		attachment_urls: z.array(z.string().trim().url().max(2000)).max(8).optional().default([]),
+	})
+	.strict()
+	.refine((value) => {
+		const hasBody = typeof value.body_html === "string" && value.body_html.trim().length > 0;
+		const hasAttachments = value.attachment_urls.length > 0;
+		return hasBody || hasAttachments;
+	}, "Message requires text or at least one attachment.");
+
+export const dmMessageUpdateSchema = z
+	.object({
+		body_html: z.string().trim().min(1).max(120000),
+	})
+	.strict();
+
+export const dmReportCreateSchema = z
+	.object({
+		conversationId: z.string().uuid(),
+		messageId: z.string().uuid(),
+		reason: z.string().trim().min(3).max(180),
+		detail: z.string().trim().max(1200).optional(),
+	})
+	.strict();
+
+export const dmReportUpdateSchema = z
+	.object({
+		status: z.enum(["open", "resolved", "dismissed"]),
+		resolutionNote: z.string().trim().max(1200).optional(),
 	})
 	.strict();
 

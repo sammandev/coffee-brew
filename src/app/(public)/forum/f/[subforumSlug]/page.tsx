@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ForumBreadcrumbs } from "@/components/forum/forum-breadcrumbs";
 import { ForumLiveAutoRefresh } from "@/components/forum/forum-live-auto-refresh";
+import { ForumSearchControls } from "@/components/forum/forum-search-controls";
 import { ThreadComposerModal } from "@/components/forum/thread-composer-modal";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getSessionContext } from "@/lib/auth";
@@ -73,10 +74,26 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 	const from = firstParam(query.from).trim();
 	const to = firstParam(query.to).trim();
 	const sort = firstParam(query.sort).trim() || "latest";
+	const minReactionsRaw = firstParam(query.minReactions).trim();
+	const minReactions = Number.isFinite(Number(minReactionsRaw)) ? Math.max(0, Number(minReactionsRaw)) : 0;
 	const page = Math.max(1, Number(firstParam(query.page) || "1") || 1);
 	const perPage = 12;
 	const fromIndex = (page - 1) * perPage;
 	const toIndex = fromIndex + perPage - 1;
+	const needsComputedSort = sort === "most_reacted" || sort === "most_discussed" || minReactions > 0;
+	let authorFilterIds: string[] | null = null;
+
+	if (author) {
+		const { data: matchedAuthors } = await supabase
+			.from("profiles")
+			.select("id")
+			.or(`display_name.ilike.%${author}%,mention_handle.ilike.%${author}%,email.ilike.%${author}%`)
+			.limit(120);
+		authorFilterIds = (matchedAuthors ?? []).map((row) => row.id);
+		if (authorFilterIds.length === 0) {
+			authorFilterIds = ["00000000-0000-0000-0000-000000000000"];
+		}
+	}
 
 	let threadQuery = supabase
 		.from("forum_threads")
@@ -91,6 +108,9 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 	if (tag) {
 		threadQuery = threadQuery.contains("tags", [tag]);
 	}
+	if (authorFilterIds) {
+		threadQuery = threadQuery.in("author_id", authorFilterIds);
+	}
 	if (from) {
 		threadQuery = threadQuery.gte("created_at", from);
 	}
@@ -104,7 +124,9 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 	} else {
 		threadQuery = threadQuery.order("is_pinned", { ascending: false }).order("updated_at", { ascending: false });
 	}
-	threadQuery = threadQuery.range(fromIndex, toIndex);
+	if (!needsComputedSort) {
+		threadQuery = threadQuery.range(fromIndex, toIndex);
+	}
 
 	const { data: baseThreads, count: totalRows } = await threadQuery;
 	let threadRows = (baseThreads ?? []) as ThreadRow[];
@@ -169,23 +191,30 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 	for (const comment of comments ?? []) {
 		commentCountByThread.set(comment.thread_id, (commentCountByThread.get(comment.thread_id) ?? 0) + 1);
 	}
+	let totalRowsEffective = totalRows ?? threadRows.length;
 
 	if (sort === "most_reacted") {
-		threadRows = threadRows.sort(
-			(left, right) =>
-				(reactionRowsByThread.get(right.id)?.length ?? 0) - (reactionRowsByThread.get(left.id)?.length ?? 0),
-		);
-	} else if (sort === "most_discussed") {
-		threadRows = threadRows.sort(
-			(left, right) => (commentCountByThread.get(right.id) ?? 0) - (commentCountByThread.get(left.id) ?? 0),
-		);
-	}
-
-	if (author) {
-		threadRows = threadRows.filter((thread) => {
-			const authorInfo = authorById.get(thread.author_id);
-			return authorInfo ? authorInfo.name.toLowerCase().includes(author) : false;
+		threadRows = threadRows.sort((left, right) => {
+			const reactionDiff =
+				(reactionRowsByThread.get(right.id)?.length ?? 0) - (reactionRowsByThread.get(left.id)?.length ?? 0);
+			if (reactionDiff !== 0) return reactionDiff;
+			if (left.is_pinned !== right.is_pinned) return right.is_pinned ? 1 : -1;
+			return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
 		});
+	} else if (sort === "most_discussed") {
+		threadRows = threadRows.sort((left, right) => {
+			const commentDiff = (commentCountByThread.get(right.id) ?? 0) - (commentCountByThread.get(left.id) ?? 0);
+			if (commentDiff !== 0) return commentDiff;
+			if (left.is_pinned !== right.is_pinned) return right.is_pinned ? 1 : -1;
+			return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
+		});
+	}
+	if (minReactions > 0) {
+		threadRows = threadRows.filter((thread) => (reactionRowsByThread.get(thread.id)?.length ?? 0) >= minReactions);
+	}
+	if (needsComputedSort) {
+		totalRowsEffective = threadRows.length;
+		threadRows = threadRows.slice(fromIndex, toIndex + 1);
 	}
 
 	const tagCounts = new Map<string, number>();
@@ -201,7 +230,7 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 		.slice(0, 12)
 		.map(([value]) => value);
 
-	const totalPages = Math.max(1, Math.ceil((totalRows ?? 0) / perPage));
+	const totalPages = Math.max(1, Math.ceil(totalRowsEffective / perPage));
 
 	function buildQuery(next: Record<string, string>) {
 		const params = new URLSearchParams();
@@ -263,69 +292,18 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 				</div>
 			</header>
 
-			<form method="get" className="grid gap-3 rounded-2xl border bg-(--surface-elevated) p-4 md:grid-cols-3">
-				<input
-					name="q"
-					defaultValue={q}
-					placeholder={locale === "id" ? "Cari kata kunci..." : "Search keywords..."}
-					className="h-9 rounded-lg border border-(--border) bg-(--surface) px-3 text-sm"
-				/>
-				<input
-					name="author"
-					defaultValue={author}
-					placeholder={locale === "id" ? "Cari penulis..." : "Search author..."}
-					className="h-9 rounded-lg border border-(--border) bg-(--surface) px-3 text-sm"
-				/>
-				<select
-					name="sort"
-					defaultValue={sort}
-					className="h-9 rounded-lg border border-(--border) bg-(--surface) px-3 text-sm"
-				>
-					<option value="latest">{locale === "id" ? "Terbaru" : "Latest"}</option>
-					<option value="oldest">{locale === "id" ? "Terlama" : "Oldest"}</option>
-					<option value="most_reacted">{locale === "id" ? "Reaksi terbanyak" : "Most reacted"}</option>
-					<option value="most_discussed">{locale === "id" ? "Diskusi terbanyak" : "Most discussed"}</option>
-				</select>
-				<input
-					name="tag"
-					defaultValue={tag}
-					placeholder="tag"
-					className="h-9 rounded-lg border border-(--border) bg-(--surface) px-3 text-sm"
-				/>
-				<input
-					name="from"
-					defaultValue={from}
-					type="date"
-					className="h-9 rounded-lg border border-(--border) bg-(--surface) px-3 text-sm"
-				/>
-				<input
-					name="to"
-					defaultValue={to}
-					type="date"
-					className="h-9 rounded-lg border border-(--border) bg-(--surface) px-3 text-sm"
-				/>
-				<div className="md:col-span-3 flex items-center justify-end gap-2">
-					<Link href={`/forum/f/${subforum.slug}`} className="rounded-lg border px-3 py-2 text-sm font-semibold">
-						{locale === "id" ? "Reset" : "Reset"}
-					</Link>
-					<button type="submit" className="rounded-lg bg-(--espresso) px-3 py-2 text-sm font-semibold text-(--surface)">
-						{locale === "id" ? "Terapkan" : "Apply"}
-					</button>
-				</div>
-			</form>
-
-			<div className="flex flex-wrap items-center gap-2">
-				<span className="text-xs font-semibold text-(--muted)">{locale === "id" ? "Tag populer:" : "Popular tags:"}</span>
-				{popularTags.map((popularTag) => (
-					<Link
-						key={popularTag}
-						href={`/forum/f/${subforum.slug}${buildQuery({ q, author, sort, from, to, tag: popularTag, page: "1" })}`}
-						className="rounded-full border px-2 py-0.5 text-xs text-(--muted)"
-					>
-						#{popularTag}
-					</Link>
-				))}
-			</div>
+			<ForumSearchControls
+				basePath={`/forum/f/${subforum.slug}`}
+				initialQuery={q}
+				initialTag={tag}
+				initialAuthor={author}
+				initialMinReactions={minReactionsRaw}
+				initialSort={sort}
+				initialFrom={from}
+				initialTo={to}
+				locale={locale}
+				popularTags={popularTags}
+			/>
 
 			<section className="space-y-3">
 				{threadRows.map((thread) => {
@@ -393,6 +371,7 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 						q,
 						tag,
 						author,
+						minReactions: minReactionsRaw,
 						from,
 						to,
 						sort,

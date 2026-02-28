@@ -63,6 +63,7 @@ export async function GET(request: Request) {
 
 	const fromIndex = (queryParams.page - 1) * queryParams.perPage;
 	const toIndex = fromIndex + queryParams.perPage - 1;
+	const needsComputedSort = queryParams.sort === "most_reacted" || queryParams.sort === "most_discussed";
 
 	let query = supabase
 		.from("forum_threads")
@@ -106,7 +107,9 @@ export async function GET(request: Request) {
 		query = query.order("is_pinned", { ascending: false }).order("updated_at", { ascending: false });
 	}
 
-	query = query.range(fromIndex, toIndex);
+	if (!needsComputedSort) {
+		query = query.range(fromIndex, toIndex);
+	}
 
 	const { data, count, error } = await query;
 
@@ -115,7 +118,7 @@ export async function GET(request: Request) {
 	}
 
 	let rows = data ?? [];
-	if ((queryParams.sort === "most_reacted" || queryParams.sort === "most_discussed") && rows.length > 0) {
+	if (needsComputedSort && rows.length > 0) {
 		const threadIds = rows.map((row) => row.id);
 		const [{ data: reactions }, { data: comments }] = await Promise.all([
 			queryParams.sort === "most_reacted"
@@ -136,10 +139,17 @@ export async function GET(request: Request) {
 		}
 		rows = [...rows].sort((left, right) => {
 			if (queryParams.sort === "most_reacted") {
-				return (reactionCountMap.get(right.id) ?? 0) - (reactionCountMap.get(left.id) ?? 0);
+				const reactionDiff = (reactionCountMap.get(right.id) ?? 0) - (reactionCountMap.get(left.id) ?? 0);
+				if (reactionDiff !== 0) return reactionDiff;
+				if (left.is_pinned !== right.is_pinned) return right.is_pinned ? 1 : -1;
+				return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
 			}
-			return (commentCountMap.get(right.id) ?? 0) - (commentCountMap.get(left.id) ?? 0);
+			const commentDiff = (commentCountMap.get(right.id) ?? 0) - (commentCountMap.get(left.id) ?? 0);
+			if (commentDiff !== 0) return commentDiff;
+			if (left.is_pinned !== right.is_pinned) return right.is_pinned ? 1 : -1;
+			return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
 		});
+		rows = rows.slice(fromIndex, toIndex + 1);
 	}
 
 	return apiOk({

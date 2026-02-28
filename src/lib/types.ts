@@ -71,6 +71,7 @@ export interface Profile {
 	status: UserStatus;
 	is_profile_private: boolean;
 	show_online_status: boolean;
+	dm_privacy: "everyone" | "verified_only" | "nobody";
 	last_active_at: string | null;
 }
 
@@ -300,4 +301,61 @@ export interface UserBadgeRecord {
 	awarded_at: string;
 	awarded_by: string | null;
 	metadata: Record<string, unknown>;
+}
+
+export interface DmConversationRecord {
+	id: string;
+	conversation_type: "direct" | "group";
+	direct_key: string | null;
+	created_by: string;
+	last_message_id: string | null;
+	last_message_at: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface DmParticipantRecord {
+	conversation_id: string;
+	user_id: string;
+	joined_at: string;
+	last_seen_at: string | null;
+	last_read_at: string | null;
+	archived_at: string | null;
+	muted_until: string | null;
+}
+
+export interface DmMessageRecord {
+	id: string;
+	conversation_id: string;
+	sender_id: string;
+	body_html: string;
+	body_text: string;
+	edited_at: string | null;
+	created_at: string;
+}
+
+export interface DmMessageAttachmentRecord {
+	id: string;
+	message_id: string;
+	bucket: string;
+	storage_path: string;
+	public_url: string;
+	mime_type: string;
+	size_bytes: number;
+	metadata: Record<string, unknown>;
+	created_at: string;
+}
+
+export interface DmReportRecord {
+	id: string;
+	reporter_id: string;
+	conversation_id: string;
+	message_id: string;
+	reason: string;
+	detail: string | null;
+	status: "open" | "resolved" | "dismissed";
+	assignee_id: string | null;
+	resolution_note: string | null;
+	created_at: string;
+	updated_at: string;
 }

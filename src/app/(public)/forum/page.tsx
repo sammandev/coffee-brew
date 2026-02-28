@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ForumBreadcrumbs } from "@/components/forum/forum-breadcrumbs";
 import { ForumLiveAutoRefresh } from "@/components/forum/forum-live-auto-refresh";
+import { ForumSearchControls } from "@/components/forum/forum-search-controls";
 import { ThreadComposerModal } from "@/components/forum/thread-composer-modal";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getSessionContext } from "@/lib/auth";
@@ -41,6 +42,13 @@ interface ThreadRow {
 export default async function ForumPage({ searchParams }: ForumPageProps) {
 	const [{ locale, t }, session, params] = await Promise.all([getServerI18n(), getSessionContext(), searchParams]);
 	const q = firstParam(params.q).trim().toLowerCase();
+	const tag = firstParam(params.tag).trim().toLowerCase();
+	const author = firstParam(params.author).trim().toLowerCase();
+	const from = firstParam(params.from).trim();
+	const to = firstParam(params.to).trim();
+	const minReactionsRaw = firstParam(params.minReactions).trim();
+	const sort = firstParam(params.sort).trim() || "latest";
+	const minReactions = Number.isFinite(Number(minReactionsRaw)) ? Math.max(0, Number(minReactionsRaw)) : 0;
 	const supabase = createSupabaseAdminClient();
 
 	const [{ data: categories }, { data: subforums }, { data: threads }] = await Promise.all([
@@ -134,9 +142,56 @@ export default async function ForumPage({ searchParams }: ForumPageProps) {
 		threadCountBySubforum.set(thread.subforum_id, (threadCountBySubforum.get(thread.subforum_id) ?? 0) + 1);
 	}
 
+	const tagCounts = new Map<string, number>();
+	for (const thread of threadRows) {
+		for (const rawTag of thread.tags ?? []) {
+			const normalized = String(rawTag ?? "")
+				.trim()
+				.toLowerCase();
+			if (!normalized) continue;
+			tagCounts.set(normalized, (tagCounts.get(normalized) ?? 0) + 1);
+		}
+	}
+	const popularTags = Array.from(tagCounts.entries())
+		.sort((left, right) => right[1] - left[1])
+		.slice(0, 12)
+		.map(([value]) => value);
+
 	const filteredThreads = threadRows.filter((thread) => {
-		if (!q) return true;
-		return `${thread.title} ${clampPlainText(thread.content, 8000)}`.toLowerCase().includes(q);
+		if (q && !`${thread.title} ${clampPlainText(thread.content, 8000)}`.toLowerCase().includes(q)) return false;
+		if (tag && !(thread.tags ?? []).some((row) => row.trim().toLowerCase() === tag)) return false;
+		if (author) {
+			const authorInfo = authorById.get(thread.author_id);
+			const authorName = (authorInfo?.name || "").toLowerCase();
+			if (!authorName.includes(author)) return false;
+		}
+		if (from && new Date(thread.created_at).getTime() < new Date(from).getTime()) return false;
+		if (to && new Date(thread.created_at).getTime() > new Date(to).getTime()) return false;
+		if (minReactions > 0) {
+			const count = (reactionRowsByThreadId.get(thread.id) ?? []).length;
+			if (count < minReactions) return false;
+		}
+		return true;
+	});
+
+	const sortedThreads = [...filteredThreads].sort((left, right) => {
+		const leftReactionCount = (reactionRowsByThreadId.get(left.id) ?? []).length;
+		const rightReactionCount = (reactionRowsByThreadId.get(right.id) ?? []).length;
+		const leftCommentCount = commentCountByThreadId.get(left.id) ?? 0;
+		const rightCommentCount = commentCountByThreadId.get(right.id) ?? 0;
+
+		if (sort === "oldest") {
+			return new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
+		}
+		if (sort === "most_reacted") {
+			if (rightReactionCount !== leftReactionCount) return rightReactionCount - leftReactionCount;
+			return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
+		}
+		if (sort === "most_discussed") {
+			if (rightCommentCount !== leftCommentCount) return rightCommentCount - leftCommentCount;
+			return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
+		}
+		return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
 	});
 
 	return (
@@ -171,20 +226,17 @@ export default async function ForumPage({ searchParams }: ForumPageProps) {
 					)}
 				</div>
 				<p className="text-(--muted)">{t("forum.subtitle")}</p>
-				<form action="/forum" className="flex items-center gap-2">
-					<input
-						name="q"
-						defaultValue={q}
-						placeholder={locale === "id" ? "Cari thread terbaru..." : "Search recent threads..."}
-						className="h-9 w-full rounded-lg border border-(--border) bg-(--surface) px-3 text-sm"
-					/>
-					<button
-						type="submit"
-						className="h-9 rounded-lg border border-(--border) bg-(--surface-elevated) px-3 text-sm font-semibold"
-					>
-						{locale === "id" ? "Cari" : "Search"}
-					</button>
-				</form>
+				<ForumSearchControls
+					initialQuery={q}
+					initialTag={tag}
+					initialAuthor={author}
+					initialMinReactions={minReactionsRaw}
+					initialSort={sort}
+					initialFrom={from}
+					initialTo={to}
+					locale={locale}
+					popularTags={popularTags}
+				/>
 			</header>
 
 			<section className="space-y-3">
@@ -228,7 +280,7 @@ export default async function ForumPage({ searchParams }: ForumPageProps) {
 					{locale === "id" ? "Aktivitas Terbaru" : "Recent Activity"}
 				</h2>
 				<div className="space-y-3">
-					{filteredThreads.map((thread) => {
+					{sortedThreads.map((thread) => {
 						const reactionCounts = buildReactionCountMap(reactionRowsByThreadId.get(thread.id) ?? []);
 						const author = authorById.get(thread.author_id) ?? { name: "Unknown User", verified: false, karma: 0 };
 						return (

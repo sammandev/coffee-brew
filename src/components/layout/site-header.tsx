@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { MobileNavMenu } from "@/components/layout/mobile-nav-menu";
 import { NavLinks } from "@/components/layout/nav-links";
+import { NavbarMessages } from "@/components/layout/navbar-messages";
 import { NavbarNotifications } from "@/components/layout/navbar-notifications";
 import { PreferenceControls } from "@/components/layout/preference-controls";
 import { UserProfileMenu } from "@/components/layout/user-profile-menu";
@@ -76,6 +77,7 @@ export async function SiteHeader() {
 						</>
 					) : (
 						<>
+							<NavbarMessages userId={user.id} />
 							<NavbarNotifications userId={user.id} />
 							<UserProfileMenu
 								accountRole={role}

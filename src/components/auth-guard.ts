@@ -1,4 +1,4 @@
-import { forbidden, redirect, unauthorized } from "next/navigation";
+import { forbidden, redirect } from "next/navigation";
 import { getSessionContext } from "@/lib/auth";
 import type { Role } from "@/lib/types";
 
@@ -26,7 +26,7 @@ export async function requireRole(options: RequireRoleOptions = {}) {
 			redirect("/login");
 		}
 
-		unauthorized();
+		redirect("/401");
 	}
 
 	if (context.status !== "active") {

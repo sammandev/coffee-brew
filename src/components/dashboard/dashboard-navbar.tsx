@@ -1,6 +1,7 @@
 import { ArrowUpRight, PanelLeft, PanelLeftClose } from "lucide-react";
 import Link from "next/link";
 import { DashboardMobileMenu } from "@/components/dashboard/dashboard-mobile-menu";
+import { NavbarMessages } from "@/components/layout/navbar-messages";
 import { NavbarNotifications } from "@/components/layout/navbar-notifications";
 import { PreferenceControls } from "@/components/layout/preference-controls";
 import { UserProfileMenu } from "@/components/layout/user-profile-menu";
@@ -64,6 +65,7 @@ export function DashboardNavbar({
 						<ArrowUpRight size={14} />
 					</Link>
 					<PreferenceControls />
+					<NavbarMessages userId={userId} />
 					<NavbarNotifications userId={userId} />
 					<UserProfileMenu
 						accountRole={role}

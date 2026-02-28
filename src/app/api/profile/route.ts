@@ -33,6 +33,9 @@ export async function PATCH(request: Request) {
 	if (typeof parsed.data.show_online_status === "boolean") {
 		patch.show_online_status = parsed.data.show_online_status;
 	}
+	if (typeof parsed.data.dm_privacy === "string") {
+		patch.dm_privacy = parsed.data.dm_privacy;
+	}
 
 	if (Object.keys(patch).length === 0) {
 		return apiError("No fields to update", 400);
@@ -54,7 +57,7 @@ export async function PATCH(request: Request) {
 		.from("profiles")
 		.update(patch)
 		.eq("id", session.userId)
-		.select("display_name, mention_handle, is_profile_private, show_online_status")
+		.select("display_name, mention_handle, is_profile_private, show_online_status, dm_privacy")
 		.single();
 
 	if (error) {
@@ -67,5 +70,6 @@ export async function PATCH(request: Request) {
 		mention_handle: data.mention_handle,
 		is_profile_private: data.is_profile_private,
 		show_online_status: data.show_online_status,
+		dm_privacy: data.dm_privacy,
 	});
 }

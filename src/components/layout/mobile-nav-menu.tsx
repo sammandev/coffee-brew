@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from "react";
 import { NavLinks } from "@/components/layout/nav-links";
+import { NavbarMessages } from "@/components/layout/navbar-messages";
 import { NavbarNotifications } from "@/components/layout/navbar-notifications";
 import { PreferenceControls } from "@/components/layout/preference-controls";
 import type { SiteNavLink } from "@/lib/types";
@@ -98,6 +99,9 @@ export function MobileNavMenu({
 					</div>
 					{isAuthenticated && userId ? (
 						<div className="mb-3">
+							<div className="mb-2" onClickCapture={onNavClickCapture}>
+								<NavbarMessages userId={userId} mobile />
+							</div>
 							<NavbarNotifications userId={userId} mobile />
 						</div>
 					) : null}

@@ -1,5 +1,6 @@
 import { ProfileAvatarForm } from "@/components/forms/profile-avatar-form";
 import { ProfileDisplayNameForm } from "@/components/forms/profile-display-name-form";
+import { ProfileDmPreferencesForm } from "@/components/forms/profile-dm-preferences-form";
 import { ProfileNewsletterForm } from "@/components/forms/profile-newsletter-form";
 import { ProfilePasswordForm } from "@/components/forms/profile-password-form";
 import { ProfileVisibilityForm } from "@/components/forms/profile-visibility-form";
@@ -18,6 +19,7 @@ interface ProfileSettingsPanelProps {
 	publicProfileHref: string;
 	showOnlineStatus: boolean;
 	isProfilePrivate: boolean;
+	dmPrivacy: "everyone" | "verified_only" | "nobody";
 	status: string;
 }
 
@@ -30,6 +32,7 @@ export function ProfileSettingsPanel({
 	publicProfileHref,
 	showOnlineStatus,
 	isProfilePrivate,
+	dmPrivacy,
 	status,
 }: ProfileSettingsPanelProps) {
 	return (
@@ -56,6 +59,7 @@ export function ProfileSettingsPanel({
 				initialShowOnlineStatus={showOnlineStatus}
 				publicProfileHref={publicProfileHref}
 			/>
+			<ProfileDmPreferencesForm initialDmPrivacy={dmPrivacy} />
 
 			<ProfilePasswordForm />
 			<ProfileNewsletterForm email={email} subscribed={newsletterSubscribed} />

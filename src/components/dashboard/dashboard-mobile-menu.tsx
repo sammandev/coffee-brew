@@ -4,6 +4,7 @@ import { Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { NavbarMessages } from "@/components/layout/navbar-messages";
 import { NavbarNotifications } from "@/components/layout/navbar-notifications";
 import { PreferenceControls } from "@/components/layout/preference-controls";
 
@@ -80,6 +81,9 @@ export function DashboardMobileMenu({ locale, userId }: DashboardMobileMenuProps
 							<PreferenceControls />
 						</div>
 						<div className="mb-3">
+							<div className="mb-2">
+								<NavbarMessages userId={userId} mobile />
+							</div>
 							<NavbarNotifications userId={userId} mobile />
 						</div>
 						<div className="border-t border-(--border) pt-3">
