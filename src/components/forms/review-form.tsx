@@ -5,8 +5,8 @@ import { useState } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 
 const scoreOptions = [1, 2, 3, 4, 5];
 
@@ -14,10 +14,13 @@ export function ReviewForm({ brewId }: { brewId: string }) {
 	const { locale } = useAppPreferences();
 	const router = useRouter();
 	const [error, setError] = useState<string | null>(null);
+	const [notes, setNotes] = useState("");
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setError(null);
+		setIsSubmitting(true);
 		const formData = new FormData(event.currentTarget);
 
 		const payload = {
@@ -35,14 +38,17 @@ export function ReviewForm({ brewId }: { brewId: string }) {
 				"Content-Type": "application/json",
 			},
 			body: JSON.stringify(payload),
-		});
+		}).catch(() => null);
 
-		if (!response.ok) {
-			const body = (await response.json()) as { error?: string };
-			setError(body.error ?? "Unable to submit review");
+		if (!response?.ok) {
+			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
+			setError(body?.error ?? "Unable to submit review");
+			setIsSubmitting(false);
 			return;
 		}
 
+		setNotes("");
+		setIsSubmitting(false);
 		router.refresh();
 	}
 
@@ -75,20 +81,25 @@ export function ReviewForm({ brewId }: { brewId: string }) {
 
 			<div>
 				<Label htmlFor="notes">{locale === "id" ? "Catatan" : "Notes"}</Label>
-				<Textarea
-					id="notes"
-					name="notes"
-					placeholder={
-						locale === "id"
-							? "Catatan rasa, aftertaste, dan penyesuaian seduh..."
-							: "Flavor notes, aftertaste, brewing tweaks..."
-					}
-				/>
+				<RichTextEditor id="notes" name="notes" value={notes} onChange={setNotes} maxPlainTextLength={2000} />
+				<p className="mt-2 text-xs text-(--muted)">
+					{locale === "id"
+						? "Catatan rasa, aftertaste, dan penyesuaian seduh..."
+						: "Flavor notes, aftertaste, brewing tweaks..."}
+				</p>
 			</div>
 
 			{error && <p className="text-sm text-(--danger)">{error}</p>}
 			<div className="flex justify-end">
-				<Button type="submit">{locale === "id" ? "Kirim Review" : "Submit Review"}</Button>
+				<Button type="submit" disabled={isSubmitting}>
+					{isSubmitting
+						? locale === "id"
+							? "Mengirim..."
+							: "Submitting..."
+						: locale === "id"
+							? "Kirim Review"
+							: "Submit Review"}
+				</Button>
 			</div>
 		</form>
 	);

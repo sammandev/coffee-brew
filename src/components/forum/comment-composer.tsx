@@ -4,20 +4,29 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 
-export function CommentComposer({ threadId }: { threadId: string }) {
-	const { t, locale } = useAppPreferences();
+interface CommentComposerProps {
+	threadId: string;
+	parentCommentId?: string | null;
+	placeholder?: string;
+	submitLabel?: string;
+}
+
+export function CommentComposer({ threadId, parentCommentId = null, placeholder, submitLabel }: CommentComposerProps) {
+	const { locale, t } = useAppPreferences();
 	const router = useRouter();
 	const [error, setError] = useState<string | null>(null);
+	const [content, setContent] = useState("");
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setError(null);
-
-		const formData = new FormData(event.currentTarget);
+		setIsSubmitting(true);
 		const payload = {
-			content: String(formData.get("content") ?? ""),
+			content,
+			parentCommentId,
 		};
 
 		const response = await fetch(`/api/forum/threads/${threadId}/comments`, {
@@ -26,29 +35,36 @@ export function CommentComposer({ threadId }: { threadId: string }) {
 				"Content-Type": "application/json",
 			},
 			body: JSON.stringify(payload),
-		});
+		}).catch(() => null);
 
-		if (!response.ok) {
-			const body = (await response.json()) as { error?: string };
-			setError(body.error ?? "Could not post comment");
+		if (!response?.ok) {
+			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
+			setError(body?.error ?? "Could not post comment");
+			setIsSubmitting(false);
 			return;
 		}
 
-		event.currentTarget.reset();
+		setContent("");
+		setIsSubmitting(false);
 		router.refresh();
 	}
 
 	return (
 		<form onSubmit={onSubmit} className="grid gap-3 rounded-3xl border bg-(--surface-elevated) p-5">
-			<Textarea
+			<RichTextEditor
 				name="content"
-				placeholder={locale === "id" ? "Bagikan pandanganmu tentang seduhan ini..." : "Share your brew thoughts..."}
-				required
+				value={content}
+				onChange={setContent}
+				minPlainTextLength={1}
+				maxPlainTextLength={3000}
 			/>
+			<p className="text-xs text-(--muted)">
+				{placeholder ?? (locale === "id" ? "Bagikan pandanganmu tentang seduhan ini..." : "Share your brew thoughts...")}
+			</p>
 			{error && <p className="text-sm text-(--danger)">{error}</p>}
 			<div className="flex justify-end">
-				<Button type="submit" size="sm">
-					{t("common.reply")}
+				<Button type="submit" size="sm" disabled={isSubmitting}>
+					{isSubmitting ? (locale === "id" ? "Mengirim..." : "Sending...") : (submitLabel ?? t("common.reply"))}
 				</Button>
 			</div>
 		</form>

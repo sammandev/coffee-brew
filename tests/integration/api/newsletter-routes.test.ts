@@ -21,8 +21,8 @@ vi.mock("@/lib/auth", () => ({
 	getSessionContext: () => mockGetSessionContext(),
 }));
 
-vi.mock("@/lib/supabase/server", () => ({
-	createSupabaseServerClient: async () => ({
+vi.mock("@/lib/supabase/admin", () => ({
+	createSupabaseAdminClient: () => ({
 		from: mockFrom,
 	}),
 }));

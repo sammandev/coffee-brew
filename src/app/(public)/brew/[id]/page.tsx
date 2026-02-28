@@ -1,8 +1,11 @@
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ReviewForm } from "@/components/forms/review-form";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { RichTextContent } from "@/components/ui/rich-text-content";
 import { getSessionContext } from "@/lib/auth";
+import { resolveBrewImageUrl } from "@/lib/brew-images";
 import { getServerI18n } from "@/lib/i18n/server";
 import { getBrewDetail } from "@/lib/queries";
 import { formatDate } from "@/lib/utils";
@@ -24,6 +27,19 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 					{locale === "id" ? "Oleh" : "By"} {brew.brewer_name}
 				</p>
 			</header>
+
+			<div className="overflow-hidden rounded-3xl border bg-[var(--surface-elevated)]">
+				<div className="relative aspect-[16/7] w-full">
+					<Image
+						src={resolveBrewImageUrl(brew.image_url)}
+						alt={brew.image_alt || brew.name}
+						fill
+						priority
+						sizes="100vw"
+						className="object-cover"
+					/>
+				</div>
+			</div>
 
 			<div className="grid gap-4 md:grid-cols-2">
 				<Card>
@@ -55,7 +71,7 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 							{locale === "id" ? "Diperbarui" : "Updated"}: {formatDate(brew.updated_at, locale)}
 						</li>
 					</ul>
-					{brew.notes && <p className="mt-4 whitespace-pre-wrap text-sm text-[var(--foreground)]/90">{brew.notes}</p>}
+					{brew.notes ? <RichTextContent html={brew.notes} className="mt-4 text-sm" /> : null}
 				</Card>
 
 				<Card>
@@ -86,7 +102,7 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 							Acidity {review.acidity}/5 · Sweetness {review.sweetness}/5 · Body {review.body}/5 · Aroma {review.aroma}
 							/5 · Balance {review.balance}/5
 						</p>
-						{review.notes && <p className="mt-2 text-sm text-[var(--foreground)]/90">{review.notes}</p>}
+						{review.notes ? <RichTextContent html={review.notes} className="mt-2 text-sm" /> : null}
 						<p className="mt-3 text-xs text-[var(--muted)]">
 							{locale === "id" ? "Diperbarui" : "Updated"} {formatDate(review.updated_at, locale)}
 						</p>

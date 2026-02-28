@@ -3,6 +3,7 @@ import { Fraunces, Manrope } from "next/font/google";
 import Script from "next/script";
 import { AppPreferencesProvider } from "@/components/providers/app-preferences-provider";
 import { getServerPreferences } from "@/lib/i18n/server";
+import { getSiteSettings } from "@/lib/site-settings";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -15,18 +16,23 @@ const manrope = Manrope({
 	subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-	title: {
-		default: "Coffee Brew",
-		template: "%s | Coffee Brew",
-	},
-	description: "Coffee brew recipes, catalog, community, and reviews.",
-	icons: {
-		icon: "/coffee-brew-mark.svg",
-		shortcut: "/coffee-brew-mark.svg",
-		apple: "/coffee-brew-mark.svg",
-	},
-};
+export async function generateMetadata(): Promise<Metadata> {
+	const settings = await getSiteSettings();
+	const baseTitle = settings.tab_title.trim().length > 0 ? settings.tab_title : settings.app_name;
+
+	return {
+		title: {
+			default: baseTitle,
+			template: `%s | ${baseTitle}`,
+		},
+		description: "Coffee brew recipes, catalog, community, and reviews.",
+		icons: {
+			icon: "/coffee-brew-mark.svg",
+			shortcut: "/coffee-brew-mark.svg",
+			apple: "/coffee-brew-mark.svg",
+		},
+	};
+}
 
 function getThemeBootstrapScript() {
 	return `

@@ -39,15 +39,21 @@ export async function updateUserStatus(params: {
 		return { ok: false, error: error.message };
 	}
 
-	await logAuditEvent({
-		actorId: params.actorId,
-		action: `users.${params.status}`,
-		targetType: "user",
-		targetId: params.targetUserId,
-		metadata: { reason: params.reason },
-	});
+	try {
+		await logAuditEvent({
+			actorId: params.actorId,
+			action: `users.${params.status}`,
+			targetType: "user",
+			targetId: params.targetUserId,
+			metadata: { reason: params.reason },
+		});
+	} catch {
+		// Keep status update successful even if audit logging fails.
+	}
 
-	await sendStatusEmail(targetProfile.email, params.status, params.reason);
+	if (targetProfile.email) {
+		await sendStatusEmail(targetProfile.email, params.status, params.reason).catch(() => null);
+	}
 
 	return { ok: true };
 }
@@ -55,17 +61,21 @@ export async function updateUserStatus(params: {
 export async function deleteUserLifecycle(params: { actorId: string; targetUserId: string; reason?: string }) {
 	const supabase = await createSupabaseServerClient();
 
-	const { data: profile } = await supabase
+	const { data: profile, error: profileError } = await supabase
 		.from("profiles")
 		.select("id, email, display_name, status")
 		.eq("id", params.targetUserId)
 		.maybeSingle();
 
+	if (profileError) {
+		return { ok: false, error: profileError.message };
+	}
+
 	if (!profile) {
 		return { ok: false, error: "User not found" };
 	}
 
-	await supabase.from("deleted_users_archive").insert({
+	const { error: archiveError } = await supabase.from("deleted_users_archive").insert({
 		user_id: profile.id,
 		email: profile.email,
 		display_name: profile.display_name,
@@ -74,18 +84,33 @@ export async function deleteUserLifecycle(params: { actorId: string; targetUserI
 		reason: params.reason ?? null,
 	});
 
-	await supabase.from("user_roles").delete().eq("user_id", params.targetUserId);
-	await supabase.from("profiles").delete().eq("id", params.targetUserId);
+	if (archiveError) {
+		return { ok: false, error: archiveError.message };
+	}
 
-	await logAuditEvent({
-		actorId: params.actorId,
-		action: "users.delete",
-		targetType: "user",
-		targetId: params.targetUserId,
-		metadata: { reason: params.reason },
-	});
+	const { error: roleDeleteError } = await supabase.from("user_roles").delete().eq("user_id", params.targetUserId);
+	if (roleDeleteError) {
+		return { ok: false, error: roleDeleteError.message };
+	}
 
-	await sendStatusEmail(profile.email, "deleted", params.reason);
+	const { error: profileDeleteError } = await supabase.from("profiles").delete().eq("id", params.targetUserId);
+	if (profileDeleteError) {
+		return { ok: false, error: profileDeleteError.message };
+	}
+
+	try {
+		await logAuditEvent({
+			actorId: params.actorId,
+			action: "users.delete",
+			targetType: "user",
+			targetId: params.targetUserId,
+			metadata: { reason: params.reason },
+		});
+	} catch {
+		// Keep lifecycle action successful even if audit logging fails.
+	}
+
+	await sendStatusEmail(profile.email, "deleted", params.reason).catch(() => null);
 
 	return { ok: true };
 }
@@ -96,7 +121,11 @@ async function sendStatusEmail(to: string, status: "blocked" | "disabled" | "del
 		eventType: "account_status",
 		subject: `Your Coffee Brew account status changed (${status})`,
 		html: `<p>Your account status is now <strong>${status}</strong>.</p><p>${reason ?? "No reason provided."}</p>`,
-	});
+	}).catch(() => ({
+		delivered: false,
+		providerId: null,
+		reason: "Transactional provider error",
+	}));
 
 	await logTransactionalEmailEvent({
 		toEmail: to,
@@ -105,5 +134,5 @@ async function sendStatusEmail(to: string, status: "blocked" | "disabled" | "del
 		providerMessageId: response.providerId,
 		status: response.delivered ? "sent" : "failed",
 		failureReason: response.reason,
-	});
+	}).catch(() => null);
 }

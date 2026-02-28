@@ -16,8 +16,9 @@ export function FaqForm() {
 	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setError(null);
+		const form = event.currentTarget;
 
-		const formData = new FormData(event.currentTarget);
+		const formData = new FormData(form);
 
 		const payload = {
 			question_en: String(formData.get("question_en") ?? ""),
@@ -40,7 +41,7 @@ export function FaqForm() {
 			return;
 		}
 
-		event.currentTarget.reset();
+		form.reset();
 		router.refresh();
 	}
 

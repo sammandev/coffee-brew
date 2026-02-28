@@ -90,7 +90,14 @@ for (let index = 0; index < extraArgs.length; index += 1) {
 		continue;
 	}
 
-	if (arg.startsWith("--output=") || arg.startsWith("--profile=") || arg.startsWith("--dns-resolver=") || arg.startsWith("--network-id=") || arg.startsWith("--workdir=") || arg.startsWith("-o=")) {
+	if (
+		arg.startsWith("--output=") ||
+		arg.startsWith("--profile=") ||
+		arg.startsWith("--dns-resolver=") ||
+		arg.startsWith("--network-id=") ||
+		arg.startsWith("--workdir=") ||
+		arg.startsWith("-o=")
+	) {
 		globalArgs.push(arg);
 		continue;
 	}
@@ -98,7 +105,8 @@ for (let index = 0; index < extraArgs.length; index += 1) {
 	commandArgs.push(arg);
 }
 
-const commandText = `"${cli}" ${globalArgs.join(" ")} ${command.join(" ")} --db-url "${dbUrl}" ${commandArgs.join(" ")}`.trim();
+const commandText =
+	`"${cli}" ${globalArgs.join(" ")} ${command.join(" ")} --db-url "${dbUrl}" ${commandArgs.join(" ")}`.trim();
 const result = spawnSync(commandText, { stdio: "inherit", shell: true });
 
 if (result.error) {

@@ -14,7 +14,9 @@ export const brewSchema = z.object({
 	grindClicks: z.number().int().min(0).max(200).nullable().optional(),
 	brewTimeSeconds: z.number().int().min(10).max(7200),
 	brewerName: z.string().trim().min(2).max(120),
-	notes: z.string().trim().max(5000).optional(),
+	notes: z.string().trim().max(30000).optional(),
+	imageUrl: z.string().trim().url().max(2000).nullable().optional(),
+	imageAlt: z.string().trim().max(200).nullable().optional(),
 	status: z.enum(["draft", "published", "hidden"]).default("draft"),
 });
 
@@ -24,7 +26,7 @@ export const reviewSchema = z.object({
 	body: z.number().int().min(1).max(5),
 	aroma: z.number().int().min(1).max(5),
 	balance: z.number().int().min(1).max(5),
-	notes: z.string().trim().max(2000).optional(),
+	notes: z.string().trim().max(15000).optional(),
 });
 
 export const localizedConfigSchema = z.record(z.string(), z.unknown()).default({});
@@ -54,11 +56,13 @@ export const faqItemSchema = z.object({
 
 export const forumThreadSchema = z.object({
 	title: z.string().trim().min(4).max(180),
-	content: z.string().trim().min(4).max(6000),
+	content: z.string().trim().min(4).max(30000),
+	tags: z.array(z.string().trim().min(1).max(32)).max(10).optional().default([]),
 });
 
 export const forumCommentSchema = z.object({
-	content: z.string().trim().min(1).max(3000),
+	content: z.string().trim().min(1).max(15000),
+	parentCommentId: z.string().uuid().nullable().optional(),
 });
 
 export const forumReactionSchema = z
@@ -98,6 +102,69 @@ export const rbacUpdateSchema = z.object({
 
 export const userActionSchema = z.object({
 	reason: z.string().trim().max(300).optional(),
+});
+
+export const blogPostSchema = z.object({
+	slug: z
+		.string()
+		.trim()
+		.min(3)
+		.max(140)
+		.regex(/^[a-z0-9-]+$/, "Slug must contain lowercase letters, numbers, or hyphens"),
+	title_en: z.string().trim().min(3).max(180),
+	title_id: z.string().trim().min(3).max(180),
+	excerpt_en: z.string().trim().min(3).max(6000),
+	excerpt_id: z.string().trim().min(3).max(6000),
+	body_en: z.string().trim().min(10).max(180000),
+	body_id: z.string().trim().min(10).max(180000),
+	hero_image_url: z.string().trim().url(),
+	hero_image_alt_en: z.string().trim().min(2).max(200),
+	hero_image_alt_id: z.string().trim().min(2).max(200),
+	tags: z.array(z.string().trim().min(1).max(40)).max(12).default([]),
+	reading_time_minutes: z.number().int().min(1).max(240).default(3),
+	status: z.enum(["draft", "published", "hidden"]).default("draft"),
+	published_at: z.string().datetime().nullable().optional(),
+});
+
+export const siteSettingsSchema = z.object({
+	app_name: z.string().trim().min(2).max(80),
+	tab_title: z.string().trim().min(2).max(80),
+	home_title_en: z.string().trim().max(180).nullable().optional(),
+	home_title_id: z.string().trim().max(180).nullable().optional(),
+	home_subtitle_en: z.string().trim().max(600).nullable().optional(),
+	home_subtitle_id: z.string().trim().max(600).nullable().optional(),
+	navbar_links: z
+		.array(
+			z.object({
+				href: z.string().trim().regex(/^\//),
+				label_en: z.string().trim().min(1).max(80),
+				label_id: z.string().trim().min(1).max(80),
+				is_visible: z.boolean(),
+			}),
+		)
+		.max(20),
+	footer_tagline_en: z.string().trim().min(2).max(240),
+	footer_tagline_id: z.string().trim().min(2).max(240),
+	footer_description_en: z.string().trim().min(2).max(400),
+	footer_description_id: z.string().trim().min(2).max(400),
+	footer_links: z
+		.array(
+			z.object({
+				group: z.enum(["sitemap", "community", "support"]),
+				href: z.string().trim().regex(/^\//),
+				label_en: z.string().trim().min(1).max(80),
+				label_id: z.string().trim().min(1).max(80),
+				is_visible: z.boolean(),
+			}),
+		)
+		.max(40),
+	enable_google_login: z.boolean(),
+	enable_magic_link_login: z.boolean(),
+	enable_signup: z.boolean(),
+});
+
+export const profileDisplayNameSchema = z.object({
+	display_name: z.string().trim().min(2).max(120),
 });
 
 export type BrewSchemaInput = z.infer<typeof brewSchema>;

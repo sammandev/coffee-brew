@@ -11,7 +11,9 @@ export async function GET(request: Request) {
 
 	let chain = supabase
 		.from("brews")
-		.select("id, name, brew_method, coffee_beans, brand_roastery, brewer_name, created_at, temperature, water_ppm")
+		.select(
+			"id, name, brew_method, coffee_beans, brand_roastery, brewer_name, image_url, image_alt, created_at, temperature, water_ppm",
+		)
 		.eq("status", "published")
 		.order("created_at", { ascending: false });
 

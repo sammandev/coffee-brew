@@ -33,8 +33,9 @@ describe("PreferenceControls", () => {
 
 	it("changes locale using language selector", () => {
 		render(<PreferenceControls />);
-		const select = screen.getByLabelText("Language");
-		fireEvent.change(select, { target: { value: "id" } });
+		const selector = screen.getByLabelText("Language");
+		fireEvent.click(selector);
+		fireEvent.click(screen.getByRole("button", { name: "ID" }));
 		expect(mockSetLocale).toHaveBeenCalledWith("id");
 	});
 
@@ -43,5 +44,21 @@ describe("PreferenceControls", () => {
 		const button = screen.getByRole("button", { name: /Theme/i });
 		fireEvent.click(button);
 		expect(mockSetThemePreference).toHaveBeenCalledWith("dark");
+	});
+
+	it("creates unique locale select ids across multiple instances", () => {
+		const { container } = render(
+			<>
+				<PreferenceControls />
+				<PreferenceControls />
+			</>,
+		);
+
+		const localeSelects = Array.from(container.querySelectorAll("button[aria-haspopup='listbox']"));
+		const ids = localeSelects.map((element) => element.id);
+		const uniqueIds = new Set(ids);
+
+		expect(localeSelects).toHaveLength(2);
+		expect(uniqueIds.size).toBe(2);
 	});
 });

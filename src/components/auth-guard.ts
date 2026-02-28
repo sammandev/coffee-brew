@@ -1,8 +1,23 @@
-import { redirect } from "next/navigation";
+import { forbidden, redirect } from "next/navigation";
 import { getSessionContext } from "@/lib/auth";
 import type { Role } from "@/lib/types";
 
-export async function requireRole(options: { minRole?: Role; allowAdmin?: boolean; allowSuperuser?: boolean } = {}) {
+interface RequireRoleOptions {
+	exactRole?: Role;
+	minRole?: Role;
+	onUnauthorized?: "redirect" | "forbidden";
+	redirectTo?: string;
+}
+
+function handleUnauthorized(options: RequireRoleOptions) {
+	if (options.onUnauthorized === "forbidden") {
+		forbidden();
+	}
+
+	redirect(options.redirectTo ?? "/dashboard");
+}
+
+export async function requireRole(options: RequireRoleOptions = {}) {
 	const context = await getSessionContext();
 
 	if (!context) {
@@ -13,18 +28,22 @@ export async function requireRole(options: { minRole?: Role; allowAdmin?: boolea
 		redirect("/login?reason=blocked");
 	}
 
+	if (options.exactRole && context.role !== options.exactRole) {
+		handleUnauthorized(options);
+	}
+
 	if (!options.minRole) {
 		return context;
 	}
 
 	if (options.minRole === "admin") {
 		if (context.role !== "admin" && context.role !== "superuser") {
-			redirect("/dashboard");
+			handleUnauthorized(options);
 		}
 	}
 
 	if (options.minRole === "superuser" && context.role !== "superuser") {
-		redirect("/dashboard");
+		handleUnauthorized(options);
 	}
 
 	return context;

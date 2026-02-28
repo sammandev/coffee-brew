@@ -17,8 +17,9 @@ export function LandingSectionForm() {
 	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setError(null);
+		const form = event.currentTarget;
 
-		const formData = new FormData(event.currentTarget);
+		const formData = new FormData(form);
 
 		const payload = {
 			section_type: String(formData.get("section_type")),
@@ -56,7 +57,7 @@ export function LandingSectionForm() {
 			return;
 		}
 
-		event.currentTarget.reset();
+		form.reset();
 		router.refresh();
 	}
 

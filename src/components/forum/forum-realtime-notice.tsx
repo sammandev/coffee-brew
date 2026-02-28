@@ -31,7 +31,7 @@ export function ForumRealtimeNotice() {
 	if (!live) return null;
 
 	return (
-		<div className="mb-4 rounded-2xl border border-[var(--accent)] bg-[var(--accent)]/10 p-3 text-sm text-[var(--accent)]">
+		<div className="mb-4 rounded-2xl border border-(--accent) bg-(--accent)/10 p-3 text-sm text-(--accent)">
 			{t("forum.liveNotice")}{" "}
 			<button type="button" className="underline" onClick={() => router.refresh()}>
 				{t("common.refresh")}

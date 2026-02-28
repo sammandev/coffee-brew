@@ -1,15 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { NavLinks } from "@/components/layout/nav-links";
 import { PreferenceControls } from "@/components/layout/preference-controls";
-import { APP_NAME } from "@/lib/constants";
+import { UserProfileMenu } from "@/components/layout/user-profile-menu";
 import { getServerI18n } from "@/lib/i18n/server";
+import { getSiteSettings } from "@/lib/site-settings";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function SiteHeader() {
 	const supabase = await createSupabaseServerClient();
-	const { t } = await getServerI18n();
+	const [{ t }, settings] = await Promise.all([getServerI18n(), getSiteSettings()]);
 
 	const {
 		data: { user },
@@ -17,7 +17,11 @@ export async function SiteHeader() {
 
 	const [{ data: profile }, roleLookup] = await Promise.all([
 		user
-			? supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle<{ display_name: string | null }>()
+			? supabase
+					.from("profiles")
+					.select("display_name, avatar_url")
+					.eq("id", user.id)
+					.maybeSingle<{ avatar_url: string | null; display_name: string | null }>()
 			: Promise.resolve({ data: null }),
 		user
 			? supabase.rpc("user_role", {
@@ -27,29 +31,19 @@ export async function SiteHeader() {
 	]);
 
 	const role = roleLookup.data ?? "user";
-	const includeDashboard = Boolean(user);
-	const includeAdmin = role === "admin" || role === "superuser";
-	const includeSuperuser = role === "superuser";
-
-	async function signOut() {
-		"use server";
-
-		const serverSupabase = await createSupabaseServerClient();
-		await serverSupabase.auth.signOut();
-		redirect("/");
-	}
+	const displayName = profile?.display_name?.trim() || user?.email?.split("@")[0] || "User";
 
 	return (
-		<header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]/95 shadow-[0_6px_30px_-24px_var(--overlay)] backdrop-blur">
+		<header className="sticky top-0 z-40 border-b border-(--border) bg-(--surface)/95 shadow-[0_6px_30px_-24px_var(--overlay)] backdrop-blur">
 			<div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
 				<div className="flex items-center gap-3">
 					<Link href="/" className="flex items-center gap-2 rounded-full px-1 py-1 transition hover:bg-[var(--sand)]/15">
-						<Image src="/coffee-brew-mark.svg" alt={APP_NAME} width={34} height={34} />
-						<span className="font-heading text-2xl text-[var(--espresso)]">{APP_NAME}</span>
+						<Image src="/coffee-brew-mark.svg" alt={settings.app_name} width={34} height={34} />
+						<span className="font-heading text-2xl text-(--espresso)">{settings.app_name}</span>
 					</Link>
 
-					<nav className="hidden items-center gap-2 text-sm font-medium text-[var(--foreground)] lg:flex">
-						<NavLinks includeDashboard={includeDashboard} includeAdmin={includeAdmin} includeSuperuser={includeSuperuser} />
+					<nav className="hidden items-center gap-2 text-sm font-medium text-foreground lg:flex">
+						<NavLinks baseLinks={settings.navbar_links} />
 					</nav>
 				</div>
 
@@ -60,70 +54,81 @@ export async function SiteHeader() {
 						<>
 							<Link
 								href="/login"
-								className="rounded-full px-4 py-2 text-sm font-semibold text-[var(--espresso)] transition hover:bg-[var(--sand)]/30"
+								className="rounded-full px-4 py-2 text-sm font-semibold text-(--espresso) transition hover:bg-(--sand)/30"
 							>
 								{t("nav.login")}
 							</Link>
-							<Link
-								href="/signup"
-								className="rounded-full bg-[var(--espresso)] px-4 py-2 text-sm font-semibold text-[var(--surface-elevated)] transition hover:opacity-90"
-							>
-								{t("nav.signup")}
-							</Link>
+							{settings.enable_signup && (
+								<Link
+									href="/signup"
+									className="rounded-full bg-(--espresso) px-4 py-2 text-sm font-semibold text-(--surface-elevated) transition hover:opacity-90"
+								>
+									{t("nav.signup")}
+								</Link>
+							)}
 						</>
 					) : (
-						<form action={signOut} className="flex items-center gap-2">
-							<span className="hidden text-xs text-[var(--muted)] xl:inline">{profile?.display_name ?? user.email}</span>
-							<button
-								type="submit"
-								className="rounded-full border px-4 py-2 text-sm font-semibold text-[var(--foreground)] transition hover:bg-[var(--sand)]/30"
-							>
-								{t("nav.signout")}
-							</button>
-						</form>
+						<UserProfileMenu
+							role={role}
+							displayName={displayName}
+							email={user.email ?? ""}
+							avatarUrl={profile?.avatar_url ?? null}
+							labels={{
+								dashboard: t("nav.dashboard"),
+								profileSettings: t("nav.profileSettings"),
+								signOut: t("nav.signout"),
+							}}
+						/>
 					)}
 				</div>
 
-				<details className="relative lg:hidden">
-					<summary className="cursor-pointer list-none rounded-full border px-4 py-2 text-sm font-semibold text-[var(--foreground)]">
-						{t("nav.menu")}
-					</summary>
-					<div className="absolute right-0 top-12 z-50 w-72 rounded-3xl border bg-[var(--surface-elevated)] p-4 shadow-[0_20px_50px_-20px_var(--overlay)]">
-						<div className="mb-3">
-							<PreferenceControls />
-						</div>
-						<nav className="grid gap-2 text-sm">
-							<NavLinks
-								includeDashboard={includeDashboard}
-								includeAdmin={includeAdmin}
-								includeSuperuser={includeSuperuser}
-								mobile
-							/>
-						</nav>
+				<div className="flex items-center gap-2 lg:hidden">
+					{user ? (
+						<UserProfileMenu
+							role={role}
+							displayName={displayName}
+							email={user.email ?? ""}
+							avatarUrl={profile?.avatar_url ?? null}
+							labels={{
+								dashboard: t("nav.dashboard"),
+								profileSettings: t("nav.profileSettings"),
+								signOut: t("nav.signout"),
+							}}
+						/>
+					) : null}
 
-						<div className="mt-3 border-t border-[var(--border)] pt-3">
+					<details className="relative">
+						<summary className="cursor-pointer list-none rounded-lg border px-3 py-1.5 text-sm font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+							{t("nav.menu")}
+						</summary>
+						<div className="absolute right-0 top-11 z-50 w-72 rounded-xl border bg-(--surface-elevated) p-4">
+							<div className="mb-3">
+								<PreferenceControls />
+							</div>
+							<nav className="grid gap-2 text-sm">
+								<NavLinks baseLinks={settings.navbar_links} mobile />
+							</nav>
+
 							{!user ? (
-								<div className="grid grid-cols-2 gap-2">
-									<Link href="/login" className="rounded-full border px-3 py-2 text-center text-sm font-semibold">
-										{t("nav.login")}
-									</Link>
-									<Link
-										href="/signup"
-										className="rounded-full bg-[var(--espresso)] px-3 py-2 text-center text-sm font-semibold text-[var(--surface-elevated)]"
-									>
-										{t("nav.signup")}
-									</Link>
+								<div className="mt-3 border-t border-(--border) pt-3">
+									<div className="grid gap-2" style={{ gridTemplateColumns: settings.enable_signup ? "1fr 1fr" : "1fr" }}>
+										<Link href="/login" className="rounded-lg border px-3 py-2 text-center text-sm font-semibold">
+											{t("nav.login")}
+										</Link>
+										{settings.enable_signup && (
+											<Link
+												href="/signup"
+												className="rounded-lg bg-(--espresso) px-3 py-2 text-center text-sm font-semibold text-(--surface-elevated)"
+											>
+												{t("nav.signup")}
+											</Link>
+										)}
+									</div>
 								</div>
-							) : (
-								<form action={signOut}>
-									<button type="submit" className="w-full rounded-full border px-3 py-2 text-sm font-semibold">
-										{t("nav.signout")}
-									</button>
-								</form>
-							)}
+							) : null}
 						</div>
-					</div>
-				</details>
+					</details>
+				</div>
 			</div>
 		</header>
 	);

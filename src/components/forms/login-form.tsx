@@ -11,7 +11,12 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 type LoginMode = "password" | "magic";
 
-export function LoginForm() {
+interface LoginFormProps {
+	enableGoogleLogin?: boolean;
+	enableMagicLinkLogin?: boolean;
+}
+
+export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = true }: LoginFormProps) {
 	const { t } = useAppPreferences();
 	const router = useRouter();
 	const [mode, setMode] = useState<LoginMode>("password");
@@ -45,15 +50,21 @@ export function LoginForm() {
 				return;
 			}
 
-			router.push("/dashboard");
+			router.push("/session/resolve");
 			router.refresh();
+			return;
+		}
+
+		if (!enableMagicLinkLogin) {
+			setError("Magic link login is disabled.");
+			setIsLoading(false);
 			return;
 		}
 
 		const { error: authError } = await supabase.auth.signInWithOtp({
 			email,
 			options: {
-				emailRedirectTo: `${window.location.origin}/dashboard`,
+				emailRedirectTo: `${window.location.origin}/session/resolve`,
 			},
 		});
 
@@ -75,7 +86,7 @@ export function LoginForm() {
 		const { error: authError } = await supabase.auth.signInWithOAuth({
 			provider: "google",
 			options: {
-				redirectTo: `${window.location.origin}/dashboard`,
+				redirectTo: `${window.location.origin}/session/resolve`,
 			},
 		});
 
@@ -112,19 +123,23 @@ export function LoginForm() {
 					</div>
 				</div>
 
-				<Button
-					type="button"
-					onClick={() => switchMode(mode === "password" ? "magic" : "password")}
-					variant="secondary"
-					disabled={isLoading}
-				>
-					{mode === "password" ? t("auth.continueMagicLink") : t("auth.continuePassword")}
-				</Button>
+				{enableMagicLinkLogin && (
+					<Button
+						type="button"
+						onClick={() => switchMode(mode === "password" ? "magic" : "password")}
+						variant="secondary"
+						disabled={isLoading}
+					>
+						{mode === "password" ? t("auth.continueMagicLink") : t("auth.continuePassword")}
+					</Button>
+				)}
 
-				<Button type="button" onClick={loginWithGoogle} variant="outline" className="gap-2" disabled={isLoading}>
-					<GoogleIcon />
-					{t("auth.continueGoogle")}
-				</Button>
+				{enableGoogleLogin && (
+					<Button type="button" onClick={loginWithGoogle} variant="outline" className="gap-2" disabled={isLoading}>
+						<GoogleIcon />
+						{t("auth.continueGoogle")}
+					</Button>
+				)}
 
 				{success && <p className="text-sm text-(--accent)">{success}</p>}
 				{error && <p className="text-sm text-(--danger)">{error}</p>}

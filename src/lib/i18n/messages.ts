@@ -13,6 +13,7 @@ const en = {
 	"nav.login": "Login",
 	"nav.signup": "Sign Up",
 	"nav.signout": "Sign Out",
+	"nav.profileSettings": "Profile Settings",
 	"nav.menu": "Menu",
 
 	"prefs.language": "Language",
@@ -126,6 +127,7 @@ const id: LocaleMessages = {
 	"nav.login": "Masuk",
 	"nav.signup": "Daftar",
 	"nav.signout": "Keluar",
+	"nav.profileSettings": "Pengaturan Profil",
 	"nav.menu": "Menu",
 
 	"prefs.language": "Bahasa",

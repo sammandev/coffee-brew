@@ -2,6 +2,7 @@ import { apiError, apiOk } from "@/lib/api";
 import { getSessionContext } from "@/lib/auth";
 import { requirePermission } from "@/lib/guards";
 import { toOverallScore } from "@/lib/rating";
+import { sanitizeForStorage, validatePlainTextLength } from "@/lib/rich-text";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { reviewSchema } from "@/lib/validators";
 
@@ -29,10 +30,23 @@ export async function PUT(request: Request, { params }: { params: Promise<{ brew
 	if (permission.response) return permission.response;
 
 	const body = await request.json();
-	const parsed = reviewSchema.safeParse(body);
+	const normalizedBody = (() => {
+		if (!body || typeof body !== "object") return body;
+		const payload = body as Record<string, unknown>;
+		const notes = typeof payload.notes === "string" ? payload.notes : "";
+		return {
+			...payload,
+			notes: sanitizeForStorage(notes),
+		};
+	})();
+	const parsed = reviewSchema.safeParse(normalizedBody);
 
 	if (!parsed.success) {
 		return apiError("Invalid review payload", 400, parsed.error.message);
+	}
+
+	if (!validatePlainTextLength(parsed.data.notes ?? "", { allowEmpty: true, max: 2000 })) {
+		return apiError("Invalid review payload", 400, "Notes must be 2000 characters or fewer.");
 	}
 
 	const supabase = await createSupabaseServerClient();

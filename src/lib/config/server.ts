@@ -6,7 +6,7 @@ import { clientEnv } from "@/lib/config/client";
 const serverEnvSchema = z.object({
 	SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).default("placeholder-service-role"),
 	RESEND_API_KEY: z.string().min(1).optional(),
-	RESEND_FROM_EMAIL: z.string().email().optional(),
+	RESEND_FROM_EMAIL: z.string().min(1).optional(),
 	BREVO_API_KEY: z.string().min(1).optional(),
 	BREVO_BASE_URL: z.string().url().default("https://api.brevo.com/v3"),
 	BREVO_LIST_IDS: z.string().min(1).optional(),

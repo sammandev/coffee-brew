@@ -9,7 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
-export function SignupForm() {
+interface SignupFormProps {
+	enableGoogleLogin?: boolean;
+}
+
+export function SignupForm({ enableGoogleLogin = true }: SignupFormProps) {
 	const { locale, t } = useAppPreferences();
 	const router = useRouter();
 	const [message, setMessage] = useState<string | null>(null);
@@ -35,7 +39,7 @@ export function SignupForm() {
 					display_name: displayName,
 					newsletter_opt_in: newsletterOptIn,
 				},
-				emailRedirectTo: `${window.location.origin}/dashboard`,
+				emailRedirectTo: `${window.location.origin}/session/resolve`,
 			},
 		});
 
@@ -70,7 +74,7 @@ export function SignupForm() {
 		const { error: oauthError } = await supabase.auth.signInWithOAuth({
 			provider: "google",
 			options: {
-				redirectTo: `${window.location.origin}/dashboard`,
+				redirectTo: `${window.location.origin}/session/resolve`,
 			},
 		});
 
@@ -113,10 +117,12 @@ export function SignupForm() {
 					</div>
 				</div>
 
-				<Button type="button" variant="outline" onClick={signInWithGoogle} className="gap-2">
-					<GoogleIcon />
-					{t("auth.continueGoogle")}
-				</Button>
+				{enableGoogleLogin && (
+					<Button type="button" variant="outline" onClick={signInWithGoogle} className="gap-2">
+						<GoogleIcon />
+						{t("auth.continueGoogle")}
+					</Button>
+				)}
 			</form>
 
 			{message && <p className="text-sm text-(--accent)">{message}</p>}

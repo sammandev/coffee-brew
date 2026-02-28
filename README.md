@@ -96,6 +96,15 @@ pnpm migrate:push
 `SUPABASE_DATABASE_URL` must be a valid URL-encoded Postgres connection string.
 Do not wrap the password in `[]`. If your password has special characters, percent-encode them.
 
+## Create User + Role
+
+Create or update an auth user and assign role (`user`, `admin`, `superuser`):
+
+```bash
+pnpm user:create -- --email jane@example.com --password "Str0ngPass!" --role user --display-name "Jane Doe"
+pnpm user:create -- --email admin@example.com --password "Str0ngPass!" --role admin --display-name "Admin One"
+```
+
 ## API Surface
 
 - `GET /api/landing`

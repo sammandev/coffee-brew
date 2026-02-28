@@ -1,10 +1,12 @@
 "use client";
 
 import { Moon, Sun } from "lucide-react";
+import { useId } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Select } from "@/components/ui/select";
 
 export function PreferenceControls() {
+	const localeSelectId = useId();
 	const { locale, setLocale, themePreference, setThemePreference, t } = useAppPreferences();
 
 	function toggleTheme() {
@@ -13,30 +15,30 @@ export function PreferenceControls() {
 
 	return (
 		<div className="flex flex-wrap items-center gap-2">
-			<label className="sr-only" htmlFor="locale-select">
+			<label className="sr-only" htmlFor={localeSelectId}>
 				{t("prefs.language")}
 			</label>
 			<Select
-				id="locale-select"
-				className="h-9 w-auto min-w-32 rounded-full px-3"
+				id={localeSelectId}
+				className="h-9 w-fit min-w-0 rounded-lg px-2"
+				menuAlign="end"
+				menuClassName="max-h-64 overflow-auto"
 				value={locale}
+				showIndicator={false}
 				onChange={(event) => setLocale(event.currentTarget.value as "en" | "id")}
 			>
-				<option value="en">{t("prefs.lang.en")}</option>
-				<option value="id">{t("prefs.lang.id")}</option>
+				<option value="en">EN</option>
+				<option value="id">ID</option>
 			</Select>
 
 			<button
 				type="button"
 				onClick={toggleTheme}
-				className="inline-flex h-9 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--sand)]/20"
+				className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--sand)]/20"
 				aria-label={`${t("prefs.theme")}: ${themePreference}`}
 				aria-pressed={themePreference === "dark"}
 			>
 				{themePreference === "light" ? <Moon size={15} /> : <Sun size={15} />}
-				<span className="hidden sm:inline">
-					{themePreference === "light" ? t("prefs.theme.dark") : t("prefs.theme.light")}
-				</span>
 			</button>
 		</div>
 	);

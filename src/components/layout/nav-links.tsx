@@ -4,29 +4,37 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { isActivePath, navItemClassName } from "@/lib/navigation";
+import type { SiteNavLink } from "@/lib/types";
 
 interface NavLinksProps {
-	includeDashboard: boolean;
-	includeAdmin: boolean;
-	includeSuperuser: boolean;
+	baseLinks?: SiteNavLink[];
 	mobile?: boolean;
 }
 
-export function NavLinks({ includeDashboard, includeAdmin, includeSuperuser, mobile = false }: NavLinksProps) {
-	const pathname = usePathname();
-	const { t } = useAppPreferences();
+const hiddenNavHrefs = new Set(["/dashboard", "/admin", "/superuser", "/me"]);
 
-	const links = [
-		{ href: "/", label: t("nav.home") },
-		{ href: "/catalog", label: t("nav.catalog") },
-		{ href: "/forum", label: t("nav.forum") },
-		{ href: "/blog", label: t("nav.blog") },
-		{ href: "/about", label: t("nav.about") },
-		{ href: "/contact", label: t("nav.contact") },
-		...(includeDashboard ? [{ href: "/dashboard", label: t("nav.dashboard") }] : []),
-		...(includeAdmin ? [{ href: "/admin", label: t("nav.admin") }] : []),
-		...(includeSuperuser ? [{ href: "/superuser", label: t("nav.superuser") }] : []),
-	];
+export function NavLinks({ baseLinks, mobile = false }: NavLinksProps) {
+	const pathname = usePathname();
+	const { locale, t } = useAppPreferences();
+
+	const configuredLinks =
+		baseLinks && baseLinks.length > 0
+			? baseLinks
+					.filter((link) => link.is_visible)
+					.map((link) => ({
+						href: link.href,
+						label: locale === "id" ? link.label_id : link.label_en,
+					}))
+			: [
+					{ href: "/", label: t("nav.home") },
+					{ href: "/catalog", label: t("nav.catalog") },
+					{ href: "/forum", label: t("nav.forum") },
+					{ href: "/blog", label: t("nav.blog") },
+					{ href: "/about", label: t("nav.about") },
+					{ href: "/contact", label: t("nav.contact") },
+				];
+
+	const links = configuredLinks.filter((link) => !hiddenNavHrefs.has(link.href));
 
 	return (
 		<>
