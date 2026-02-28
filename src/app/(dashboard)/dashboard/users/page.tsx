@@ -27,7 +27,10 @@ export default async function DashboardUsersPage() {
 
 	const { data: profiles } =
 		authUserIds.length > 0
-			? await supabase.from("profiles").select("id, email, display_name, status, created_at").in("id", authUserIds)
+			? await supabase
+					.from("profiles")
+					.select("id, email, display_name, status, created_at, is_verified")
+					.in("id", authUserIds)
 			: { data: [] as Array<Record<string, unknown>> };
 
 	const profileMap = new Map((profiles ?? []).map((profile) => [String(profile.id), profile]));
@@ -54,6 +57,7 @@ export default async function DashboardUsersPage() {
 			email,
 			display_name: displayName,
 			status: resolveUserStatus(profileRecord.status),
+			is_verified: Boolean(profileRecord.is_verified),
 			created_at: createdAt,
 		};
 	});
@@ -103,7 +107,7 @@ export default async function DashboardUsersPage() {
 								{locale === "id" ? "Bergabung" : "Joined"} {formatDate(user.created_at, locale)}
 							</p>
 						</div>
-						<UserStatusControls userId={user.id} status={user.status} />
+						<UserStatusControls userId={user.id} status={user.status} isVerified={user.is_verified} />
 					</Card>
 				))}
 			</div>

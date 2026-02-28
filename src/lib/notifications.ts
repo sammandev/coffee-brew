@@ -1,6 +1,13 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-export type NotificationEventType = "comment" | "reaction" | "reply" | "review";
+export type NotificationEventType =
+	| "comment"
+	| "reaction"
+	| "reply"
+	| "review"
+	| "mention"
+	| "poll_vote"
+	| "report_update";
 
 export interface NotificationInsertInput {
 	actorId?: string | null;

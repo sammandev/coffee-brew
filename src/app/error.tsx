@@ -2,8 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect } from "react";
 
-export default function ErrorPage({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+	useEffect(() => {
+		console.error(error);
+	}, [error]);
+
 	return (
 		<div className="mx-auto grid min-h-[70vh] w-full max-w-3xl place-items-center px-4 py-10">
 			<div className="w-full rounded-3xl border bg-(--surface-elevated) p-6 text-center sm:p-8">

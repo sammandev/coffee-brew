@@ -7,11 +7,19 @@ import { FormModal } from "@/components/ui/form-modal";
 
 interface ThreadComposerModalProps {
 	description: string;
+	initialSubforumId?: string;
+	subforums?: Array<{ id: string; name_en: string; name_id: string; slug: string }>;
 	title: string;
 	triggerLabel: string;
 }
 
-export function ThreadComposerModal({ description, title, triggerLabel }: ThreadComposerModalProps) {
+export function ThreadComposerModal({
+	description,
+	initialSubforumId,
+	subforums,
+	title,
+	triggerLabel,
+}: ThreadComposerModalProps) {
 	const [open, setOpen] = useState(false);
 
 	return (
@@ -27,7 +35,13 @@ export function ThreadComposerModal({ description, title, triggerLabel }: Thread
 				allowFullscreen
 				defaultFullscreen
 			>
-				<ThreadComposer hideTitle onSubmitted={() => setOpen(false)} />
+				<ThreadComposer
+					hideTitle
+					variant="embedded"
+					subforums={subforums}
+					initialSubforumId={initialSubforumId}
+					onSubmitted={() => setOpen(false)}
+				/>
 			</FormModal>
 		</>
 	);

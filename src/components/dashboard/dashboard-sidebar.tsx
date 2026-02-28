@@ -38,7 +38,11 @@ function buildSections(locale: "en" | "id", role: Role): SidebarSection[] {
 
 	const operations: SidebarSection = {
 		title: locale === "id" ? "Operasional" : "Operations",
-		links: [{ href: "/dashboard/moderation", label: locale === "id" ? "Moderasi" : "Moderation" }],
+		links: [
+			{ href: "/dashboard/moderation", label: locale === "id" ? "Moderasi" : "Moderation" },
+			{ href: "/dashboard/moderation/reports", label: locale === "id" ? "Laporan Forum" : "Forum Reports" },
+			{ href: "/dashboard/forum", label: locale === "id" ? "Kategori Forum" : "Forum Taxonomy" },
+		],
 	};
 
 	const account: SidebarSection = {
@@ -55,6 +59,7 @@ function buildSections(locale: "en" | "id", role: Role): SidebarSection[] {
 				{ href: "/dashboard/rbac", label: "RBAC" },
 				{ href: "/dashboard/users", label: locale === "id" ? "Pengguna" : "Users" },
 				{ href: "/dashboard/settings", label: locale === "id" ? "Pengaturan" : "Settings" },
+				{ href: "/dashboard/badges", label: locale === "id" ? "Badge" : "Badges" },
 			],
 		});
 	}

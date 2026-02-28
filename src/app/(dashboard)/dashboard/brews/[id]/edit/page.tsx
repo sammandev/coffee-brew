@@ -27,8 +27,8 @@ export default async function DashboardEditBrewPage({ params }: { params: Promis
 	if (isOwner || isSuperuser) {
 		return (
 			<div className="space-y-4">
-				<h1 className="font-heading text-4xl text-[var(--espresso)]">{locale === "id" ? "Ubah Brew" : "Edit Brew"}</h1>
-				<p className="text-[var(--muted)]">
+				<h1 className="font-heading text-4xl text-(--espresso)">{locale === "id" ? "Ubah Brew" : "Edit Brew"}</h1>
+				<p className="text-(--muted)">
 					{locale === "id" ? "Anda dapat mengubah detail brew ini secara penuh." : "You can fully edit this brew details."}
 				</p>
 				<BrewForm mode="edit" brewId={id} initialValues={brew} redirectPath="/dashboard/brews" />
@@ -41,27 +41,25 @@ export default async function DashboardEditBrewPage({ params }: { params: Promis
 
 	return (
 		<div className="space-y-4">
-			<h1 className="font-heading text-4xl text-[var(--espresso)]">
-				{locale === "id" ? "Moderasi Brew" : "Moderate Brew"}
-			</h1>
+			<h1 className="font-heading text-4xl text-(--espresso)">{locale === "id" ? "Moderasi Brew" : "Moderate Brew"}</h1>
 
 			<Card className="space-y-3">
-				<p className="text-sm text-[var(--muted)]">
+				<p className="text-sm text-(--muted)">
 					{locale === "id"
 						? "Admin hanya dapat show/hide brew pengguna lain."
 						: "Admins can only show or hide brews owned by other users."}
 				</p>
-				<p className="text-sm text-[var(--foreground)]/90">
+				<p className="text-sm text-(--foreground)/90">
 					<strong>{brew.name}</strong> · {brew.brew_method}
 				</p>
-				<p className="text-xs text-[var(--muted)]">
+				<p className="text-xs text-(--muted)">
 					{locale === "id" ? "Diperbarui" : "Updated"}: {formatDate(brew.updated_at, locale)}
 				</p>
 
 				{canModerate ? (
 					<ModerationToggle targetType="brew" targetId={brew.id} hidden={brew.status === "hidden"} />
 				) : (
-					<p className="text-sm text-[var(--danger)]">
+					<p className="text-sm text-(--danger)">
 						{locale === "id"
 							? "Brew milik superuser tidak dapat dimoderasi oleh admin."
 							: "Brews owned by superusers cannot be moderated by admins."}

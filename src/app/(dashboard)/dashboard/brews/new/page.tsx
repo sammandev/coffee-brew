@@ -8,8 +8,8 @@ export default async function DashboardCreateBrewPage() {
 
 	return (
 		<div className="space-y-4">
-			<h1 className="font-heading text-4xl text-[var(--espresso)]">{locale === "id" ? "Buat Brew" : "Create Brew"}</h1>
-			<p className="text-[var(--muted)]">
+			<h1 className="font-heading text-4xl text-(--espresso)">{locale === "id" ? "Buat Brew" : "Create Brew"}</h1>
+			<p className="text-(--muted)">
 				{locale === "id"
 					? "Admin dan superuser dapat membuat brew mereka sendiri untuk katalog."
 					: "Admins and superusers can create their own brews for the catalog."}

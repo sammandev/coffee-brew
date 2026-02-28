@@ -11,6 +11,7 @@ const serverEnvSchema = z.object({
 	BREVO_BASE_URL: z.string().url().default("https://api.brevo.com/v3"),
 	BREVO_LIST_IDS: z.string().min(1).optional(),
 	BREVO_LIST_ID: z.string().min(1).optional(),
+	TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
 });
 
 const parsed = serverEnvSchema.safeParse(process.env);

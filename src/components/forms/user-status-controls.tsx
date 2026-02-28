@@ -8,11 +8,12 @@ import { DeleteModal } from "@/components/ui/delete-modal";
 import { WarningModal } from "@/components/ui/warning-modal";
 
 interface UserStatusControlsProps {
+	isVerified?: boolean;
 	userId: string;
 	status: "active" | "blocked" | "disabled";
 }
 
-export function UserStatusControls({ userId, status }: UserStatusControlsProps) {
+export function UserStatusControls({ userId, status, isVerified = false }: UserStatusControlsProps) {
 	const { locale } = useAppPreferences();
 	const router = useRouter();
 	const [loading, setLoading] = useState<string | null>(null);
@@ -45,6 +46,25 @@ export function UserStatusControls({ userId, status }: UserStatusControlsProps) 
 		setError(body?.error ?? (locale === "id" ? "Aksi pengguna gagal." : "User action failed."));
 	}
 
+	async function toggleVerified() {
+		setLoading("verify");
+		setError(null);
+		const response = await fetch(`/api/superuser/users/${userId}/verify`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ verified: !isVerified }),
+		}).catch(() => null);
+		setLoading(null);
+		if (response?.ok) {
+			router.refresh();
+			return;
+		}
+		const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
+		setError(body?.error ?? (locale === "id" ? "Aksi verifikasi gagal." : "Verification update failed."));
+	}
+
 	const isWarningAction = pendingAction === "block" || pendingAction === "disable";
 	const warningTitle =
 		pendingAction === "block"
@@ -73,6 +93,17 @@ export function UserStatusControls({ userId, status }: UserStatusControlsProps) 
 					</Button>
 					<Button variant="outline" size="sm" onClick={() => setPendingAction("disable")} disabled={loading !== null}>
 						{loading === "disable" ? "..." : locale === "id" ? "Nonaktifkan" : "Disable"}
+					</Button>
+					<Button variant="outline" size="sm" onClick={() => void toggleVerified()} disabled={loading !== null}>
+						{loading === "verify"
+							? "..."
+							: isVerified
+								? locale === "id"
+									? "Cabut Verifikasi"
+									: "Unverify"
+								: locale === "id"
+									? "Verifikasi"
+									: "Verify"}
 					</Button>
 					<Button variant="destructive" size="sm" onClick={() => setPendingAction("delete")} disabled={loading !== null}>
 						{loading === "delete" ? "..." : locale === "id" ? "Hapus" : "Delete"}

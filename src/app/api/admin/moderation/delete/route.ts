@@ -2,6 +2,7 @@ import { z } from "zod";
 import { apiError, apiOk } from "@/lib/api";
 import { logAuditEvent } from "@/lib/audit";
 import { requireSessionContext } from "@/lib/auth";
+import { applyForumReputation } from "@/lib/forum-reputation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const moderationDeleteSchema = z.object({
@@ -28,6 +29,24 @@ export async function POST(request: Request) {
 
 	const supabase = createSupabaseAdminClient();
 	let targetTable: "brews" | "forum_threads" | "forum_comments";
+	let authorId: string | null = null;
+	if (parsed.data.targetType === "thread") {
+		const { data: thread } = await supabase
+			.from("forum_threads")
+			.select("author_id")
+			.eq("id", parsed.data.targetId)
+			.maybeSingle();
+		authorId = thread?.author_id ?? null;
+	}
+	if (parsed.data.targetType === "comment") {
+		const { data: comment } = await supabase
+			.from("forum_comments")
+			.select("author_id")
+			.eq("id", parsed.data.targetId)
+			.maybeSingle();
+		authorId = comment?.author_id ?? null;
+	}
+
 	if (parsed.data.targetType === "brew") {
 		targetTable = "brews";
 	} else if (parsed.data.targetType === "thread") {
@@ -39,6 +58,27 @@ export async function POST(request: Request) {
 	const { error } = await supabase.from(targetTable).delete().eq("id", parsed.data.targetId);
 	if (error) {
 		return apiError("Could not delete content", 400, error.message);
+	}
+
+	if (authorId && parsed.data.targetType === "thread") {
+		await applyForumReputation({
+			userId: authorId,
+			actorId: session.userId,
+			eventType: "thread_deleted_penalty",
+			sourceType: "thread",
+			sourceId: parsed.data.targetId,
+			metadata: { reason: parsed.data.reason ?? null },
+		});
+	}
+	if (authorId && parsed.data.targetType === "comment") {
+		await applyForumReputation({
+			userId: authorId,
+			actorId: session.userId,
+			eventType: "comment_deleted_penalty",
+			sourceType: "comment",
+			sourceId: parsed.data.targetId,
+			metadata: { reason: parsed.data.reason ?? null },
+		});
 	}
 
 	await supabase.from("moderation_events").insert({

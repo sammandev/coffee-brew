@@ -1,6 +1,7 @@
 import { apiError, apiOk } from "@/lib/api";
 import { logAuditEvent } from "@/lib/audit";
 import { requireSessionContext } from "@/lib/auth";
+import { applyForumReputation } from "@/lib/forum-reputation";
 import { assertPermission } from "@/lib/permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { moderationSchema } from "@/lib/validators";
@@ -59,24 +60,50 @@ export async function POST(request: Request) {
 	}
 
 	if (parsed.data.targetType === "thread") {
-		const { error } = await supabase
+		const { data: thread, error } = await supabase
 			.from("forum_threads")
 			.update({ status: parsed.data.hide ? "hidden" : "visible" })
-			.eq("id", parsed.data.targetId);
+			.eq("id", parsed.data.targetId)
+			.select("id, author_id")
+			.single();
 
 		if (error) {
 			return apiError("Could not update thread visibility", 400, error.message);
 		}
+
+		if (parsed.data.hide && thread.author_id) {
+			await applyForumReputation({
+				userId: thread.author_id,
+				actorId: session.userId,
+				eventType: "thread_hidden_penalty",
+				sourceType: "thread",
+				sourceId: thread.id,
+				metadata: { reason: parsed.data.reason ?? null },
+			});
+		}
 	}
 
 	if (parsed.data.targetType === "comment") {
-		const { error } = await supabase
+		const { data: comment, error } = await supabase
 			.from("forum_comments")
 			.update({ status: parsed.data.hide ? "hidden" : "visible" })
-			.eq("id", parsed.data.targetId);
+			.eq("id", parsed.data.targetId)
+			.select("id, author_id")
+			.single();
 
 		if (error) {
 			return apiError("Could not update comment visibility", 400, error.message);
+		}
+
+		if (parsed.data.hide && comment.author_id) {
+			await applyForumReputation({
+				userId: comment.author_id,
+				actorId: session.userId,
+				eventType: "comment_hidden_penalty",
+				sourceType: "comment",
+				sourceId: comment.id,
+				metadata: { reason: parsed.data.reason ?? null },
+			});
 		}
 	}
 

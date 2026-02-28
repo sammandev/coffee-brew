@@ -7,7 +7,7 @@ import { useAppPreferences } from "@/components/providers/app-preferences-provid
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { cn, formatDate } from "@/lib/utils";
 
-type NotificationEventType = "comment" | "reaction" | "reply" | "review";
+type NotificationEventType = "comment" | "reaction" | "reply" | "review" | "mention" | "poll_vote" | "report_update";
 type NotificationView = "active" | "archived";
 
 interface NotificationItem {
@@ -28,6 +28,7 @@ interface NotificationsResponse {
 }
 
 interface NavbarNotificationsProps {
+	mobile?: boolean;
 	userId: string;
 }
 
@@ -47,7 +48,10 @@ function normalizeNotification(row: Record<string, unknown>): NotificationItem |
 		row.event_type !== "comment" &&
 		row.event_type !== "reaction" &&
 		row.event_type !== "reply" &&
-		row.event_type !== "review"
+		row.event_type !== "review" &&
+		row.event_type !== "mention" &&
+		row.event_type !== "poll_vote" &&
+		row.event_type !== "report_update"
 	) {
 		return null;
 	}
@@ -64,7 +68,7 @@ function normalizeNotification(row: Record<string, unknown>): NotificationItem |
 	};
 }
 
-export function NavbarNotifications({ userId }: NavbarNotificationsProps) {
+export function NavbarNotifications({ userId, mobile = false }: NavbarNotificationsProps) {
 	const { locale, t } = useAppPreferences();
 	const router = useRouter();
 	const rootRef = useRef<HTMLDivElement>(null);
@@ -84,6 +88,9 @@ export function NavbarNotifications({ userId }: NavbarNotificationsProps) {
 			comment: t("notifications.event.comment"),
 			reply: t("notifications.event.reply"),
 			reaction: t("notifications.event.reaction"),
+			mention: t("notifications.event.mention"),
+			poll_vote: t("notifications.event.pollVote"),
+			report_update: t("notifications.event.reportUpdate"),
 		}),
 		[t],
 	);
@@ -304,19 +311,30 @@ export function NavbarNotifications({ userId }: NavbarNotificationsProps) {
 	}
 
 	return (
-		<div ref={rootRef} className="relative">
+		<div ref={rootRef} className={cn("relative", mobile && "w-full")}>
 			<button
 				ref={triggerRef}
 				type="button"
 				onClick={() => setOpen((current) => !current)}
-				className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-(--border) bg-(--surface) text-foreground transition hover:bg-(--sand)/15"
+				className={cn(
+					"relative inline-flex h-9 items-center rounded-lg border border-(--border) bg-(--surface) text-foreground transition hover:bg-(--sand)/15",
+					mobile ? "w-full justify-between px-3" : "w-9 justify-center",
+				)}
 				aria-label={t("notifications.title")}
 				aria-expanded={open}
 				aria-haspopup="menu"
 			>
-				<Bell size={16} />
+				<span className="inline-flex items-center gap-2">
+					<Bell size={16} />
+					{mobile ? <span className="text-sm font-semibold">{t("notifications.title")}</span> : null}
+				</span>
 				{unreadCount > 0 ? (
-					<span className="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-(--danger) px-1 text-[10px] font-semibold text-white">
+					<span
+						className={cn(
+							"inline-flex min-w-4 items-center justify-center rounded-full bg-(--danger) px-1 text-[10px] font-semibold text-white",
+							mobile ? "static" : "absolute -top-1 -right-1",
+						)}
+					>
 						{unreadCount > 99 ? "99+" : unreadCount}
 					</span>
 				) : null}
@@ -325,7 +343,10 @@ export function NavbarNotifications({ userId }: NavbarNotificationsProps) {
 			{open ? (
 				<div
 					role="menu"
-					className="absolute right-0 top-11 z-[130] w-[22rem] max-w-[calc(100vw-1.5rem)] rounded-xl border border-(--border) bg-(--surface-elevated) p-3 shadow-[0_18px_40px_-22px_var(--overlay)]"
+					className={cn(
+						"rounded-xl border border-(--border) bg-(--surface-elevated) p-3 shadow-[0_18px_40px_-22px_var(--overlay)]",
+						mobile ? "mt-2 w-full" : "absolute right-0 top-11 z-130 w-88 max-w-[calc(100vw-1.5rem)]",
+					)}
 				>
 					<div className="mb-2 flex items-center justify-between gap-2">
 						<div>

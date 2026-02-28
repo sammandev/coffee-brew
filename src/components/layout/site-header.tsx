@@ -1,10 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
+import { MobileNavMenu } from "@/components/layout/mobile-nav-menu";
 import { NavLinks } from "@/components/layout/nav-links";
 import { NavbarNotifications } from "@/components/layout/navbar-notifications";
 import { PreferenceControls } from "@/components/layout/preference-controls";
 import { UserProfileMenu } from "@/components/layout/user-profile-menu";
 import { getServerI18n } from "@/lib/i18n/server";
+import { touchUserPresence } from "@/lib/presence";
 import { getSiteSettings } from "@/lib/site-settings";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -33,6 +35,10 @@ export async function SiteHeader() {
 
 	const role = roleLookup.data ?? "user";
 	const displayName = profile?.display_name?.trim() || user?.email?.split("@")[0] || "User";
+
+	if (user) {
+		await touchUserPresence(user.id).catch(() => null);
+	}
 
 	return (
 		<header className="sticky top-0 z-40 border-b border-(--border) bg-(--surface)/95 shadow-[0_6px_30px_-24px_var(--overlay)] backdrop-blur">
@@ -88,53 +94,27 @@ export async function SiteHeader() {
 
 				<div className="flex items-center gap-2 lg:hidden">
 					{user ? (
-						<>
-							<NavbarNotifications userId={user.id} />
-							<UserProfileMenu
-								accountRole={role}
-								displayName={displayName}
-								email={user.email ?? ""}
-								avatarUrl={profile?.avatar_url ?? null}
-								labels={{
-									dashboard: t("nav.dashboard"),
-									profileSettings: t("nav.profileSettings"),
-									signOut: t("nav.signout"),
-								}}
-							/>
-						</>
+						<UserProfileMenu
+							accountRole={role}
+							displayName={displayName}
+							email={user.email ?? ""}
+							avatarUrl={profile?.avatar_url ?? null}
+							labels={{
+								dashboard: t("nav.dashboard"),
+								profileSettings: t("nav.profileSettings"),
+								signOut: t("nav.signout"),
+							}}
+						/>
 					) : null}
-
-					<details className="relative">
-						<summary className="cursor-pointer list-none rounded-lg border px-3 py-1.5 text-sm font-semibold text-foreground [&::-webkit-details-marker]:hidden">
-							{t("nav.menu")}
-						</summary>
-						<div className="absolute right-0 top-11 z-50 w-72 rounded-xl border bg-(--surface-elevated) p-4">
-							<div className="mb-3">
-								<PreferenceControls />
-							</div>
-							<nav className="grid gap-2 text-sm">
-								<NavLinks baseLinks={settings.navbar_links} mobile />
-							</nav>
-
-							{!user ? (
-								<div className="mt-3 border-t border-(--border) pt-3">
-									<div className="grid gap-2" style={{ gridTemplateColumns: settings.enable_signup ? "1fr 1fr" : "1fr" }}>
-										<Link href="/login" className="rounded-lg border px-3 py-2 text-center text-sm font-semibold">
-											{t("nav.login")}
-										</Link>
-										{settings.enable_signup && (
-											<Link
-												href="/signup"
-												className="rounded-lg bg-(--espresso) px-3 py-2 text-center text-sm font-semibold text-(--surface-elevated)"
-											>
-												{t("nav.signup")}
-											</Link>
-										)}
-									</div>
-								</div>
-							) : null}
-						</div>
-					</details>
+					<MobileNavMenu
+						menuLabel={t("nav.menu")}
+						loginLabel={t("nav.login")}
+						signupLabel={t("nav.signup")}
+						enableSignup={settings.enable_signup}
+						isAuthenticated={Boolean(user)}
+						userId={user?.id ?? null}
+						navbarLinks={settings.navbar_links}
+					/>
 				</div>
 			</div>
 		</header>

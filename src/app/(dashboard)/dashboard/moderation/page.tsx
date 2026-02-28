@@ -1,10 +1,13 @@
 import { requireRole } from "@/components/auth-guard";
+import { ForumThreadAdminActions } from "@/components/forms/forum-thread-admin-actions";
+import { ForumThreadMergeForm } from "@/components/forms/forum-thread-merge-form";
 import { ModerationDeleteAction } from "@/components/forms/moderation-delete-action";
 import { ModerationToggle } from "@/components/forms/moderation-toggle";
 import { Card } from "@/components/ui/card";
 import { getServerI18n } from "@/lib/i18n/server";
 import { clampPlainText } from "@/lib/rich-text";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { ForumSubforum } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
 export default async function DashboardModerationPage() {
@@ -14,7 +17,7 @@ export default async function DashboardModerationPage() {
 		createSupabaseServerClient(),
 	]);
 
-	const [{ data: brews }, { data: threads }, { data: comments }] = await Promise.all([
+	const [{ data: brews }, { data: threads }, { data: comments }, { data: subforums }] = await Promise.all([
 		supabase
 			.from("brews")
 			.select("id, owner_id, name, status, created_at")
@@ -22,7 +25,7 @@ export default async function DashboardModerationPage() {
 			.limit(20),
 		supabase
 			.from("forum_threads")
-			.select("id, title, status, created_at")
+			.select("id, title, status, created_at, is_locked, is_pinned, subforum_id")
 			.order("created_at", { ascending: false })
 			.limit(20),
 		supabase
@@ -30,6 +33,11 @@ export default async function DashboardModerationPage() {
 			.select("id, content, status, created_at")
 			.order("created_at", { ascending: false })
 			.limit(20),
+		supabase
+			.from("forum_subforums")
+			.select("id, name_en, name_id")
+			.eq("is_visible", true)
+			.order("order_index", { ascending: true }),
 	]);
 	const ownerRoles = new Map<string, string>();
 	for (const ownerId of Array.from(new Set((brews ?? []).map((brew) => brew.owner_id)))) {
@@ -42,6 +50,7 @@ export default async function DashboardModerationPage() {
 	return (
 		<div className="space-y-8">
 			<h1 className="font-heading text-4xl text-[var(--espresso)]">{locale === "id" ? "Moderasi" : "Moderation"}</h1>
+			{session.role === "superuser" ? <ForumThreadMergeForm /> : null}
 
 			<section className="space-y-3">
 				<h2 className="font-heading text-2xl text-[var(--espresso)]">{locale === "id" ? "Racikan" : "Brews"}</h2>
@@ -82,6 +91,13 @@ export default async function DashboardModerationPage() {
 							</div>
 							<div className="flex flex-wrap items-center gap-2">
 								<ModerationToggle targetType="thread" targetId={thread.id} hidden={thread.status === "hidden"} />
+								<ForumThreadAdminActions
+									threadId={thread.id}
+									initialLocked={Boolean(thread.is_locked)}
+									initialPinned={Boolean(thread.is_pinned)}
+									initialSubforumId={thread.subforum_id}
+									subforums={(subforums ?? []) as Pick<ForumSubforum, "id" | "name_en" | "name_id">[]}
+								/>
 								{session.role === "superuser" ? <ModerationDeleteAction targetType="thread" targetId={thread.id} /> : null}
 							</div>
 						</Card>

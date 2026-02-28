@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { FORUM_REACTION_TYPES } from "@/lib/constants";
+import { FORUM_REACTION_TYPES, FORUM_THREAD_SORT_VALUES } from "@/lib/constants";
 
 export const brewSchema = z.object({
 	name: z.string().trim().min(2).max(120),
@@ -58,14 +58,130 @@ export const faqItemSchema = z.object({
 });
 
 export const forumThreadSchema = z.object({
+	subforumId: z.string().uuid(),
 	title: z.string().trim().min(4).max(180),
 	content: z.string().trim().min(4).max(30000),
 	tags: z.array(z.string().trim().min(1).max(32)).max(10).optional().default([]),
 });
 
+export const forumThreadUpdateSchema = z.object({
+	title: z.string().trim().min(4).max(180).optional(),
+	content: z.string().trim().min(4).max(30000).optional(),
+	tags: z.array(z.string().trim().min(1).max(32)).max(10).optional(),
+	subforumId: z.string().uuid().optional(),
+});
+
 export const forumCommentSchema = z.object({
 	content: z.string().trim().min(1).max(15000),
 	parentCommentId: z.string().uuid().nullable().optional(),
+});
+
+export const forumThreadListQuerySchema = z.object({
+	subforum: z.string().trim().min(1).max(120).optional(),
+	q: z.string().trim().max(120).optional(),
+	tag: z.string().trim().max(32).optional(),
+	author: z.string().trim().max(120).optional(),
+	from: z
+		.string()
+		.trim()
+		.regex(/^\d{4}-\d{2}-\d{2}(T.*)?$/)
+		.optional(),
+	to: z
+		.string()
+		.trim()
+		.regex(/^\d{4}-\d{2}-\d{2}(T.*)?$/)
+		.optional(),
+	sort: z.enum(FORUM_THREAD_SORT_VALUES).optional().default("latest"),
+	page: z.coerce.number().int().min(1).max(2000).optional().default(1),
+	perPage: z.coerce.number().int().min(1).max(50).optional().default(12),
+});
+
+export const forumPollCreateSchema = z.object({
+	question: z.string().trim().min(4).max(240),
+	options: z.array(z.string().trim().min(1).max(120)).min(2).max(10),
+	closesAt: z.string().datetime().nullable().optional(),
+});
+
+export const forumPollVoteSchema = z.object({
+	optionIndex: z.number().int().min(0).max(100),
+});
+
+export const forumReportCreateSchema = z.object({
+	targetType: z.enum(["thread", "comment", "reply"]),
+	targetId: z.string().uuid(),
+	reason: z.string().trim().min(3).max(160),
+	detail: z.string().trim().max(1000).optional(),
+});
+
+export const forumReportUpdateSchema = z.object({
+	status: z.enum(["open", "resolved", "dismissed"]),
+	resolutionNote: z.string().trim().max(1000).optional(),
+	assigneeId: z.string().uuid().nullable().optional(),
+});
+
+export const forumDraftSchema = z.object({
+	draftType: z.enum(["thread", "comment"]),
+	subforumId: z.string().uuid().nullable().optional(),
+	threadId: z.string().uuid().nullable().optional(),
+	payload: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const forumMentionSearchSchema = z.object({
+	q: z.string().trim().min(1).max(40),
+	limit: z.coerce.number().int().min(1).max(20).optional().default(8),
+});
+
+export const forumCategorySchema = z.object({
+	id: z.string().uuid().optional(),
+	slug: z
+		.string()
+		.trim()
+		.min(2)
+		.max(120)
+		.regex(/^[a-z0-9-]+$/),
+	name_en: z.string().trim().min(2).max(120),
+	name_id: z.string().trim().min(2).max(120),
+	description_en: z.string().trim().max(500).optional().nullable(),
+	description_id: z.string().trim().max(500).optional().nullable(),
+	order_index: z.number().int().min(0).max(999).default(0),
+	is_visible: z.boolean().default(true),
+});
+
+export const forumSubforumSchema = z.object({
+	id: z.string().uuid().optional(),
+	category_id: z.string().uuid(),
+	slug: z
+		.string()
+		.trim()
+		.min(2)
+		.max(120)
+		.regex(/^[a-z0-9-]+$/),
+	name_en: z.string().trim().min(2).max(120),
+	name_id: z.string().trim().min(2).max(120),
+	description_en: z.string().trim().max(500).optional().nullable(),
+	description_id: z.string().trim().max(500).optional().nullable(),
+	order_index: z.number().int().min(0).max(999).default(0),
+	is_visible: z.boolean().default(true),
+});
+
+export const badgeDefinitionSchema = z.object({
+	id: z.string().uuid().optional(),
+	badge_key: z
+		.string()
+		.trim()
+		.min(2)
+		.max(40)
+		.regex(/^[a-z0-9_-]+$/),
+	label_en: z.string().trim().min(2).max(80),
+	label_id: z.string().trim().min(2).max(80),
+	min_points: z.number().int().min(0).max(100000),
+	color_hex: z
+		.string()
+		.trim()
+		.regex(/^#[0-9a-fA-F]{6}$/)
+		.optional()
+		.nullable(),
+	is_active: z.boolean().default(true),
 });
 
 export const forumReactionSchema = z
@@ -171,6 +287,21 @@ export const siteSettingsSchema = z.object({
 export const profileDisplayNameSchema = z.object({
 	display_name: z.string().trim().min(2).max(120),
 });
+
+export const profilePreferencesSchema = z
+	.object({
+		display_name: z.string().trim().min(2).max(120).optional(),
+		mention_handle: z
+			.string()
+			.trim()
+			.min(3)
+			.max(32)
+			.regex(/^[a-z0-9_]+$/)
+			.optional(),
+		is_profile_private: z.boolean().optional(),
+		show_online_status: z.boolean().optional(),
+	})
+	.strict();
 
 export type BrewSchemaInput = z.infer<typeof brewSchema>;
 export type ReviewSchemaInput = z.infer<typeof reviewSchema>;

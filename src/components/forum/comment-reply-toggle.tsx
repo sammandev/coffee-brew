@@ -5,6 +5,8 @@ import { CommentComposer } from "@/components/forum/comment-composer";
 import { Button } from "@/components/ui/button";
 
 interface CommentReplyToggleProps {
+	authorName?: string;
+	currentUserId?: string;
 	hideLabel: string;
 	placeholder: string;
 	submitLabel: string;
@@ -13,6 +15,8 @@ interface CommentReplyToggleProps {
 }
 
 export function CommentReplyToggle({
+	authorName,
+	currentUserId,
 	hideLabel,
 	placeholder,
 	submitLabel,
@@ -34,6 +38,8 @@ export function CommentReplyToggle({
 			</Button>
 			{open ? (
 				<CommentComposer
+					authorName={authorName}
+					currentUserId={currentUserId}
 					threadId={threadId}
 					parentCommentId={parentCommentId}
 					placeholder={placeholder}

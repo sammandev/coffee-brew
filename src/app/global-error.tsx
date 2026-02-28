@@ -1,8 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import { useEffect } from "react";
 
-export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+	useEffect(() => {
+		console.error(error);
+	}, [error]);
+
 	return (
 		<html lang="en">
 			<body className="bg-background text-foreground">

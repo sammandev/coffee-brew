@@ -1,11 +1,25 @@
 "use client";
 
+import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Bold, Eraser, Italic, Link2, List, ListOrdered, Quote, Underline as UnderlineIcon, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+	AtSign,
+	Bold,
+	Eraser,
+	ImagePlus,
+	Italic,
+	Link2,
+	List,
+	ListOrdered,
+	Loader2,
+	Quote,
+	Underline as UnderlineIcon,
+	X,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,7 +29,10 @@ import { cn } from "@/lib/utils";
 interface RichTextEditorProps {
 	className?: string;
 	disabled?: boolean;
+	enableImageUpload?: boolean;
+	enableMentions?: boolean;
 	id?: string;
+	imageUploadEndpoint?: string;
 	maxPlainTextLength?: number;
 	minPlainTextLength?: number;
 	name?: string;
@@ -30,7 +47,10 @@ function isActiveClass(active: boolean) {
 export function RichTextEditor({
 	className,
 	disabled = false,
+	enableImageUpload = false,
+	enableMentions = false,
 	id,
+	imageUploadEndpoint = "/api/forum/media",
 	maxPlainTextLength,
 	minPlainTextLength = 0,
 	name,
@@ -39,6 +59,13 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
 	const [linkInputOpen, setLinkInputOpen] = useState(false);
 	const [linkValue, setLinkValue] = useState("");
+	const [isUploadingImage, setIsUploadingImage] = useState(false);
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const [mentionOpen, setMentionOpen] = useState(false);
+	const [mentionQuery, setMentionQuery] = useState("");
+	const [mentionLoading, setMentionLoading] = useState(false);
+	const [mentionError, setMentionError] = useState<string | null>(null);
+	const [mentionResults, setMentionResults] = useState<Array<{ handle: string; label: string }>>([]);
 
 	const editor = useEditor({
 		extensions: [
@@ -48,6 +75,9 @@ export function RichTextEditor({
 				horizontalRule: false,
 				link: false,
 				underline: false,
+			}),
+			Image.configure({
+				inline: false,
 			}),
 			Underline,
 			Link.configure({
@@ -86,6 +116,79 @@ export function RichTextEditor({
 	const showLengthError =
 		plainTextLength > 0 &&
 		(plainTextLength < minPlainTextLength || (maxPlainTextLength ? plainTextLength > maxPlainTextLength : false));
+
+	async function uploadImage(file: File) {
+		if (!enableImageUpload || !imageUploadEndpoint) return;
+		setIsUploadingImage(true);
+		try {
+			const formData = new FormData();
+			formData.set("file", file);
+			const response = await fetch(imageUploadEndpoint, {
+				method: "POST",
+				body: formData,
+			}).catch(() => null);
+
+			if (!response?.ok) {
+				setIsUploadingImage(false);
+				return;
+			}
+			const payload = (await response.json().catch(() => ({}))) as { image_url?: string; url?: string };
+			const imageUrl = payload.image_url || payload.url;
+			if (!imageUrl || !editor) {
+				setIsUploadingImage(false);
+				return;
+			}
+			editor.chain().focus().setImage({ src: imageUrl }).run();
+		} finally {
+			setIsUploadingImage(false);
+		}
+	}
+
+	async function searchMentions(nextQuery: string) {
+		if (!enableMentions) return;
+		const normalized = nextQuery.trim().replace(/^@+/, "");
+		setMentionQuery(nextQuery);
+		setMentionError(null);
+		if (normalized.length < 1) {
+			setMentionResults([]);
+			return;
+		}
+		setMentionLoading(true);
+		const response = await fetch(`/api/forum/mentions/search?q=${encodeURIComponent(normalized)}`, {
+			method: "GET",
+		}).catch(() => null);
+		if (!response?.ok) {
+			setMentionResults([]);
+			setMentionLoading(false);
+			setMentionError("Could not load mention users.");
+			return;
+		}
+		const payload = (await response.json().catch(() => ({}))) as {
+			users?: Array<{ mention_handle?: string; display_name?: string | null; email?: string | null }>;
+		};
+		const users = payload.users ?? [];
+		setMentionResults(
+			users
+				.map((user) => {
+					const handle = user.mention_handle?.trim();
+					if (!handle) return null;
+					return {
+						handle,
+						label: user.display_name?.trim() || user.email || handle,
+					};
+				})
+				.filter((item): item is { handle: string; label: string } => Boolean(item)),
+		);
+		setMentionLoading(false);
+	}
+
+	function insertMention(handle: string) {
+		if (!editor) return;
+		editor.chain().focus().insertContent(`@${handle} `).run();
+		setMentionOpen(false);
+		setMentionQuery("");
+		setMentionResults([]);
+	}
 
 	function applyLink() {
 		if (!editor) return;
@@ -204,6 +307,46 @@ export function RichTextEditor({
 				>
 					<Eraser size={14} />
 				</Button>
+				{enableImageUpload ? (
+					<>
+						<Button
+							type="button"
+							size="sm"
+							variant="ghost"
+							className="h-8 px-3"
+							onClick={() => fileInputRef.current?.click()}
+							disabled={disabled || !editor || isUploadingImage}
+							aria-label="Upload image"
+						>
+							{isUploadingImage ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
+						</Button>
+						<input
+							ref={fileInputRef}
+							type="file"
+							accept="image/png,image/jpeg,image/webp"
+							className="hidden"
+							onChange={(event) => {
+								const file = event.currentTarget.files?.[0];
+								if (!file) return;
+								void uploadImage(file);
+								event.currentTarget.value = "";
+							}}
+						/>
+					</>
+				) : null}
+				{enableMentions ? (
+					<Button
+						type="button"
+						size="sm"
+						variant="ghost"
+						className={cn("h-8 px-3", mentionOpen && "bg-(--sand)/30")}
+						onClick={() => setMentionOpen((current) => !current)}
+						disabled={disabled || !editor}
+						aria-label="Mention user"
+					>
+						<AtSign size={14} />
+					</Button>
+				) : null}
 			</div>
 
 			{linkInputOpen && (
@@ -236,12 +379,43 @@ export function RichTextEditor({
 					</div>
 				</div>
 			)}
+			{mentionOpen && enableMentions ? (
+				<div className="space-y-2 rounded-2xl border bg-(--surface) p-3">
+					<Label htmlFor={`${id ?? name ?? "rich-text"}-mention`} className="block text-xs">
+						Mention user
+					</Label>
+					<Input
+						id={`${id ?? name ?? "rich-text"}-mention`}
+						value={mentionQuery}
+						onChange={(event) => {
+							void searchMentions(event.currentTarget.value);
+						}}
+						placeholder="@username"
+					/>
+					<div className="max-h-40 space-y-1 overflow-y-auto">
+						{mentionLoading ? <p className="text-xs text-(--muted)">Loading...</p> : null}
+						{mentionError ? <p className="text-xs text-(--danger)">{mentionError}</p> : null}
+						{!mentionLoading &&
+							mentionResults.map((result) => (
+								<button
+									key={result.handle}
+									type="button"
+									onClick={() => insertMention(result.handle)}
+									className="flex w-full items-center justify-between rounded-md border px-2 py-1 text-left text-xs hover:bg-(--sand)/20"
+								>
+									<span className="font-semibold text-(--espresso)">@{result.handle}</span>
+									<span className="text-(--muted)">{result.label}</span>
+								</button>
+							))}
+					</div>
+				</div>
+			) : null}
 
 			<div className="rounded-2xl border bg-(--surface)">
 				<EditorContent
 					id={id}
 					editor={editor}
-					className="min-h-32 px-4 py-3 text-sm text-foreground focus-within:ring-2 focus-within:ring-(--accent)/20 [&_.ProseMirror]:min-h-24 [&_.ProseMirror]:outline-none [&_.ProseMirror_a]:text-[var(--accent)] [&_.ProseMirror_a]:underline [&_.ProseMirror_blockquote]:border-l-2 [&_.ProseMirror_blockquote]:border-[var(--border)] [&_.ProseMirror_blockquote]:pl-3 [&_.ProseMirror_li]:ml-4 [&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ul]:list-disc"
+					className="min-h-32 px-4 py-3 text-sm text-foreground focus-within:ring-2 focus-within:ring-(--accent)/20 [&_.ProseMirror]:min-h-24 [&_.ProseMirror]:outline-none [&_.ProseMirror_a]:text-(--accent) [&_.ProseMirror_a]:underline [&_.ProseMirror_blockquote]:border-l-2 [&_.ProseMirror_blockquote]:border-(--border) [&_.ProseMirror_blockquote]:pl-3 [&_.ProseMirror_li]:ml-4 [&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ul]:list-disc"
 				/>
 			</div>
 

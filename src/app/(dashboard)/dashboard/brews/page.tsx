@@ -42,10 +42,10 @@ export default async function DashboardBrewsPage() {
 			<header className="flex flex-wrap items-center justify-between gap-3">
 				<div>
 					<Badge>{locale === "id" ? "Manajemen Brew" : "Brew Management"}</Badge>
-					<h1 className="mt-2 font-heading text-4xl text-[var(--espresso)]">
+					<h1 className="mt-2 font-heading text-4xl text-(--espresso)">
 						{locale === "id" ? "Operasional Brew" : "Brew Operations"}
 					</h1>
-					<p className="mt-1 text-sm text-[var(--muted)]">
+					<p className="mt-1 text-sm text-(--muted)">
 						{locale === "id"
 							? "Kelola brew milik sendiri dan moderasi visibilitas brew pengguna lain."
 							: "Manage your own brews and moderate visibility for other users."}
@@ -53,16 +53,16 @@ export default async function DashboardBrewsPage() {
 				</div>
 				<Link
 					href="/dashboard/brews/new"
-					className="rounded-full bg-[var(--espresso)] px-4 py-2 text-sm font-semibold text-[var(--surface-elevated)]"
+					className="rounded-full bg-(--espresso) px-4 py-2 text-sm font-semibold text-(--surface-elevated)"
 				>
 					{locale === "id" ? "Buat Brew" : "Create Brew"}
 				</Link>
 			</header>
 
-			<div className="overflow-x-auto rounded-3xl border bg-[var(--surface-elevated)]">
+			<div className="overflow-x-auto rounded-3xl border bg-(--surface-elevated)">
 				<table className="w-full min-w-220 text-sm">
 					<thead>
-						<tr className="border-b bg-[var(--surface)] text-left">
+						<tr className="border-b bg-(--surface) text-left">
 							<th className="px-4 py-3">{locale === "id" ? "Nama" : "Name"}</th>
 							<th className="px-4 py-3">{locale === "id" ? "Metode" : "Method"}</th>
 							<th className="px-4 py-3">{locale === "id" ? "Pemilik" : "Owner"}</th>
@@ -80,8 +80,8 @@ export default async function DashboardBrewsPage() {
 							return (
 								<tr key={brew.id} className="border-b align-top">
 									<td className="px-4 py-3">
-										<p className="font-semibold text-[var(--espresso)]">{brew.name}</p>
-										<p className="text-xs text-[var(--muted)]">{brew.brewer_name}</p>
+										<p className="font-semibold text-(--espresso)">{brew.name}</p>
+										<p className="text-xs text-(--muted)">{brew.brewer_name}</p>
 									</td>
 									<td className="px-4 py-3">{brew.brew_method}</td>
 									<td className="px-4 py-3">{resolveOwnerLabel(owner)}</td>
@@ -90,7 +90,7 @@ export default async function DashboardBrewsPage() {
 									<td className="px-4 py-3">
 										<Link
 											href={`/dashboard/brews/${brew.id}/edit`}
-											className="rounded-full border px-3 py-1 text-xs font-semibold hover:bg-[var(--sand)]/20"
+											className="rounded-full border px-3 py-1 text-xs font-semibold hover:bg-(--sand)/20"
 										>
 											{canFullEdit ? (locale === "id" ? "Ubah" : "Edit") : locale === "id" ? "Moderasi" : "Moderate"}
 										</Link>
@@ -104,7 +104,7 @@ export default async function DashboardBrewsPage() {
 
 			{(brews ?? []).length === 0 ? (
 				<Card>
-					<p className="text-sm text-[var(--muted)]">
+					<p className="text-sm text-(--muted)">
 						{locale === "id" ? "Belum ada brew untuk dikelola." : "No brews available yet."}
 					</p>
 				</Card>

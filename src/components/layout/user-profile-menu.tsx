@@ -18,6 +18,8 @@ interface UserProfileMenuProps {
 		signOut: string;
 	};
 	mobile?: boolean;
+	mobilePanelClassName?: string;
+	mobilePanelMode?: "inline" | "viewport";
 }
 
 function resolveFirstWord(displayName: string) {
@@ -56,6 +58,8 @@ export function UserProfileMenu({
 	email,
 	labels,
 	mobile = false,
+	mobilePanelClassName,
+	mobilePanelMode = "inline",
 }: UserProfileMenuProps) {
 	const pathname = usePathname();
 	const router = useRouter();
@@ -68,6 +72,7 @@ export function UserProfileMenu({
 	const initial = resolveInitial(displayName);
 	const dashboardPath = resolveDashboardPath(accountRole);
 	const profileSettingsPath = resolveProfileSettingsPath(accountRole);
+	const viewportPanel = mobilePanelMode === "viewport";
 
 	useEffect(() => {
 		if (!open) return;
@@ -138,51 +143,67 @@ export function UserProfileMenu({
 			</button>
 
 			{open ? (
-				<div
-					role="menu"
-					className={cn(
-						"rounded-xl border bg-(--surface-elevated) p-3 shadow-[0_14px_32px_-20px_var(--overlay)]",
-						mobile ? "mt-2 w-full" : "absolute right-0 top-11 z-[80] w-72",
-					)}
-				>
-					<div className="flex items-center gap-2">
-						<span className="inline-flex rounded-full border bg-(--surface) px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-(--muted)">
-							{resolveRoleLabel(accountRole)}
-						</span>
-						<p className="text-sm font-semibold text-(--espresso)">{displayName}</p>
-					</div>
-					<p className="mt-1 break-all text-xs text-(--muted)">{email}</p>
-
-					<div className="my-3 border-t border-(--border)" />
-
-					<div className="grid gap-1">
-						<Link
-							href={dashboardPath}
+				<>
+					{viewportPanel ? (
+						<button
+							type="button"
+							className="fixed inset-0 z-110 bg-(--overlay)/35 lg:hidden"
 							onClick={() => setOpen(false)}
-							className="rounded-md px-2 py-1.5 text-sm transition hover:bg-(--sand)/20"
-						>
-							{labels.dashboard}
-						</Link>
-						<Link
-							href={profileSettingsPath}
-							onClick={() => setOpen(false)}
-							className="rounded-md px-2 py-1.5 text-sm transition hover:bg-(--sand)/20"
-						>
-							{labels.profileSettings}
-						</Link>
-					</div>
+							aria-label="Close profile menu"
+						/>
+					) : null}
 
-					<div className="my-3 border-t border-(--border)" />
-
-					<button
-						type="button"
-						onClick={signOut}
-						disabled={isSigningOut}
-						className="w-full rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-(--sand)/20 disabled:opacity-60"
+					<div
+						role="menu"
+						className={cn(
+							"rounded-xl border bg-(--surface-elevated) p-3 shadow-[0_14px_32px_-20px_var(--overlay)]",
+							viewportPanel
+								? "fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4rem)] z-120 max-h-[calc(100dvh-5rem)] overflow-y-auto"
+								: mobile
+									? "mt-2 w-full"
+									: "absolute right-0 top-11 z-80 w-72",
+							mobilePanelClassName,
+						)}
 					>
-						{isSigningOut ? `${labels.signOut}...` : labels.signOut}
-					</button>
-				</div>
+						<div className="flex items-center gap-2">
+							<span className="inline-flex rounded-full border bg-(--surface) px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-(--muted)">
+								{resolveRoleLabel(accountRole)}
+							</span>
+							<p className="text-sm font-semibold text-(--espresso)">{displayName}</p>
+						</div>
+						<p className="mt-1 break-all text-xs text-(--muted)">{email}</p>
+
+						<div className="my-3 border-t border-(--border)" />
+
+						<div className="grid gap-1">
+							<Link
+								href={dashboardPath}
+								onClick={() => setOpen(false)}
+								className="rounded-md px-2 py-1.5 text-sm transition hover:bg-(--sand)/20"
+							>
+								{labels.dashboard}
+							</Link>
+							<Link
+								href={profileSettingsPath}
+								onClick={() => setOpen(false)}
+								className="rounded-md px-2 py-1.5 text-sm transition hover:bg-(--sand)/20"
+							>
+								{labels.profileSettings}
+							</Link>
+						</div>
+
+						<div className="my-3 border-t border-(--border)" />
+
+						<button
+							type="button"
+							onClick={signOut}
+							disabled={isSigningOut}
+							className="w-full rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-(--sand)/20 disabled:opacity-60"
+						>
+							{isSigningOut ? `${labels.signOut}...` : labels.signOut}
+						</button>
+					</div>
+				</>
 			) : null}
 		</div>
 	);

@@ -78,6 +78,29 @@ body {
 	}
 }
 
+.video-embed {
+	margin-top: 0.75rem;
+	margin-bottom: 0.75rem;
+	overflow: hidden;
+	border-radius: 0.75rem;
+	border: 1px solid var(--border);
+	background: color-mix(in srgb, var(--surface) 88%, black 12%);
+}
+
+.video-embed iframe {
+	display: block;
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	height: auto;
+}
+
+.ProseMirror img {
+	max-width: 100%;
+	height: auto;
+	border-radius: 0.75rem;
+	border: 1px solid var(--border);
+}
+
 .fade-up {
 	animation: fade-up 0.6s ease-out both;
 }

@@ -54,9 +54,9 @@ export function DashboardShell({
 
 	return (
 		<div className="min-h-screen bg-[radial-gradient(circle_at_top_left,color-mix(in_oklab,var(--surface)_40%,transparent),transparent_45%),linear-gradient(180deg,color-mix(in_oklab,var(--background)_96%,var(--surface)_4%),var(--background))] text-foreground">
-			<div className="mx-auto flex w-full max-w-[1680px] gap-4 px-3 py-4 sm:px-4 lg:px-6">
+			<div className="mx-auto flex w-full max-w-420 gap-4 px-3 py-4 sm:px-4 lg:px-6">
 				<DashboardSidebar locale={locale} onClose={() => setSidebarOpen(false)} open={sidebarOpen} role={role} />
-				<div className="flex h-[calc(100vh-2rem)] min-h-[640px] flex-1 flex-col overflow-hidden rounded-3xl border border-(--border) bg-(--surface) shadow-[0_20px_58px_-38px_var(--overlay)]">
+				<div className="flex h-[calc(100vh-2rem)] min-h-160 flex-1 flex-col overflow-hidden rounded-3xl border border-(--border) bg-(--surface) shadow-[0_20px_58px_-38px_var(--overlay)]">
 					<DashboardNavbar
 						appName={appName}
 						avatarUrl={avatarUrl}

@@ -11,7 +11,11 @@ export default async function DashboardProfilePage() {
 	const supabase = await createSupabaseServerClient();
 
 	const [{ data: profile }, { data: newsletter }] = await Promise.all([
-		supabase.from("profiles").select("display_name, avatar_url, status").eq("id", session.userId).maybeSingle(),
+		supabase
+			.from("profiles")
+			.select("display_name, avatar_url, status, is_profile_private, show_online_status")
+			.eq("id", session.userId)
+			.maybeSingle(),
 		supabase.from("newsletter_subscriptions").select("consent").eq("email", session.email).maybeSingle(),
 	]);
 
@@ -29,6 +33,9 @@ export default async function DashboardProfilePage() {
 					email: "Email",
 					status: locale === "id" ? "Status" : "Status",
 				}}
+				publicProfileHref={`/users/${session.userId}`}
+				showOnlineStatus={profile?.show_online_status ?? true}
+				isProfilePrivate={profile?.is_profile_private ?? false}
 				status={profile?.status ?? session.status}
 				newsletterSubscribed={newsletter?.consent ?? false}
 			/>

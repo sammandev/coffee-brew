@@ -2,6 +2,7 @@ import { ProfileAvatarForm } from "@/components/forms/profile-avatar-form";
 import { ProfileDisplayNameForm } from "@/components/forms/profile-display-name-form";
 import { ProfileNewsletterForm } from "@/components/forms/profile-newsletter-form";
 import { ProfilePasswordForm } from "@/components/forms/profile-password-form";
+import { ProfileVisibilityForm } from "@/components/forms/profile-visibility-form";
 import { Card } from "@/components/ui/card";
 
 interface ProfileSettingsPanelProps {
@@ -14,6 +15,9 @@ interface ProfileSettingsPanelProps {
 		status: string;
 	};
 	newsletterSubscribed: boolean;
+	publicProfileHref: string;
+	showOnlineStatus: boolean;
+	isProfilePrivate: boolean;
 	status: string;
 }
 
@@ -23,6 +27,9 @@ export function ProfileSettingsPanel({
 	email,
 	labels,
 	newsletterSubscribed,
+	publicProfileHref,
+	showOnlineStatus,
+	isProfilePrivate,
 	status,
 }: ProfileSettingsPanelProps) {
 	return (
@@ -43,6 +50,12 @@ export function ProfileSettingsPanel({
 				<ProfileAvatarForm displayName={displayName} initialAvatarUrl={avatarUrl} />
 				<ProfileDisplayNameForm initialDisplayName={displayName} />
 			</div>
+
+			<ProfileVisibilityForm
+				initialIsProfilePrivate={isProfilePrivate}
+				initialShowOnlineStatus={showOnlineStatus}
+				publicProfileHref={publicProfileHref}
+			/>
 
 			<ProfilePasswordForm />
 			<ProfileNewsletterForm email={email} subscribed={newsletterSubscribed} />

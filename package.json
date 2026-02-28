@@ -14,14 +14,15 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"check:all": "pnpm run build && pnpm run lint:fix && pnpm run lint && pnpm run typecheck && pnpm run test",
-		"migrate:push": "node scripts/supabase-migration.js push",
-		"migrate:list": "node scripts/supabase-migration.js list",
+		"migrate:push": "tsx scripts/supabase-migration.ts push",
+		"migrate:list": "tsx scripts/supabase-migration.ts list",
 		"user:create": "tsx scripts/create-user-with-role.ts"
 	},
 	"dependencies": {
 		"@supabase/ssr": "^0.8.0",
 		"@supabase/supabase-js": "^2.98.0",
 		"@tiptap/extension-link": "^3.20.0",
+		"@tiptap/extension-image": "^3.20.0",
 		"@tiptap/extension-underline": "^3.20.0",
 		"@tiptap/react": "^3.20.0",
 		"@tiptap/starter-kit": "^3.20.0",

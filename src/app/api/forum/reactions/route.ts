@@ -1,4 +1,5 @@
 import { apiError, apiOk } from "@/lib/api";
+import { applyForumReputation } from "@/lib/forum-reputation";
 import { requirePermission } from "@/lib/guards";
 import { createNotifications } from "@/lib/notifications";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -58,6 +59,14 @@ export async function POST(request: Request) {
 		if (error) return apiError("Could not add reaction", 400, error.message);
 
 		if (comment.author_id !== permission.context.userId) {
+			await applyForumReputation({
+				userId: comment.author_id,
+				actorId: permission.context.userId,
+				eventType: "reaction_received",
+				sourceType: "comment",
+				sourceId: comment.id,
+				metadata: { reaction: parsed.data.reaction },
+			});
 			await createNotifications([
 				{
 					recipientId: comment.author_id,
@@ -108,6 +117,14 @@ export async function POST(request: Request) {
 	}
 
 	if (thread.author_id !== permission.context.userId) {
+		await applyForumReputation({
+			userId: thread.author_id,
+			actorId: permission.context.userId,
+			eventType: "reaction_received",
+			sourceType: "thread",
+			sourceId: thread.id,
+			metadata: { reaction: parsed.data.reaction },
+		});
 		await createNotifications([
 			{
 				recipientId: thread.author_id,

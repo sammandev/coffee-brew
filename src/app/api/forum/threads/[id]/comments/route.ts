@@ -1,4 +1,8 @@
 import { apiError, apiOk } from "@/lib/api";
+import { getSessionContext } from "@/lib/auth";
+import { notifyMentions } from "@/lib/forum-mentions";
+import { applyForumReputation } from "@/lib/forum-reputation";
+import { isSuspiciousForumContent, verifyTurnstileToken } from "@/lib/forum-spam";
 import { requirePermission } from "@/lib/guards";
 import { buildRecipientIds, createNotifications } from "@/lib/notifications";
 import { sanitizeForStorage, validatePlainTextLength } from "@/lib/rich-text";
@@ -27,8 +31,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 	const { id } = await params;
 	const permission = await requirePermission("forum", "create");
 	if (permission.response) return permission.response;
+	const session = await getSessionContext();
+	if (!session) {
+		return apiError("Unauthorized", 401);
+	}
 
 	const body = await request.json();
+	const turnstileToken: string | null =
+		body && typeof body === "object" && typeof (body as Record<string, unknown>).turnstileToken === "string"
+			? ((body as Record<string, unknown>).turnstileToken as string)
+			: null;
 	const normalizedBody = (() => {
 		if (!body || typeof body !== "object") return body;
 		const payload = body as Record<string, unknown>;
@@ -49,6 +61,34 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 	}
 
 	const supabase = await createSupabaseServerClient();
+	const [{ data: thread }, { data: actorTrustProfile }] = await Promise.all([
+		supabase
+			.from("forum_threads")
+			.select("id, title, author_id, is_locked")
+			.eq("id", id)
+			.eq("status", "visible")
+			.maybeSingle(),
+		supabase.from("profiles").select("created_at, karma_points").eq("id", permission.context.userId).maybeSingle(),
+	]);
+	if (!thread) {
+		return apiError("Thread not found", 404);
+	}
+	const isModerator = session.role === "admin" || session.role === "superuser";
+	if (thread.is_locked && !isModerator) {
+		return apiError("Thread is locked", 403);
+	}
+
+	const actorCreatedAt = actorTrustProfile?.created_at ? new Date(actorTrustProfile.created_at).getTime() : Date.now();
+	const accountAgeDays = Math.max(0, (Date.now() - actorCreatedAt) / (24 * 60 * 60 * 1000));
+	const karmaPoints = Number(actorTrustProfile?.karma_points ?? 0);
+	const lowTrust = karmaPoints < 50 || accountAgeDays < 7;
+	if (lowTrust && turnstileToken) {
+		const turnstile = await verifyTurnstileToken(turnstileToken, request.headers.get("x-forwarded-for"));
+		if (!turnstile.ok) {
+			return apiError("Security verification required", 400, turnstile.error);
+		}
+	}
+
 	const parentCommentId: string | null = parsed.data.parentCommentId ?? null;
 	let parentCommentAuthorId: string | null = null;
 
@@ -107,19 +147,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 		return apiError("Could not create comment", 400, error.message);
 	}
 
-	const [{ data: thread }, { data: actorProfile }] = await Promise.all([
-		supabase.from("forum_threads").select("id, title, author_id").eq("id", id).maybeSingle(),
-		supabase
-			.from("profiles")
-			.select("display_name, email")
-			.eq("id", permission.context.userId)
-			.maybeSingle<{ display_name: string | null; email: string | null }>(),
-	]);
+	const { data: actorProfile } = await supabase
+		.from("profiles")
+		.select("display_name, email")
+		.eq("id", permission.context.userId)
+		.maybeSingle<{ display_name: string | null; email: string | null }>();
 
 	const actorName = actorProfile?.display_name?.trim() || actorProfile?.email || "Someone";
-	const recipientIds = buildRecipientIds([thread?.author_id ?? null, parentCommentAuthorId], permission.context.userId);
+	const recipientIds = buildRecipientIds([thread.author_id ?? null, parentCommentAuthorId], permission.context.userId);
 
-	if (thread && recipientIds.length > 0) {
+	if (recipientIds.length > 0) {
 		const eventType = parentCommentId ? "reply" : "comment";
 		const title = parentCommentId ? `${actorName} replied to a discussion` : `${actorName} commented on your thread`;
 		const body = parentCommentId
@@ -141,6 +178,42 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 				},
 			})),
 		);
+	}
+
+	await applyForumReputation({
+		userId: permission.context.userId,
+		actorId: permission.context.userId,
+		eventType: "comment_create",
+		sourceType: "comment",
+		sourceId: data.id as string,
+	});
+
+	await notifyMentions({
+		actorId: permission.context.userId,
+		actorName,
+		content: parsed.data.content,
+		title: `${actorName} mentioned you in a reply`,
+		linkPath: `/forum/${id}#comment-${data.id}`,
+		metadata: {
+			thread_id: id,
+			comment_id: data.id,
+			parent_comment_id: parentCommentId,
+		},
+	});
+
+	if (isSuspiciousForumContent(parsed.data.content)) {
+		await supabase.from("forum_reports").insert({
+			reporter_id: permission.context.userId,
+			target_type: parentCommentId ? "reply" : "comment",
+			target_id: data.id,
+			reason: "Automatic spam review",
+			detail: "System detected suspicious link pattern in comment content.",
+			status: "open",
+			metadata: {
+				auto_flagged: true,
+				thread_id: id,
+			},
+		});
 	}
 
 	return apiOk({ comment: data }, 201);

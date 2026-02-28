@@ -56,3 +56,16 @@ export const APP_NAME = "Coffee Brew";
 export const FORUM_REACTION_TYPES = ["like", "coffee", "fire", "mindblown"] as const;
 
 export type ForumReactionType = (typeof FORUM_REACTION_TYPES)[number];
+
+export const FORUM_THREAD_SORT_VALUES = ["latest", "oldest", "most_reacted", "most_discussed"] as const;
+export type ForumThreadSortValue = (typeof FORUM_THREAD_SORT_VALUES)[number];
+
+export const FORUM_REPUTATION_POINTS = {
+	threadCreate: 5,
+	commentCreate: 2,
+	reactionReceived: 1,
+	threadHiddenPenalty: -5,
+	threadDeletedPenalty: -10,
+	commentHiddenPenalty: -3,
+	commentDeletedPenalty: -6,
+} as const;
