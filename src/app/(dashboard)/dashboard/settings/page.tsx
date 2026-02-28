@@ -15,8 +15,8 @@ export default async function DashboardSettingsPage() {
 				</h1>
 				<p className="mt-2 text-[var(--muted)]">
 					{locale === "id"
-						? "Kelola nama aplikasi, title tab, konten navbar/footer, serta toggle metode login dan pendaftaran."
-						: "Manage app name, tab title, navbar/footer content, and login/registration toggles."}
+						? "Kelola nama aplikasi, title tab, ikon tab, konten navbar/footer, serta toggle metode login dan pendaftaran."
+						: "Manage app name, tab title, tab icon, navbar/footer content, and login/registration toggles."}
 				</p>
 			</header>
 

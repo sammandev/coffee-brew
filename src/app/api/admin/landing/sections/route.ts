@@ -3,11 +3,29 @@ import { requirePermission } from "@/lib/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { landingSectionSchema } from "@/lib/validators";
 
+function normalizeSectionPayload(body: unknown) {
+	if (!body || typeof body !== "object") return body;
+	const payload = body as Record<string, unknown>;
+	const status =
+		typeof payload.status === "string"
+			? payload.status
+			: typeof payload.is_visible === "boolean"
+				? payload.is_visible
+					? "published"
+					: "hidden"
+				: "published";
+	return {
+		...payload,
+		status,
+		is_visible: status === "published",
+	};
+}
+
 export async function POST(request: Request) {
 	const permission = await requirePermission("landing", "create");
 	if (permission.response) return permission.response;
 
-	const body = await request.json();
+	const body = normalizeSectionPayload(await request.json());
 	const parsed = landingSectionSchema.safeParse(body);
 
 	if (!parsed.success) {
@@ -19,6 +37,7 @@ export async function POST(request: Request) {
 		.from("landing_sections")
 		.insert({
 			...parsed.data,
+			is_visible: parsed.data.status === "published",
 			created_by: permission.context?.userId,
 		})
 		.select("*")
@@ -52,7 +71,16 @@ export async function PUT(request: Request) {
 	if (typeof body.body_id === "string" || body.body_id === null) updatePayload.body_id = body.body_id;
 	if (typeof body.section_type === "string") updatePayload.section_type = body.section_type;
 	if (typeof body.order_index === "number") updatePayload.order_index = body.order_index;
-	if (typeof body.is_visible === "boolean") updatePayload.is_visible = body.is_visible;
+	if (typeof body.status === "string") {
+		if (body.status !== "draft" && body.status !== "published" && body.status !== "hidden") {
+			return apiError("Invalid status", 400);
+		}
+		updatePayload.status = body.status;
+		updatePayload.is_visible = body.status === "published";
+	} else if (typeof body.is_visible === "boolean") {
+		updatePayload.is_visible = body.is_visible;
+		updatePayload.status = body.is_visible ? "published" : "hidden";
+	}
 	if (typeof body.config === "object" && body.config !== null) updatePayload.config = body.config;
 	if (typeof body.config_id === "object" && body.config_id !== null) updatePayload.config_id = body.config_id;
 

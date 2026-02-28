@@ -1,8 +1,10 @@
 import { apiError, apiOk } from "@/lib/api";
 import { logAuditEvent } from "@/lib/audit";
 import { requireSessionContext } from "@/lib/auth";
+import { DEFAULT_ROLE_PERMISSIONS } from "@/lib/constants";
 import { assertPermission } from "@/lib/permissions";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import type { PermissionAction, ResourceKey } from "@/lib/types";
 import { rbacUpdateSchema } from "@/lib/validators";
 
 export async function GET() {
@@ -15,7 +17,7 @@ export async function GET() {
 		return apiError("Forbidden", 403);
 	}
 
-	const supabase = await createSupabaseServerClient();
+	const supabase = createSupabaseAdminClient();
 
 	const [{ data: roles }, { data: permissions }, { data: rolePermissions }] = await Promise.all([
 		supabase.from("roles").select("id, name"),
@@ -43,7 +45,7 @@ export async function PUT(request: Request) {
 		return apiError("Invalid payload", 400, parsed.error.message);
 	}
 
-	const supabase = await createSupabaseServerClient();
+	const supabase = createSupabaseAdminClient();
 
 	const [{ data: role }, { data: permissionRows }] = await Promise.all([
 		supabase.from("roles").select("id, name").eq("name", parsed.data.role).single(),
@@ -58,7 +60,10 @@ export async function PUT(request: Request) {
 		(permissionRows ?? []).map((permission) => [`${permission.resource_key}:${permission.action_key}`, permission.id]),
 	);
 
-	const permissionIds = parsed.data.permissions
+	const effectivePermissions =
+		parsed.data.role === "superuser" ? DEFAULT_ROLE_PERMISSIONS.superuser : parsed.data.permissions;
+
+	const permissionIds = effectivePermissions
 		.map((permission) => lookup.get(`${permission.resource}:${permission.action}`))
 		.filter((id): id is string => Boolean(id));
 
@@ -85,8 +90,15 @@ export async function PUT(request: Request) {
 		metadata: {
 			role: parsed.data.role,
 			permissionCount: permissionIds.length,
+			enforcedSuperuserDefaults: parsed.data.role === "superuser",
 		},
 	});
 
-	return apiOk({ success: true, role: parsed.data.role, permissionCount: permissionIds.length });
+	return apiOk({
+		success: true,
+		role: parsed.data.role,
+		permissionCount: permissionIds.length,
+		enforcedSuperuserDefaults: parsed.data.role === "superuser",
+		permissions: effectivePermissions as Array<{ action: PermissionAction; resource: ResourceKey }>,
+	});
 }

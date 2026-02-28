@@ -29,6 +29,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 			locale={locale}
 			role={session.role}
 			title={locale === "id" ? "Dashboard Operasional" : "Operations Dashboard"}
+			userId={session.userId}
 		>
 			{children}
 		</DashboardShell>

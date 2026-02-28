@@ -3,11 +3,29 @@ import { requirePermission } from "@/lib/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { faqItemSchema } from "@/lib/validators";
 
+function normalizeFaqPayload(body: unknown) {
+	if (!body || typeof body !== "object") return body;
+	const payload = body as Record<string, unknown>;
+	const status =
+		typeof payload.status === "string"
+			? payload.status
+			: typeof payload.is_visible === "boolean"
+				? payload.is_visible
+					? "published"
+					: "hidden"
+				: "published";
+	return {
+		...payload,
+		status,
+		is_visible: status === "published",
+	};
+}
+
 export async function POST(request: Request) {
 	const permission = await requirePermission("landing", "update");
 	if (permission.response) return permission.response;
 
-	const body = await request.json();
+	const body = normalizeFaqPayload(await request.json());
 	const parsed = faqItemSchema.safeParse(body);
 
 	if (!parsed.success) {
@@ -20,6 +38,7 @@ export async function POST(request: Request) {
 		.from("faq_items")
 		.insert({
 			...parsed.data,
+			is_visible: parsed.data.status === "published",
 			created_by: permission.context?.userId,
 		})
 		.select("*")
@@ -50,7 +69,16 @@ export async function PUT(request: Request) {
 	if (typeof body.question_id === "string") patch.question_id = body.question_id;
 	if (typeof body.answer_id === "string") patch.answer_id = body.answer_id;
 	if (typeof body.order_index === "number") patch.order_index = body.order_index;
-	if (typeof body.is_visible === "boolean") patch.is_visible = body.is_visible;
+	if (typeof body.status === "string") {
+		if (body.status !== "draft" && body.status !== "published" && body.status !== "hidden") {
+			return apiError("Invalid status", 400);
+		}
+		patch.status = body.status;
+		patch.is_visible = body.status === "published";
+	} else if (typeof body.is_visible === "boolean") {
+		patch.is_visible = body.is_visible;
+		patch.status = body.is_visible ? "published" : "hidden";
+	}
 
 	if (Object.keys(patch).length === 0) {
 		return apiError("No fields to update", 400);

@@ -8,6 +8,7 @@ import type { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface UserProfileMenuProps {
+	accountRole: Role;
 	avatarUrl: string | null;
 	displayName: string;
 	email: string;
@@ -17,7 +18,6 @@ interface UserProfileMenuProps {
 		signOut: string;
 	};
 	mobile?: boolean;
-	role: Role;
 }
 
 function resolveFirstWord(displayName: string) {
@@ -43,17 +43,31 @@ function resolveProfileSettingsPath(role: Role) {
 	return "/dashboard/profile";
 }
 
-export function UserProfileMenu({ avatarUrl, displayName, email, labels, mobile = false, role }: UserProfileMenuProps) {
-	const _pathname = usePathname();
+function resolveRoleLabel(role: Role) {
+	if (role === "superuser") return "Superuser";
+	if (role === "admin") return "Admin";
+	return "User";
+}
+
+export function UserProfileMenu({
+	accountRole,
+	avatarUrl,
+	displayName,
+	email,
+	labels,
+	mobile = false,
+}: UserProfileMenuProps) {
+	const pathname = usePathname();
 	const router = useRouter();
 	const rootRef = useRef<HTMLDivElement>(null);
 	const triggerRef = useRef<HTMLButtonElement>(null);
+	const previousPathRef = useRef(pathname);
 	const [open, setOpen] = useState(false);
 	const [isSigningOut, setIsSigningOut] = useState(false);
 	const firstWord = resolveFirstWord(displayName);
 	const initial = resolveInitial(displayName);
-	const dashboardPath = resolveDashboardPath(role);
-	const profileSettingsPath = resolveProfileSettingsPath(role);
+	const dashboardPath = resolveDashboardPath(accountRole);
+	const profileSettingsPath = resolveProfileSettingsPath(accountRole);
 
 	useEffect(() => {
 		if (!open) return;
@@ -80,8 +94,11 @@ export function UserProfileMenu({ avatarUrl, displayName, email, labels, mobile 
 	}, [open]);
 
 	useEffect(() => {
-		setOpen(false);
-	}, []);
+		if (previousPathRef.current !== pathname) {
+			setOpen(false);
+			previousPathRef.current = pathname;
+		}
+	}, [pathname]);
 
 	async function signOut() {
 		if (isSigningOut) return;
@@ -125,12 +142,15 @@ export function UserProfileMenu({ avatarUrl, displayName, email, labels, mobile 
 					role="menu"
 					className={cn(
 						"rounded-xl border bg-(--surface-elevated) p-3 shadow-[0_14px_32px_-20px_var(--overlay)]",
-						mobile ? "mt-2 w-full" : "absolute right-0 top-11 z-80 w-72",
+						mobile ? "mt-2 w-full" : "absolute right-0 top-11 z-[80] w-72",
 					)}
 				>
-					<p className="text-sm font-semibold text-(--espresso)">
-						{role.toUpperCase()} {displayName}
-					</p>
+					<div className="flex items-center gap-2">
+						<span className="inline-flex rounded-full border bg-(--surface) px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-(--muted)">
+							{resolveRoleLabel(accountRole)}
+						</span>
+						<p className="text-sm font-semibold text-(--espresso)">{displayName}</p>
+					</div>
 					<p className="mt-1 break-all text-xs text-(--muted)">{email}</p>
 
 					<div className="my-3 border-t border-(--border)" />

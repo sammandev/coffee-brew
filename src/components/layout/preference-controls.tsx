@@ -34,7 +34,7 @@ export function PreferenceControls() {
 			<button
 				type="button"
 				onClick={toggleTheme}
-				className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--sand)]/20"
+				className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-(--border) bg-(--surface) text-sm font-semibold text-foreground hover:bg-(--sand)/20"
 				aria-label={`${t("prefs.theme")}: ${themePreference}`}
 				aria-pressed={themePreference === "dark"}
 			>

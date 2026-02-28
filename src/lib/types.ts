@@ -16,6 +16,7 @@ export type ResourceKey = "landing" | "brews" | "catalog" | "forum" | "reviews" 
 export type UserStatus = "active" | "blocked" | "disabled";
 
 export type BrewStatus = "draft" | "published" | "hidden";
+export type ContentLifecycleStatus = "draft" | "published" | "hidden";
 
 export type ForumContentStatus = "visible" | "hidden";
 
@@ -39,6 +40,7 @@ export interface BrewInput {
 	notes?: string;
 	imageUrl?: string | null;
 	imageAlt?: string | null;
+	tags?: string[];
 	status: BrewStatus;
 }
 
@@ -78,6 +80,7 @@ export interface LandingSection {
 	config_id: Record<string, unknown>;
 	order_index: number;
 	is_visible: boolean;
+	status: ContentLifecycleStatus;
 	created_at: string;
 	updated_at: string;
 }
@@ -90,6 +93,7 @@ export interface FaqItem {
 	answer_id: string;
 	order_index: number;
 	is_visible: boolean;
+	status: ContentLifecycleStatus;
 	created_at: string;
 	updated_at: string;
 }
@@ -156,6 +160,8 @@ export interface SiteSettings {
 	enable_google_login: boolean;
 	enable_magic_link_login: boolean;
 	enable_signup: boolean;
+	tab_icon_url: string | null;
+	tab_icon_storage_path: string | null;
 }
 
 export interface BlogPostRecord {

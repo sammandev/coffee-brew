@@ -27,6 +27,7 @@ describe("UserProfileMenu", () => {
 				avatarUrl={null}
 				displayName="John Doe"
 				email="john@example.com"
+				accountRole="user"
 				labels={{
 					dashboard: "Dashboard",
 					profileSettings: "Profile Settings",
@@ -46,6 +47,7 @@ describe("UserProfileMenu", () => {
 				avatarUrl={null}
 				displayName="John Doe"
 				email="john@example.com"
+				accountRole="user"
 				labels={{
 					dashboard: "Dashboard",
 					profileSettings: "Profile Settings",
@@ -55,15 +57,16 @@ describe("UserProfileMenu", () => {
 		);
 
 		fireEvent.click(screen.getByRole("button", { name: /John/ }));
-		expect(screen.getByText("USER John Doe")).toBeInTheDocument();
+		expect(screen.getByText("John Doe")).toBeInTheDocument();
+		expect(screen.getByText("User")).toBeInTheDocument();
 
 		fireEvent.mouseDown(document.body);
-		expect(screen.queryByText("USER John Doe")).not.toBeInTheDocument();
+		expect(screen.queryByText("John Doe")).not.toBeInTheDocument();
 
 		fireEvent.click(screen.getByRole("button", { name: /John/ }));
-		expect(screen.getByText("USER John Doe")).toBeInTheDocument();
+		expect(screen.getByText("John Doe")).toBeInTheDocument();
 		fireEvent.keyDown(document, { key: "Escape" });
-		expect(screen.queryByText("USER John Doe")).not.toBeInTheDocument();
+		expect(screen.queryByText("John Doe")).not.toBeInTheDocument();
 	});
 
 	it("closes when pathname changes", () => {
@@ -72,6 +75,7 @@ describe("UserProfileMenu", () => {
 				avatarUrl={null}
 				displayName="John Doe"
 				email="john@example.com"
+				accountRole="user"
 				labels={{
 					dashboard: "Dashboard",
 					profileSettings: "Profile Settings",
@@ -81,7 +85,7 @@ describe("UserProfileMenu", () => {
 		);
 
 		fireEvent.click(screen.getByRole("button", { name: /John/ }));
-		expect(screen.getByText("USER John Doe")).toBeInTheDocument();
+		expect(screen.getByText("John Doe")).toBeInTheDocument();
 
 		mockedPathname = "/dashboard";
 		rerender(
@@ -89,6 +93,7 @@ describe("UserProfileMenu", () => {
 				avatarUrl={null}
 				displayName="John Doe"
 				email="john@example.com"
+				accountRole="user"
 				labels={{
 					dashboard: "Dashboard",
 					profileSettings: "Profile Settings",
@@ -97,6 +102,6 @@ describe("UserProfileMenu", () => {
 			/>,
 		);
 
-		expect(screen.queryByText("USER John Doe")).not.toBeInTheDocument();
+		expect(screen.queryByText("John Doe")).not.toBeInTheDocument();
 	});
 });

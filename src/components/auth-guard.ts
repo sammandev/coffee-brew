@@ -1,10 +1,11 @@
-import { forbidden, redirect } from "next/navigation";
+import { forbidden, redirect, unauthorized } from "next/navigation";
 import { getSessionContext } from "@/lib/auth";
 import type { Role } from "@/lib/types";
 
 interface RequireRoleOptions {
 	exactRole?: Role;
 	minRole?: Role;
+	onUnauthenticated?: "redirect" | "unauthorized";
 	onUnauthorized?: "redirect" | "forbidden";
 	redirectTo?: string;
 }
@@ -21,11 +22,15 @@ export async function requireRole(options: RequireRoleOptions = {}) {
 	const context = await getSessionContext();
 
 	if (!context) {
-		redirect("/login");
+		if (options.onUnauthenticated === "redirect") {
+			redirect("/login");
+		}
+
+		unauthorized();
 	}
 
 	if (context.status !== "active") {
-		redirect("/login?reason=blocked");
+		forbidden();
 	}
 
 	if (options.exactRole && context.role !== options.exactRole) {

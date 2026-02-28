@@ -1,0 +1,13 @@
+<svg width="960" height="540" viewBox="0 0 960 540" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="540" fill="#F6EFE7"/>
+  <circle cx="480" cy="248" r="164" fill="#E9DBC9"/>
+  <rect x="396" y="180" width="168" height="176" rx="28" fill="#5A3A2B"/>
+  <rect x="428" y="226" width="104" height="98" rx="18" fill="#F6EFE7"/>
+  <path d="M430 184C430 155.281 453.281 132 482 132C510.719 132 534 155.281 534 184V214H430V184Z" fill="#7C4D36"/>
+  <circle cx="480" cy="266" r="12" fill="#5A3A2B"/>
+  <rect x="474" y="266" width="12" height="34" rx="6" fill="#5A3A2B"/>
+  <path d="M340 294C340 270.804 358.804 252 382 252H392V336H382C358.804 336 340 317.196 340 294Z" fill="#DDAA78"/>
+  <circle cx="376" cy="294" r="9" fill="#5A3A2B"/>
+  <text x="480" y="432" text-anchor="middle" font-size="56" font-family="Arial, sans-serif" font-weight="700" fill="#5A3A2B">401</text>
+  <text x="480" y="466" text-anchor="middle" font-size="22" font-family="Arial, sans-serif" fill="#7A5A46">Authentication Required</text>
+</svg>

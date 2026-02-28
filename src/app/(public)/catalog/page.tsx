@@ -44,6 +44,15 @@ export default async function CatalogPage() {
 								<div className="space-y-2 p-5">
 									<CardTitle>{brew.name}</CardTitle>
 									<CardDescription className="mt-1">{brew.brew_method}</CardDescription>
+									{Array.isArray(brew.tags) && brew.tags.length > 0 ? (
+										<div className="mt-2 flex flex-wrap gap-1.5">
+											{brew.tags.slice(0, 5).map((tag: string) => (
+												<span key={`${brew.id}-${tag}`} className="rounded-full border px-2 py-0.5 text-[11px] text-(--muted)">
+													#{tag}
+												</span>
+											))}
+										</div>
+									) : null}
 									<p className="mt-2 text-sm text-(--muted)">Beans: {brew.coffee_beans}</p>
 									<p className="text-sm text-(--muted)">Roastery: {brew.brand_roastery}</p>
 									<p className="mt-3 text-xs text-(--muted)">

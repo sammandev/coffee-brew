@@ -29,6 +29,25 @@ export async function POST(request: Request) {
 	const supabase = await createSupabaseServerClient();
 
 	if (parsed.data.targetType === "brew") {
+		const { data: brew } = await supabase
+			.from("brews")
+			.select("id, owner_id")
+			.eq("id", parsed.data.targetId)
+			.maybeSingle();
+		if (!brew) {
+			return apiError("Brew not found", 404);
+		}
+
+		if (session.role === "admin" && brew.owner_id !== session.userId) {
+			const { data: ownerRole } = await supabase.rpc("user_role", { user_id: brew.owner_id });
+			if (ownerRole !== "user" && ownerRole !== "admin" && ownerRole !== "superuser") {
+				return apiError("Forbidden", 403, "Unable to verify brew owner role.");
+			}
+			if (ownerRole === "superuser") {
+				return apiError("Forbidden", 403, "Admin cannot moderate superuser brews.");
+			}
+		}
+
 		const { error } = await supabase
 			.from("brews")
 			.update({ status: parsed.data.hide ? "hidden" : "published" })

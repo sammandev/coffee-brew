@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 
 interface FaqRow {
@@ -86,10 +87,8 @@ export function FaqTable({ items }: { items: FaqRow[] }) {
 								/>
 							</td>
 							<td className="px-4 py-3">
-								<input
-									type="checkbox"
+								<Checkbox
 									defaultChecked={item.is_visible}
-									className="size-4"
 									onChange={(event) => updateFaq(item.id, { is_visible: event.currentTarget.checked })}
 								/>
 							</td>

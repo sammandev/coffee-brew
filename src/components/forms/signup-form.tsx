@@ -5,8 +5,10 @@ import { useState } from "react";
 import { GoogleIcon } from "@/components/icons/google-icon";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 interface SignupFormProps {
@@ -98,13 +100,20 @@ export function SignupForm({ enableGoogleLogin = true }: SignupFormProps) {
 				</div>
 				<div>
 					<Label htmlFor="password">Password</Label>
-					<Input id="password" name="password" type="password" required minLength={8} />
+					<PasswordInput
+						id="password"
+						name="password"
+						required
+						minLength={8}
+						showLabel={t("auth.showPassword")}
+						hideLabel={t("auth.hidePassword")}
+					/>
 				</div>
 
-				<label className="flex items-center gap-2 text-sm text-(--muted)">
-					<input type="checkbox" name="newsletter" className="size-4 rounded border" />
+				<div className="flex items-center gap-2 text-sm text-(--muted)">
+					<Checkbox name="newsletter" />
 					{locale === "id" ? "Berlangganan newsletter kopi." : "Subscribe to coffee newsletter updates."}
-				</label>
+				</div>
 
 				<Button type="submit">{t("auth.createAccount")}</Button>
 

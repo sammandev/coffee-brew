@@ -3,7 +3,24 @@ import { getSessionContext } from "@/lib/auth";
 import { requirePermission } from "@/lib/guards";
 import { sanitizeForStorage, validatePlainTextLength } from "@/lib/rich-text";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isMissingColumnError } from "@/lib/supabase-errors";
 import { brewSchema } from "@/lib/validators";
+
+const BREW_OPTIONAL_COLUMNS = ["image_url", "image_alt", "tags"] as const;
+
+function normalizeTags(raw: unknown) {
+	if (!Array.isArray(raw)) return [];
+	const normalized: string[] = [];
+
+	for (const item of raw) {
+		if (typeof item !== "string") continue;
+		const value = item.trim().toLowerCase();
+		if (!value || normalized.includes(value)) continue;
+		normalized.push(value);
+	}
+
+	return normalized.slice(0, 10);
+}
 
 export async function GET() {
 	const supabase = await createSupabaseServerClient();
@@ -47,11 +64,13 @@ export async function POST(request: Request) {
 		const notes = typeof payload.notes === "string" ? payload.notes : "";
 		const imageUrl = typeof payload.imageUrl === "string" ? payload.imageUrl.trim() : "";
 		const imageAlt = typeof payload.imageAlt === "string" ? payload.imageAlt.trim() : "";
+		const tags = normalizeTags(payload.tags);
 		return {
 			...payload,
 			notes: sanitizeForStorage(notes),
 			imageUrl: imageUrl.length > 0 ? imageUrl : null,
 			imageAlt: imageAlt.length > 0 ? imageAlt : null,
+			tags,
 		};
 	})();
 	const parsed = brewSchema.safeParse(normalizedBody);
@@ -69,30 +88,53 @@ export async function POST(request: Request) {
 	}
 
 	const supabase = await createSupabaseServerClient();
+	const insertPayload = {
+		owner_id: permission.context.userId,
+		name: parsed.data.name,
+		brew_method: parsed.data.brewMethod,
+		coffee_beans: parsed.data.coffeeBeans,
+		brand_roastery: parsed.data.brandRoastery,
+		water_type: parsed.data.waterType,
+		water_ppm: parsed.data.waterPpm,
+		temperature: parsed.data.temperature,
+		temperature_unit: parsed.data.temperatureUnit,
+		grind_size: parsed.data.grindSize,
+		grind_clicks: parsed.data.grindClicks ?? null,
+		brew_time_seconds: parsed.data.brewTimeSeconds,
+		brewer_name: parsed.data.brewerName,
+		notes: parsed.data.notes ?? null,
+		status: parsed.data.status,
+	};
 
-	const { data, error } = await supabase
+	let { data, error } = await supabase
 		.from("brews")
 		.insert({
-			owner_id: permission.context.userId,
-			name: parsed.data.name,
-			brew_method: parsed.data.brewMethod,
-			coffee_beans: parsed.data.coffeeBeans,
-			brand_roastery: parsed.data.brandRoastery,
-			water_type: parsed.data.waterType,
-			water_ppm: parsed.data.waterPpm,
-			temperature: parsed.data.temperature,
-			temperature_unit: parsed.data.temperatureUnit,
-			grind_size: parsed.data.grindSize,
-			grind_clicks: parsed.data.grindClicks ?? null,
-			brew_time_seconds: parsed.data.brewTimeSeconds,
-			brewer_name: parsed.data.brewerName,
-			notes: parsed.data.notes ?? null,
+			...insertPayload,
 			image_url: parsed.data.imageUrl ?? null,
 			image_alt: parsed.data.imageAlt ?? null,
-			status: parsed.data.status,
+			tags: parsed.data.tags ?? [],
 		})
 		.select("*")
 		.single();
+
+	if (error && isMissingColumnError(error, [...BREW_OPTIONAL_COLUMNS])) {
+		const missingImageColumns = isMissingColumnError(error, ["image_url", "image_alt"]);
+		const missingTagsColumn = isMissingColumnError(error, ["tags"]);
+		console.warn("[brews:create] optional columns missing; retrying insert with compatibility payload");
+
+		const compatibilityPayload = {
+			...insertPayload,
+			...(missingImageColumns
+				? {}
+				: {
+						image_url: parsed.data.imageUrl ?? null,
+						image_alt: parsed.data.imageAlt ?? null,
+					}),
+			...(missingTagsColumn ? {} : { tags: parsed.data.tags ?? [] }),
+		};
+
+		({ data, error } = await supabase.from("brews").insert(compatibilityPayload).select("*").single());
+	}
 
 	if (error) {
 		return apiError("Could not create brew", 400, error.message);

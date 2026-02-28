@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ACTIONS, RESOURCES } from "@/lib/constants";
 import type { Role } from "@/lib/types";
 
@@ -14,6 +15,7 @@ interface RbacMatrixEditorProps {
 export function RbacMatrixEditor({ role, activePermissions }: RbacMatrixEditorProps) {
 	const { locale } = useAppPreferences();
 	const router = useRouter();
+	const isSystemRole = role === "superuser";
 	const [selected, setSelected] = useState(
 		new Set(activePermissions.map((permission) => `${permission.resource}:${permission.action}`)),
 	);
@@ -21,6 +23,7 @@ export function RbacMatrixEditor({ role, activePermissions }: RbacMatrixEditorPr
 	const [saving, setSaving] = useState(false);
 
 	const toggle = (key: string) => {
+		if (isSystemRole) return;
 		const next = new Set(selected);
 		if (next.has(key)) next.delete(key);
 		else next.add(key);
@@ -28,6 +31,7 @@ export function RbacMatrixEditor({ role, activePermissions }: RbacMatrixEditorPr
 	};
 
 	async function save() {
+		if (isSystemRole) return;
 		setSaving(true);
 		setError(null);
 
@@ -58,6 +62,13 @@ export function RbacMatrixEditor({ role, activePermissions }: RbacMatrixEditorPr
 	return (
 		<div className="grid gap-4 rounded-3xl border bg-(--surface-elevated) p-5">
 			<h3 className="font-heading text-xl text-(--espresso)">{role} Permissions</h3>
+			{isSystemRole ? (
+				<p className="text-xs text-(--muted)">
+					{locale === "id"
+						? "Role superuser bersifat sistem dan selalu memiliki akses penuh."
+						: "Superuser is a system role and always has full access."}
+				</p>
+			) : null}
 			<div className="grid gap-3 overflow-x-auto">
 				<table className="w-full min-w-170 text-sm">
 					<thead>
@@ -78,7 +89,7 @@ export function RbacMatrixEditor({ role, activePermissions }: RbacMatrixEditorPr
 									const key = `${resource}:${action}`;
 									return (
 										<td key={key} className="px-2 py-2 text-center">
-											<input type="checkbox" className="size-4" checked={selected.has(key)} onChange={() => toggle(key)} />
+											<Checkbox checked={selected.has(key)} onChange={() => toggle(key)} aria-label={`${resource}:${action}`} />
 										</td>
 									);
 								})}
@@ -92,7 +103,7 @@ export function RbacMatrixEditor({ role, activePermissions }: RbacMatrixEditorPr
 				<button
 					type="button"
 					onClick={save}
-					disabled={saving}
+					disabled={saving || isSystemRole}
 					className="rounded-full bg-(--espresso) px-5 py-2 text-sm font-semibold text-(--surface-elevated)"
 				>
 					{saving ? (locale === "id" ? "Menyimpan..." : "Saving...") : locale === "id" ? "Simpan Matriks" : "Save Matrix"}

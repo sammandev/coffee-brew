@@ -1,3 +1,5 @@
+import { requireRole } from "@/components/auth-guard";
+import { ModerationDeleteAction } from "@/components/forms/moderation-delete-action";
 import { ModerationToggle } from "@/components/forms/moderation-toggle";
 import { Card } from "@/components/ui/card";
 import { getServerI18n } from "@/lib/i18n/server";
@@ -6,10 +8,18 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 
 export default async function DashboardModerationPage() {
-	const [{ locale }, supabase] = await Promise.all([getServerI18n(), createSupabaseServerClient()]);
+	const [session, { locale }, supabase] = await Promise.all([
+		requireRole({ minRole: "admin", onUnauthorized: "forbidden" }),
+		getServerI18n(),
+		createSupabaseServerClient(),
+	]);
 
 	const [{ data: brews }, { data: threads }, { data: comments }] = await Promise.all([
-		supabase.from("brews").select("id, name, status, created_at").order("created_at", { ascending: false }).limit(20),
+		supabase
+			.from("brews")
+			.select("id, owner_id, name, status, created_at")
+			.order("created_at", { ascending: false })
+			.limit(20),
 		supabase
 			.from("forum_threads")
 			.select("id, title, status, created_at")
@@ -21,6 +31,13 @@ export default async function DashboardModerationPage() {
 			.order("created_at", { ascending: false })
 			.limit(20),
 	]);
+	const ownerRoles = new Map<string, string>();
+	for (const ownerId of Array.from(new Set((brews ?? []).map((brew) => brew.owner_id)))) {
+		const { data: roleName } = await supabase.rpc("user_role", { user_id: ownerId });
+		if (typeof roleName === "string") {
+			ownerRoles.set(ownerId, roleName);
+		}
+	}
 
 	return (
 		<div className="space-y-8">
@@ -35,7 +52,20 @@ export default async function DashboardModerationPage() {
 								<p className="font-semibold text-[var(--espresso)]">{brew.name}</p>
 								<p className="text-xs text-[var(--muted)]">{formatDate(brew.created_at, locale)}</p>
 							</div>
-							<ModerationToggle targetType="brew" targetId={brew.id} hidden={brew.status === "hidden"} />
+							{session.role === "admin" &&
+							brew.owner_id !== session.userId &&
+							ownerRoles.get(brew.owner_id) === "superuser" ? (
+								<p className="text-xs text-[var(--muted)]">
+									{locale === "id"
+										? "Brew superuser tidak dapat dimoderasi admin."
+										: "Superuser brews cannot be moderated by admin."}
+								</p>
+							) : (
+								<div className="flex flex-wrap items-center gap-2">
+									<ModerationToggle targetType="brew" targetId={brew.id} hidden={brew.status === "hidden"} />
+									{session.role === "superuser" ? <ModerationDeleteAction targetType="brew" targetId={brew.id} /> : null}
+								</div>
+							)}
 						</Card>
 					))}
 				</div>
@@ -50,7 +80,10 @@ export default async function DashboardModerationPage() {
 								<p className="font-semibold text-[var(--espresso)]">{thread.title}</p>
 								<p className="text-xs text-[var(--muted)]">{formatDate(thread.created_at, locale)}</p>
 							</div>
-							<ModerationToggle targetType="thread" targetId={thread.id} hidden={thread.status === "hidden"} />
+							<div className="flex flex-wrap items-center gap-2">
+								<ModerationToggle targetType="thread" targetId={thread.id} hidden={thread.status === "hidden"} />
+								{session.role === "superuser" ? <ModerationDeleteAction targetType="thread" targetId={thread.id} /> : null}
+							</div>
 						</Card>
 					))}
 				</div>
@@ -65,7 +98,10 @@ export default async function DashboardModerationPage() {
 								<p className="line-clamp-2 text-sm text-[var(--foreground)]/90">{clampPlainText(comment.content, 220)}</p>
 								<p className="text-xs text-[var(--muted)]">{formatDate(comment.created_at, locale)}</p>
 							</div>
-							<ModerationToggle targetType="comment" targetId={comment.id} hidden={comment.status === "hidden"} />
+							<div className="flex flex-wrap items-center gap-2">
+								<ModerationToggle targetType="comment" targetId={comment.id} hidden={comment.status === "hidden"} />
+								{session.role === "superuser" ? <ModerationDeleteAction targetType="comment" targetId={comment.id} /> : null}
+							</div>
 						</Card>
 					))}
 				</div>

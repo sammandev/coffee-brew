@@ -13,6 +13,7 @@
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
 		"test:watch": "vitest",
+		"check:all": "pnpm run build && pnpm run lint:fix && pnpm run lint && pnpm run typecheck && pnpm run test",
 		"migrate:push": "node scripts/supabase-migration.js push",
 		"migrate:list": "node scripts/supabase-migration.js list",
 		"user:create": "tsx scripts/create-user-with-role.ts"

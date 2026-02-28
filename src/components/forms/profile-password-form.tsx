@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 const PASSWORD_MIN_LENGTH = 8;
@@ -60,24 +60,26 @@ export function ProfilePasswordForm() {
 
 			<div>
 				<Label htmlFor="next_password">{locale === "id" ? "Kata sandi baru" : "New password"}</Label>
-				<Input
+				<PasswordInput
 					id="next_password"
-					type="password"
 					value={nextPassword}
 					onChange={(event) => setNextPassword(event.currentTarget.value)}
 					minLength={PASSWORD_MIN_LENGTH}
 					required
+					showLabel={locale === "id" ? "Tampilkan kata sandi" : "Show password"}
+					hideLabel={locale === "id" ? "Sembunyikan kata sandi" : "Hide password"}
 				/>
 			</div>
 			<div>
 				<Label htmlFor="confirm_password">{locale === "id" ? "Konfirmasi kata sandi" : "Confirm password"}</Label>
-				<Input
+				<PasswordInput
 					id="confirm_password"
-					type="password"
 					value={confirmPassword}
 					onChange={(event) => setConfirmPassword(event.currentTarget.value)}
 					minLength={PASSWORD_MIN_LENGTH}
 					required
+					showLabel={locale === "id" ? "Tampilkan kata sandi" : "Show password"}
+					hideLabel={locale === "id" ? "Sembunyikan kata sandi" : "Hide password"}
 				/>
 			</div>
 

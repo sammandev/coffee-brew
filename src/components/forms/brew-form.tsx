@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 interface BrewFormProps {
 	mode: "create" | "edit";
 	brewId?: string;
+	redirectPath?: string;
 	initialValues?: {
 		name?: string;
 		brew_method?: string;
@@ -33,11 +34,17 @@ interface BrewFormProps {
 		notes?: string;
 		image_url?: string | null;
 		image_alt?: string | null;
+		tags?: string[] | null;
 		status?: BrewStatus;
 	};
 }
 
 type ImageMode = "upload" | "url";
+
+function toTagInput(tags: string[] | null | undefined) {
+	if (!Array.isArray(tags)) return "";
+	return tags.join(", ");
+}
 
 function resolveDefaultImageMode(imageUrl: string) {
 	if (!imageUrl) return "url" as const;
@@ -53,7 +60,7 @@ function isValidImageUrl(value: string) {
 	}
 }
 
-export function BrewForm({ mode, brewId, initialValues }: BrewFormProps) {
+export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: BrewFormProps) {
 	const { locale } = useAppPreferences();
 	const router = useRouter();
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,6 +87,7 @@ export function BrewForm({ mode, brewId, initialValues }: BrewFormProps) {
 			notes: initialValues?.notes ?? "",
 			imageUrl: initialValues?.image_url?.trim() ?? "",
 			imageAlt: initialValues?.image_alt?.trim() ?? "",
+			tags: toTagInput(initialValues?.tags),
 			status: initialValues?.status ?? "draft",
 		}),
 		[initialValues],
@@ -94,6 +102,7 @@ export function BrewForm({ mode, brewId, initialValues }: BrewFormProps) {
 	const [uploadedImageUrl, setUploadedImageUrl] = useState(
 		resolveDefaultImageMode(defaults.imageUrl) === "upload" ? defaults.imageUrl : "",
 	);
+	const [tagsInput, setTagsInput] = useState(defaults.tags);
 
 	useEffect(() => {
 		const nextMode = resolveDefaultImageMode(defaults.imageUrl);
@@ -102,7 +111,8 @@ export function BrewForm({ mode, brewId, initialValues }: BrewFormProps) {
 		setImageMode(nextMode);
 		setImageUrlInput(nextMode === "url" ? defaults.imageUrl : "");
 		setUploadedImageUrl(nextMode === "upload" ? defaults.imageUrl : "");
-	}, [defaults.imageAlt, defaults.imageUrl, defaults.notes]);
+		setTagsInput(defaults.tags);
+	}, [defaults.imageAlt, defaults.imageUrl, defaults.notes, defaults.tags]);
 
 	const selectedImageUrl = imageMode === "upload" ? uploadedImageUrl.trim() : imageUrlInput.trim();
 	const imagePreviewUrl = resolveBrewImageUrl(selectedImageUrl || null);
@@ -157,6 +167,11 @@ export function BrewForm({ mode, brewId, initialValues }: BrewFormProps) {
 		const formData = new FormData(event.currentTarget);
 		const normalizedImageUrl = selectedImageUrl.trim();
 		const normalizedImageAlt = imageAlt.trim();
+		const tags = tagsInput
+			.split(",")
+			.map((tag) => tag.trim().toLowerCase())
+			.filter((tag, index, arr) => tag.length > 0 && arr.indexOf(tag) === index)
+			.slice(0, 10);
 
 		if (imageMode === "upload" && !normalizedImageUrl) {
 			setError(
@@ -190,6 +205,7 @@ export function BrewForm({ mode, brewId, initialValues }: BrewFormProps) {
 			notes: String(formData.get("notes") ?? ""),
 			imageUrl: normalizedImageUrl.length > 0 ? normalizedImageUrl : null,
 			imageAlt: normalizedImageUrl.length > 0 && normalizedImageAlt.length > 0 ? normalizedImageAlt : null,
+			tags,
 			status: String(formData.get("status") ?? "draft"),
 		};
 
@@ -208,7 +224,7 @@ export function BrewForm({ mode, brewId, initialValues }: BrewFormProps) {
 			return;
 		}
 
-		router.push("/me");
+		router.push(redirectPath);
 		router.refresh();
 	}
 
@@ -227,7 +243,7 @@ export function BrewForm({ mode, brewId, initialValues }: BrewFormProps) {
 			return;
 		}
 
-		router.push("/me");
+		router.push(redirectPath);
 		router.refresh();
 	}
 
@@ -436,6 +452,18 @@ export function BrewForm({ mode, brewId, initialValues }: BrewFormProps) {
 
 					{imageError ? <p className="text-sm text-(--danger)">{imageError}</p> : null}
 				</section>
+
+				<div className="grid gap-2">
+					<Label htmlFor="tags">{locale === "id" ? "Tag (pisahkan dengan koma)" : "Tags (comma-separated)"}</Label>
+					<Input
+						id="tags"
+						name="tags"
+						value={tagsInput}
+						onChange={(event) => setTagsInput(event.currentTarget.value)}
+						placeholder={locale === "id" ? "v60, fruity, light-roast" : "v60, fruity, light-roast"}
+						maxLength={320}
+					/>
+				</div>
 
 				<div className="grid gap-2">
 					<Label htmlFor="notes">{locale === "id" ? "Catatan" : "Notes"}</Label>

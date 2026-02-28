@@ -88,6 +88,7 @@ export default async function ThreadDetailPage({ params }: { params: Promise<{ t
 			return (
 				<div key={comment.id} className="space-y-3" style={{ marginLeft: `${depth * 1.25}rem` }}>
 					<Card className="space-y-4">
+						<span id={`comment-${comment.id}`} className="block h-0 w-0 overflow-hidden" aria-hidden="true" />
 						<RichTextContent html={comment.content} />
 						<div className="flex items-center justify-between gap-3">
 							<p className="text-xs text-[var(--muted)]">{formatDate(comment.created_at, locale)}</p>

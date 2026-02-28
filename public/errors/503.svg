@@ -1,0 +1,15 @@
+<svg width="960" height="540" viewBox="0 0 960 540" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="540" fill="#F6EEE6"/>
+  <circle cx="480" cy="248" r="164" fill="#E9DAC8"/>
+  <rect x="336" y="170" width="288" height="168" rx="24" fill="#5A3A2B"/>
+  <rect x="362" y="198" width="236" height="112" rx="12" fill="#F6EEE6"/>
+  <path d="M402 238H558" stroke="#C9B29E" stroke-width="10" stroke-linecap="round"/>
+  <path d="M402 270H530" stroke="#C9B29E" stroke-width="10" stroke-linecap="round"/>
+  <path d="M278 300L332 246L360 274L306 328L278 300Z" fill="#D89E6E"/>
+  <circle cx="296" cy="318" r="10" fill="#5A3A2B"/>
+  <path d="M612 318C612 292.49 632.49 272 658 272C683.51 272 704 292.49 704 318C704 343.51 683.51 364 658 364C632.49 364 612 343.51 612 318Z" fill="#E2B285"/>
+  <circle cx="658" cy="318" r="20" fill="#F6EEE6"/>
+  <path d="M658 286V296M658 340V350M690 318H680M636 318H626M681 295L674 302M642 334L635 341M681 341L674 334M642 302L635 295" stroke="#5A3A2B" stroke-width="6" stroke-linecap="round"/>
+  <text x="480" y="432" text-anchor="middle" font-size="56" font-family="Arial, sans-serif" font-weight="700" fill="#5A3A2B">503</text>
+  <text x="480" y="466" text-anchor="middle" font-size="22" font-family="Arial, sans-serif" fill="#7A5A46">Service Unavailable</text>
+</svg>

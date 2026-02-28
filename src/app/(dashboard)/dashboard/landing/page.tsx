@@ -8,7 +8,7 @@ export default async function DashboardLandingPage() {
 	const { data: sections } = await supabase
 		.from("landing_sections")
 		.select(
-			"id, section_type, title, title_id, subtitle, subtitle_id, body, body_id, config, config_id, order_index, is_visible",
+			"id, section_type, title, title_id, subtitle, subtitle_id, body, body_id, config, config_id, order_index, status, is_visible",
 		)
 		.order("order_index", { ascending: true });
 

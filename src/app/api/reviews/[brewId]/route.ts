@@ -1,6 +1,7 @@
 import { apiError, apiOk } from "@/lib/api";
 import { getSessionContext } from "@/lib/auth";
 import { requirePermission } from "@/lib/guards";
+import { createNotifications } from "@/lib/notifications";
 import { toOverallScore } from "@/lib/rating";
 import { sanitizeForStorage, validatePlainTextLength } from "@/lib/rich-text";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -56,7 +57,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ brew
 		return apiError("Unauthorized", 401);
 	}
 
-	const { data: brew } = await supabase.from("brews").select("id, status").eq("id", brewId).maybeSingle();
+	const { data: brew } = await supabase
+		.from("brews")
+		.select("id, name, owner_id, status")
+		.eq("id", brewId)
+		.maybeSingle();
 
 	if (!brew || brew.status === "hidden") {
 		return apiError("Brew not available for review", 404);
@@ -85,6 +90,30 @@ export async function PUT(request: Request, { params }: { params: Promise<{ brew
 
 	if (error) {
 		return apiError("Could not save review", 400, error.message);
+	}
+
+	const { data: actorProfile } = await supabase
+		.from("profiles")
+		.select("display_name")
+		.eq("id", session.userId)
+		.maybeSingle<{ display_name: string | null }>();
+	const actorName = actorProfile?.display_name?.trim() || session.email.split("@")[0] || "Someone";
+
+	if (brew.owner_id !== session.userId) {
+		await createNotifications([
+			{
+				recipientId: brew.owner_id,
+				actorId: session.userId,
+				eventType: "review",
+				title: `${actorName} reviewed your brew`,
+				body: `Your brew "${brew.name}" has a new rating update.`,
+				linkPath: `/brew/${brewId}#reviews`,
+				metadata: {
+					brew_id: brewId,
+					review_id: data.id,
+				},
+			},
+		]);
 	}
 
 	return apiOk({ review: data });

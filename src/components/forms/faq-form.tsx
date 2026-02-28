@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -71,10 +72,10 @@ export function FaqForm() {
 					<Label htmlFor="order_index">Order</Label>
 					<Input id="order_index" name="order_index" type="number" defaultValue={0} />
 				</div>
-				<label className="flex items-center gap-2 self-end text-sm text-(--muted)">
-					<input type="checkbox" name="is_visible" defaultChecked className="size-4 rounded border" />
+				<div className="flex items-center gap-2 self-end text-sm text-(--muted)">
+					<Checkbox name="is_visible" defaultChecked />
 					Visible
-				</label>
+				</div>
 			</div>
 
 			{error && <p className="text-sm text-(--danger)">{error}</p>}

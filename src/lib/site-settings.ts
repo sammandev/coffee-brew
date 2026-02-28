@@ -36,6 +36,8 @@ const DEFAULT_SETTINGS: SiteSettings = {
 	enable_google_login: true,
 	enable_magic_link_login: true,
 	enable_signup: true,
+	tab_icon_url: null,
+	tab_icon_storage_path: null,
 };
 
 function asString(value: unknown, fallback: string) {
@@ -131,5 +133,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
 		enable_google_login: Boolean(data.enable_google_login ?? true),
 		enable_magic_link_login: Boolean(data.enable_magic_link_login ?? true),
 		enable_signup: Boolean(data.enable_signup ?? true),
+		tab_icon_url: asNullableString(data.tab_icon_url),
+		tab_icon_storage_path: asNullableString(data.tab_icon_storage_path),
 	};
 }

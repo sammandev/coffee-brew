@@ -2,18 +2,86 @@ import { requireRole } from "@/components/auth-guard";
 import { UserStatusControls } from "@/components/forms/user-status-controls";
 import { Card } from "@/components/ui/card";
 import { getServerI18n } from "@/lib/i18n/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import type { UserStatus } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
+
+function resolveUserStatus(status: unknown): UserStatus {
+	if (status === "blocked" || status === "disabled" || status === "active") {
+		return status;
+	}
+	return "active";
+}
 
 export default async function DashboardUsersPage() {
 	await requireRole({ minRole: "superuser", onUnauthorized: "forbidden" });
-	const [{ locale }, supabase] = await Promise.all([getServerI18n(), createSupabaseServerClient()]);
+	const { locale } = await getServerI18n();
+	const supabase = createSupabaseAdminClient();
 
-	const { data: users } = await supabase
-		.from("profiles")
-		.select("id, email, display_name, status, created_at")
-		.order("created_at", { ascending: false })
-		.limit(100);
+	const { data: authUsersResult } = await supabase.auth.admin.listUsers({
+		page: 1,
+		perPage: 1000,
+	});
+	const authUsers = authUsersResult?.users ?? [];
+	const authUserIds = authUsers.map((user) => user.id);
+
+	const { data: profiles } =
+		authUserIds.length > 0
+			? await supabase.from("profiles").select("id, email, display_name, status, created_at").in("id", authUserIds)
+			: { data: [] as Array<Record<string, unknown>> };
+
+	const profileMap = new Map((profiles ?? []).map((profile) => [String(profile.id), profile]));
+	const accountRows = authUsers.map((authUser) => {
+		const profile = profileMap.get(authUser.id) ?? null;
+		const profileRecord = (profile ?? {}) as Record<string, unknown>;
+		const metadataDisplayName =
+			typeof authUser.user_metadata?.display_name === "string" ? authUser.user_metadata.display_name : null;
+		const email =
+			(typeof profileRecord.email === "string" && profileRecord.email) ||
+			authUser.email ||
+			(locale === "id" ? "tanpa-email@example.com" : "missing-email@example.com");
+		const displayName =
+			(typeof profileRecord.display_name === "string" && profileRecord.display_name.trim()) ||
+			metadataDisplayName ||
+			email;
+		const createdAt =
+			(typeof profileRecord.created_at === "string" && profileRecord.created_at) ||
+			authUser.created_at ||
+			new Date().toISOString();
+
+		return {
+			id: authUser.id,
+			email,
+			display_name: displayName,
+			status: resolveUserStatus(profileRecord.status),
+			created_at: createdAt,
+		};
+	});
+
+	const userIds = accountRows.map((user) => user.id);
+	const { data: roleRows } =
+		userIds.length > 0
+			? await supabase.from("user_roles").select("user_id, roles(name)").in("user_id", userIds)
+			: { data: [] as Array<{ user_id: string; roles: { name: string } | Array<{ name: string }> | null }> };
+
+	const rolePriority = new Map([
+		["superuser", 1],
+		["admin", 2],
+		["user", 3],
+	]);
+	const roleByUserId = new Map<string, string>();
+	for (const row of roleRows ?? []) {
+		const roleName = Array.isArray(row.roles) ? row.roles[0]?.name : row.roles?.name;
+		if (!roleName) continue;
+		const previous = roleByUserId.get(row.user_id);
+		if (!previous) {
+			roleByUserId.set(row.user_id, roleName);
+			continue;
+		}
+		if ((rolePriority.get(roleName) ?? 99) < (rolePriority.get(previous) ?? 99)) {
+			roleByUserId.set(row.user_id, roleName);
+		}
+	}
 
 	return (
 		<div className="space-y-6">
@@ -21,10 +89,15 @@ export default async function DashboardUsersPage() {
 				{locale === "id" ? "Manajemen Pengguna" : "User Management"}
 			</h1>
 			<div className="space-y-3">
-				{users?.map((user) => (
+				{accountRows.map((user) => (
 					<Card key={user.id} className="flex flex-wrap items-center justify-between gap-4">
 						<div>
-							<p className="font-semibold text-[var(--espresso)]">{user.display_name ?? user.email}</p>
+							<div className="flex items-center gap-2">
+								<span className="rounded-full border bg-(--surface) px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-(--muted)">
+									{roleByUserId.get(user.id) ?? "user"}
+								</span>
+								<p className="font-semibold text-[var(--espresso)]">{user.display_name ?? user.email}</p>
+							</div>
 							<p className="text-xs text-[var(--muted)]">{user.email}</p>
 							<p className="text-xs text-[var(--muted)]">
 								{locale === "id" ? "Bergabung" : "Joined"} {formatDate(user.created_at, locale)}

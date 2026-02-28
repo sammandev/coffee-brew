@@ -14,37 +14,33 @@ export default async function ForumPage() {
 
 	return (
 		<div className="space-y-6">
-			<header>
+			<header className="space-y-3">
 				<Badge>{t("nav.forum")}</Badge>
-				<h1 className="mt-2 font-heading text-4xl text-[var(--espresso)]">{t("forum.title")}</h1>
-				<p className="text-[var(--muted)]">{t("forum.subtitle")}</p>
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<h1 className="font-heading text-4xl text-(--espresso)">{t("forum.title")}</h1>
+					{session ? (
+						<ThreadComposerModal
+							title={t("forum.startDiscussion")}
+							description={
+								locale === "id"
+									? "Buat thread baru untuk berbagi insight, pertanyaan, atau tips seduh."
+									: "Create a new thread to share brewing insights, questions, or tips."
+							}
+							triggerLabel={locale === "id" ? "Mulai Diskusi" : "Start Discussion"}
+						/>
+					) : (
+						<Link
+							href="/login"
+							className="rounded-full border px-4 py-2 text-sm font-semibold text-(--accent) hover:bg-(--sand)/15"
+						>
+							{t("forum.loginToPost")}
+						</Link>
+					)}
+				</div>
+				<p className="text-(--muted)">{t("forum.subtitle")}</p>
 			</header>
 
 			<ForumRealtimeNotice />
-
-			<div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-[var(--surface-elevated)] p-4">
-				<h2 className="font-heading text-2xl text-[var(--espresso)]">
-					{locale === "id" ? "Coffee Discussions" : "Coffee Discussions"}
-				</h2>
-				{session ? (
-					<ThreadComposerModal
-						title={t("forum.startDiscussion")}
-						description={
-							locale === "id"
-								? "Buat thread baru untuk berbagi insight, pertanyaan, atau tips seduh."
-								: "Create a new thread to share brewing insights, questions, or tips."
-						}
-						triggerLabel={locale === "id" ? "Start Discussion" : "Start Discussion"}
-					/>
-				) : (
-					<Link
-						href="/login"
-						className="rounded-full border px-4 py-2 text-sm font-semibold text-[var(--accent)] hover:bg-[var(--sand)]/15"
-					>
-						{t("forum.loginToPost")}
-					</Link>
-				)}
-			</div>
 
 			<div className="space-y-3">
 				{threads.map((thread) => (
@@ -54,14 +50,14 @@ export default async function ForumPage() {
 							{Array.isArray(thread.tags) && thread.tags.length > 0 && (
 								<div className="mt-3 flex flex-wrap gap-2">
 									{thread.tags.slice(0, 5).map((tag: string) => (
-										<span key={`${thread.id}-${tag}`} className="rounded-full border px-2 py-0.5 text-xs text-[var(--muted)]">
+										<span key={`${thread.id}-${tag}`} className="rounded-full border px-2 py-0.5 text-xs text-(--muted)">
 											#{tag}
 										</span>
 									))}
 								</div>
 							)}
 							<CardDescription className="mt-2 line-clamp-2">{clampPlainText(thread.content, 180)}</CardDescription>
-							<p className="mt-4 text-xs text-[var(--muted)]">
+							<p className="mt-4 text-xs text-(--muted)">
 								{locale === "id" ? "Diperbarui" : "Updated"} {formatDate(thread.updated_at, locale)}
 							</p>
 						</Card>

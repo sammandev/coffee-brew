@@ -17,6 +17,7 @@ export const brewSchema = z.object({
 	notes: z.string().trim().max(30000).optional(),
 	imageUrl: z.string().trim().url().max(2000).nullable().optional(),
 	imageAlt: z.string().trim().max(200).nullable().optional(),
+	tags: z.array(z.string().trim().min(1).max(32)).max(10).default([]),
 	status: z.enum(["draft", "published", "hidden"]).default("draft"),
 });
 
@@ -42,7 +43,8 @@ export const landingSectionSchema = z.object({
 	config: localizedConfigSchema,
 	config_id: localizedConfigSchema.optional(),
 	order_index: z.number().int().min(0).max(999),
-	is_visible: z.boolean().default(true),
+	is_visible: z.boolean().optional(),
+	status: z.enum(["draft", "published", "hidden"]).default("published"),
 });
 
 export const faqItemSchema = z.object({
@@ -51,7 +53,8 @@ export const faqItemSchema = z.object({
 	question_id: z.string().trim().min(3).max(300),
 	answer_id: z.string().trim().min(3).max(5000),
 	order_index: z.number().int().min(0).max(999).default(0),
-	is_visible: z.boolean().default(true),
+	is_visible: z.boolean().optional(),
+	status: z.enum(["draft", "published", "hidden"]).default("published"),
 });
 
 export const forumThreadSchema = z.object({
@@ -161,6 +164,8 @@ export const siteSettingsSchema = z.object({
 	enable_google_login: z.boolean(),
 	enable_magic_link_login: z.boolean(),
 	enable_signup: z.boolean(),
+	tab_icon_url: z.string().trim().url().max(2000).nullable().optional(),
+	tab_icon_storage_path: z.string().trim().max(400).nullable().optional(),
 });
 
 export const profileDisplayNameSchema = z.object({

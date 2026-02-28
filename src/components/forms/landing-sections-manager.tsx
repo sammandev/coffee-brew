@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { WarningModal } from "@/components/ui/warning-modal";
+import type { ContentLifecycleStatus } from "@/lib/types";
 
 interface SectionRow {
 	id: string;
@@ -24,7 +25,8 @@ interface SectionRow {
 	config: Record<string, unknown>;
 	config_id: Record<string, unknown>;
 	order_index: number;
-	is_visible: boolean;
+	status?: ContentLifecycleStatus;
+	is_visible?: boolean;
 }
 
 interface SectionFormState {
@@ -44,7 +46,7 @@ interface SectionFormState {
 	assetAlt: string;
 	assetAltId: string;
 	order_index: string;
-	is_visible: boolean;
+	status: ContentLifecycleStatus;
 }
 
 const EMPTY_FORM: SectionFormState = {
@@ -64,8 +66,15 @@ const EMPTY_FORM: SectionFormState = {
 	assetAlt: "",
 	assetAltId: "",
 	order_index: "0",
-	is_visible: true,
+	status: "draft",
 };
+
+function resolveStatus(section: Pick<SectionRow, "status" | "is_visible">): ContentLifecycleStatus {
+	if (section.status === "draft" || section.status === "published" || section.status === "hidden") {
+		return section.status;
+	}
+	return section.is_visible ? "published" : "hidden";
+}
 
 function toFormState(section: SectionRow): SectionFormState {
 	return {
@@ -85,7 +94,7 @@ function toFormState(section: SectionRow): SectionFormState {
 		assetAlt: String(section.config?.assetAlt ?? ""),
 		assetAltId: String(section.config_id?.assetAlt ?? ""),
 		order_index: String(section.order_index),
-		is_visible: section.is_visible,
+		status: resolveStatus(section),
 	};
 }
 
@@ -99,7 +108,8 @@ function toPayload(form: SectionFormState) {
 		body: form.body.trim() || null,
 		body_id: form.body_id.trim() || null,
 		order_index: Number(form.order_index || 0),
-		is_visible: form.is_visible,
+		status: form.status,
+		is_visible: form.status === "published",
 		config: {
 			ctaText: form.ctaText.trim() || undefined,
 			ctaLink: form.ctaLink.trim() || undefined,
@@ -113,6 +123,12 @@ function toPayload(form: SectionFormState) {
 			assetAlt: form.assetAltId.trim() || undefined,
 		},
 	};
+}
+
+function statusLabel(status: ContentLifecycleStatus, locale: "en" | "id") {
+	if (status === "draft") return locale === "id" ? "Draft" : "Draft";
+	if (status === "hidden") return locale === "id" ? "Tersembunyi" : "Hidden";
+	return locale === "id" ? "Dipublikasi" : "Published";
 }
 
 export function LandingSectionsManager({ sections }: { sections: SectionRow[] }) {
@@ -196,19 +212,19 @@ export function LandingSectionsManager({ sections }: { sections: SectionRow[] })
 		router.refresh();
 	}
 
-	async function setVisibility(section: SectionRow, isVisible: boolean) {
+	async function setStatus(section: SectionRow, status: ContentLifecycleStatus) {
 		setIsSubmitting(true);
 		setError(null);
 
 		const response = await fetch("/api/admin/landing/sections", {
 			method: "PUT",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ id: section.id, is_visible: isVisible }),
+			body: JSON.stringify({ id: section.id, status, is_visible: status === "published" }),
 		}).catch(() => null);
 
 		if (!response?.ok) {
 			const body = response ? ((await response.json()) as { error?: string }) : null;
-			setError(body?.error ?? (locale === "id" ? "Gagal memperbarui visibilitas." : "Could not update visibility."));
+			setError(body?.error ?? (locale === "id" ? "Gagal memperbarui status." : "Could not update status."));
 			setIsSubmitting(false);
 			return;
 		}
@@ -257,44 +273,47 @@ export function LandingSectionsManager({ sections }: { sections: SectionRow[] })
 							<th className="px-4 py-3">Title</th>
 							<th className="px-4 py-3">Type</th>
 							<th className="px-4 py-3">Order</th>
-							<th className="px-4 py-3">Visible</th>
+							<th className="px-4 py-3">Status</th>
 							<th className="px-4 py-3">Actions</th>
 						</tr>
 					</thead>
 					<tbody>
-						{sortedSections.map((section) => (
-							<tr key={section.id} className="border-b">
-								<td className="px-4 py-3">{section.title}</td>
-								<td className="px-4 py-3">{section.section_type}</td>
-								<td className="px-4 py-3">{section.order_index}</td>
-								<td className="px-4 py-3">{section.is_visible ? "Yes" : "No"}</td>
-								<td className="px-4 py-3">
-									<div className="flex flex-wrap gap-2">
-										<Button type="button" size="sm" variant="outline" onClick={() => openEdit(section)}>
-											{t("common.edit")}
-										</Button>
-										{section.is_visible ? (
-											<Button type="button" size="sm" variant="outline" onClick={() => setHideTarget(section)}>
-												{locale === "id" ? "Sembunyikan" : "Hide"}
+						{sortedSections.map((section) => {
+							const currentStatus = resolveStatus(section);
+							return (
+								<tr key={section.id} className="border-b">
+									<td className="px-4 py-3">{section.title}</td>
+									<td className="px-4 py-3">{section.section_type}</td>
+									<td className="px-4 py-3">{section.order_index}</td>
+									<td className="px-4 py-3">{statusLabel(currentStatus, locale)}</td>
+									<td className="px-4 py-3">
+										<div className="flex flex-wrap gap-2">
+											<Button type="button" size="sm" variant="outline" onClick={() => openEdit(section)}>
+												{t("common.edit")}
 											</Button>
-										) : (
-											<Button
-												type="button"
-												size="sm"
-												variant="secondary"
-												onClick={() => setVisibility(section, true)}
-												disabled={isSubmitting}
-											>
-												{locale === "id" ? "Tampilkan" : "Unhide"}
+											{currentStatus !== "draft" ? (
+												<Button type="button" size="sm" variant="outline" onClick={() => void setStatus(section, "draft")}>
+													{locale === "id" ? "Draft" : "Draft"}
+												</Button>
+											) : null}
+											{currentStatus !== "published" ? (
+												<Button type="button" size="sm" variant="secondary" onClick={() => void setStatus(section, "published")}>
+													{locale === "id" ? "Publikasikan" : "Publish"}
+												</Button>
+											) : null}
+											{currentStatus !== "hidden" ? (
+												<Button type="button" size="sm" variant="outline" onClick={() => setHideTarget(section)}>
+													{locale === "id" ? "Sembunyikan" : "Hide"}
+												</Button>
+											) : null}
+											<Button type="button" size="sm" variant="destructive" onClick={() => setDeleteTarget(section)}>
+												{t("common.delete")}
 											</Button>
-										)}
-										<Button type="button" size="sm" variant="destructive" onClick={() => setDeleteTarget(section)}>
-											{t("common.delete")}
-										</Button>
-									</div>
-								</td>
-							</tr>
-						))}
+										</div>
+									</td>
+								</tr>
+							);
+						})}
 					</tbody>
 				</table>
 			</div>
@@ -344,13 +363,13 @@ export function LandingSectionsManager({ sections }: { sections: SectionRow[] })
 			<WarningModal
 				open={Boolean(hideTarget)}
 				onClose={() => setHideTarget(null)}
-				onConfirm={() => (hideTarget ? setVisibility(hideTarget, false) : Promise.resolve())}
+				onConfirm={() => (hideTarget ? setStatus(hideTarget, "hidden") : Promise.resolve())}
 				isSubmitting={isSubmitting}
 				title={locale === "id" ? "Sembunyikan Section" : "Hide Section"}
 				description={
 					locale === "id"
-						? "Section ini tidak akan tampil di halaman publik sampai ditampilkan kembali."
-						: "This section will be hidden from the public page until it is shown again."
+						? "Section ini tidak akan tampil di halaman publik sampai dipublikasikan kembali."
+						: "This section will be hidden from the public page until published again."
 				}
 				confirmLabel={locale === "id" ? "Sembunyikan" : "Hide"}
 			/>
@@ -515,15 +534,18 @@ function SectionFormFields({
 						onChange={(event) => updateForm("order_index", event.currentTarget.value)}
 					/>
 				</div>
-				<label className="flex items-center gap-2 self-end text-sm text-(--muted)">
-					<input
-						type="checkbox"
-						checked={form.is_visible}
-						onChange={(event) => updateForm("is_visible", event.currentTarget.checked)}
-						className="size-4 rounded border"
-					/>
-					Visible
-				</label>
+				<div>
+					<Label htmlFor="section-status">Status</Label>
+					<Select
+						id="section-status"
+						value={form.status}
+						onChange={(event) => updateForm("status", event.currentTarget.value as ContentLifecycleStatus)}
+					>
+						<option value="draft">Draft</option>
+						<option value="published">Published</option>
+						<option value="hidden">Hidden</option>
+					</Select>
+				</div>
 			</div>
 		</div>
 	);

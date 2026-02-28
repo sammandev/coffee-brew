@@ -7,6 +7,7 @@ import { useAppPreferences } from "@/components/providers/app-preferences-provid
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 type LoginMode = "password" | "magic";
@@ -107,7 +108,14 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 				{mode === "password" && (
 					<div>
 						<Label htmlFor="password">Password</Label>
-						<Input id="password" name="password" type="password" required minLength={8} />
+						<PasswordInput
+							id="password"
+							name="password"
+							required
+							minLength={8}
+							showLabel={t("auth.showPassword")}
+							hideLabel={t("auth.hidePassword")}
+						/>
 					</div>
 				)}
 				<Button type="submit" disabled={isLoading}>

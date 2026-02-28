@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { NavLinks } from "@/components/layout/nav-links";
+import { NavbarNotifications } from "@/components/layout/navbar-notifications";
 import { PreferenceControls } from "@/components/layout/preference-controls";
 import { UserProfileMenu } from "@/components/layout/user-profile-menu";
 import { getServerI18n } from "@/lib/i18n/server";
@@ -68,33 +69,39 @@ export async function SiteHeader() {
 							)}
 						</>
 					) : (
-						<UserProfileMenu
-							role={role}
-							displayName={displayName}
-							email={user.email ?? ""}
-							avatarUrl={profile?.avatar_url ?? null}
-							labels={{
-								dashboard: t("nav.dashboard"),
-								profileSettings: t("nav.profileSettings"),
-								signOut: t("nav.signout"),
-							}}
-						/>
+						<>
+							<NavbarNotifications userId={user.id} />
+							<UserProfileMenu
+								accountRole={role}
+								displayName={displayName}
+								email={user.email ?? ""}
+								avatarUrl={profile?.avatar_url ?? null}
+								labels={{
+									dashboard: t("nav.dashboard"),
+									profileSettings: t("nav.profileSettings"),
+									signOut: t("nav.signout"),
+								}}
+							/>
+						</>
 					)}
 				</div>
 
 				<div className="flex items-center gap-2 lg:hidden">
 					{user ? (
-						<UserProfileMenu
-							role={role}
-							displayName={displayName}
-							email={user.email ?? ""}
-							avatarUrl={profile?.avatar_url ?? null}
-							labels={{
-								dashboard: t("nav.dashboard"),
-								profileSettings: t("nav.profileSettings"),
-								signOut: t("nav.signout"),
-							}}
-						/>
+						<>
+							<NavbarNotifications userId={user.id} />
+							<UserProfileMenu
+								accountRole={role}
+								displayName={displayName}
+								email={user.email ?? ""}
+								avatarUrl={profile?.avatar_url ?? null}
+								labels={{
+									dashboard: t("nav.dashboard"),
+									profileSettings: t("nav.profileSettings"),
+									signOut: t("nav.signout"),
+								}}
+							/>
+						</>
 					) : null}
 
 					<details className="relative">

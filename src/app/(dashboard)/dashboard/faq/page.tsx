@@ -5,7 +5,7 @@ export default async function DashboardFaqPage() {
 	const supabase = await createSupabaseServerClient();
 	const { data: items } = await supabase
 		.from("faq_items")
-		.select("id, question_en, answer_en, question_id, answer_id, order_index, is_visible")
+		.select("id, question_en, answer_en, question_id, answer_id, order_index, status, is_visible")
 		.order("order_index", { ascending: true });
 
 	return (

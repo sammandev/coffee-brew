@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 
 interface Section {
@@ -78,10 +79,8 @@ export function LandingSectionsTable({ sections }: { sections: Section[] }) {
 								/>
 							</td>
 							<td className="px-4 py-3">
-								<input
-									type="checkbox"
+								<Checkbox
 									defaultChecked={section.is_visible}
-									className="size-4"
 									onChange={(event) => updateSection(section, { is_visible: event.currentTarget.checked })}
 								/>
 							</td>

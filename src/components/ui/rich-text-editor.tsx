@@ -46,6 +46,8 @@ export function RichTextEditor({
 				codeBlock: false,
 				heading: false,
 				horizontalRule: false,
+				link: false,
+				underline: false,
 			}),
 			Underline,
 			Link.configure({

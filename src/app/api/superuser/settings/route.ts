@@ -1,7 +1,9 @@
 import { apiError, apiOk } from "@/lib/api";
 import { requireSessionContext } from "@/lib/auth";
 import { getSiteSettings } from "@/lib/site-settings";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { TAB_ICON_BUCKET, toManagedTabIconPath } from "@/lib/tab-icons";
 import { siteSettingsSchema } from "@/lib/validators";
 
 async function requireSuperuser() {
@@ -37,6 +39,21 @@ export async function PUT(request: Request) {
 	}
 
 	const supabase = await createSupabaseServerClient();
+	const { data: existingSettings } = await supabase
+		.from("site_settings")
+		.select("tab_icon_url, tab_icon_storage_path")
+		.eq("id", true)
+		.maybeSingle();
+	const previousTabIconUrl = existingSettings?.tab_icon_url ?? null;
+	const nextTabIconUrl =
+		parsed.data.tab_icon_url === undefined
+			? (existingSettings?.tab_icon_url ?? null)
+			: (parsed.data.tab_icon_url ?? null);
+	const nextTabIconStoragePath =
+		parsed.data.tab_icon_storage_path === undefined
+			? (existingSettings?.tab_icon_storage_path ?? null)
+			: (parsed.data.tab_icon_storage_path ?? null);
+
 	const { data, error } = await supabase
 		.from("site_settings")
 		.update({
@@ -45,6 +62,8 @@ export async function PUT(request: Request) {
 			home_title_id: parsed.data.home_title_id || null,
 			home_subtitle_en: parsed.data.home_subtitle_en || null,
 			home_subtitle_id: parsed.data.home_subtitle_id || null,
+			tab_icon_url: nextTabIconUrl,
+			tab_icon_storage_path: nextTabIconStoragePath,
 		})
 		.eq("id", true)
 		.select("*")
@@ -52,6 +71,13 @@ export async function PUT(request: Request) {
 
 	if (error) {
 		return apiError("Could not update settings", 400, error.message);
+	}
+
+	if (previousTabIconUrl && previousTabIconUrl !== nextTabIconUrl) {
+		const previousPath = toManagedTabIconPath(previousTabIconUrl);
+		if (previousPath) {
+			await createSupabaseAdminClient().storage.from(TAB_ICON_BUCKET).remove([previousPath]);
+		}
 	}
 
 	return apiOk({ settings: data });

@@ -1,6 +1,8 @@
 import { apiError, apiOk } from "@/lib/api";
+import { BLOG_IMAGE_BUCKET, toManagedBlogImagePath } from "@/lib/blog-images";
 import { requirePermission } from "@/lib/guards";
 import { sanitizeForStorage, validatePlainTextLength } from "@/lib/rich-text";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { blogPostSchema } from "@/lib/validators";
 
@@ -87,6 +89,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 			: (parsed.data.published_at ?? null);
 
 	const supabase = await createSupabaseServerClient();
+	const { data: existingPost } = await supabase.from("blog_posts").select("hero_image_url").eq("id", id).maybeSingle();
+	const previousHeroImageUrl = existingPost?.hero_image_url ?? null;
 	const { data, error } = await supabase
 		.from("blog_posts")
 		.update({
@@ -102,6 +106,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 		return apiError("Could not update blog post", 400, error.message);
 	}
 
+	if (previousHeroImageUrl && previousHeroImageUrl !== data.hero_image_url) {
+		const previousPath = toManagedBlogImagePath(previousHeroImageUrl);
+		if (previousPath) {
+			await createSupabaseAdminClient().storage.from(BLOG_IMAGE_BUCKET).remove([previousPath]);
+		}
+	}
+
 	return apiOk({ post: data });
 }
 
@@ -111,10 +122,16 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 
 	const { id } = await params;
 	const supabase = await createSupabaseServerClient();
+	const { data: existingPost } = await supabase.from("blog_posts").select("hero_image_url").eq("id", id).maybeSingle();
 	const { error } = await supabase.from("blog_posts").delete().eq("id", id);
 
 	if (error) {
 		return apiError("Could not delete blog post", 400, error.message);
+	}
+
+	const previousPath = toManagedBlogImagePath(existingPost?.hero_image_url ?? null);
+	if (previousPath) {
+		await createSupabaseAdminClient().storage.from(BLOG_IMAGE_BUCKET).remove([previousPath]);
 	}
 
 	return apiOk({ success: true });

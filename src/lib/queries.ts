@@ -1,34 +1,74 @@
 import { aggregateRatings } from "@/lib/rating";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isMissingColumnError } from "@/lib/supabase-errors";
+
+const BREW_OPTIONAL_COLUMNS = ["image_url", "image_alt", "tags"] as const;
 
 export async function getVisibleLandingSections() {
 	const supabase = await createSupabaseServerClient();
-	const { data } = await supabase
+	let { data, error } = await supabase
 		.from("landing_sections")
 		.select("*")
-		.eq("is_visible", true)
+		.eq("status", "published")
 		.order("order_index", { ascending: true });
+
+	if (error && isMissingColumnError(error, ["status"])) {
+		const fallback = await supabase
+			.from("landing_sections")
+			.select("*")
+			.eq("is_visible", true)
+			.order("order_index", { ascending: true });
+		data = fallback.data;
+	}
+
 	return data ?? [];
 }
 
 export async function getVisibleFaqItems() {
 	const supabase = await createSupabaseServerClient();
-	const { data } = await supabase
+	let { data, error } = await supabase
 		.from("faq_items")
 		.select("*")
-		.eq("is_visible", true)
+		.eq("status", "published")
 		.order("order_index", { ascending: true });
+
+	if (error && isMissingColumnError(error, ["status"])) {
+		const fallback = await supabase
+			.from("faq_items")
+			.select("*")
+			.eq("is_visible", true)
+			.order("order_index", { ascending: true });
+		data = fallback.data;
+	}
+
 	return data ?? [];
 }
 
 export async function getPublishedBrews(limit = 24) {
 	const supabase = await createSupabaseServerClient();
-	const { data } = await supabase
+	let { data, error } = await supabase
 		.from("brews")
-		.select("id, name, brew_method, brand_roastery, coffee_beans, brewer_name, image_url, image_alt, created_at")
+		.select("id, name, brew_method, brand_roastery, coffee_beans, brewer_name, image_url, image_alt, tags, created_at")
 		.eq("status", "published")
 		.order("created_at", { ascending: false })
 		.limit(limit);
+
+	if (error && isMissingColumnError(error, [...BREW_OPTIONAL_COLUMNS])) {
+		console.warn("[queries:getPublishedBrews] optional brew columns missing; retrying with compatibility query");
+		const fallback = await supabase
+			.from("brews")
+			.select("id, name, brew_method, brand_roastery, coffee_beans, brewer_name, created_at")
+			.eq("status", "published")
+			.order("created_at", { ascending: false })
+			.limit(limit);
+		data = (fallback.data ?? []).map((brew) => ({ ...brew, image_url: null, image_alt: null, tags: [] }));
+		error = fallback.error ?? null;
+	}
+
+	if (error) {
+		return [];
+	}
+
 	return data ?? [];
 }
 
@@ -60,10 +100,10 @@ export async function getLandingStats() {
 export async function getHomeShowcase(limitBrews = 6, limitReviews = 6) {
 	const supabase = await createSupabaseServerClient();
 
-	const [{ data: brews }, { data: recentReviews }] = await Promise.all([
+	const [{ data: brewRows, error: brewError }, { data: recentReviews }] = await Promise.all([
 		supabase
 			.from("brews")
-			.select("id, name, brew_method, brand_roastery, coffee_beans, brewer_name, image_url, image_alt, created_at")
+			.select("id, name, brew_method, brand_roastery, coffee_beans, brewer_name, image_url, image_alt, tags, created_at")
 			.eq("status", "published")
 			.order("created_at", { ascending: false })
 			.limit(limitBrews),
@@ -73,8 +113,20 @@ export async function getHomeShowcase(limitBrews = 6, limitReviews = 6) {
 			.order("updated_at", { ascending: false })
 			.limit(limitReviews),
 	]);
+	let brews = brewRows ?? [];
 
-	const brewIds = (brews ?? []).map((brew) => brew.id);
+	if (brewError && isMissingColumnError(brewError, [...BREW_OPTIONAL_COLUMNS])) {
+		console.warn("[queries:getHomeShowcase] optional brew columns missing; retrying with compatibility query");
+		const fallback = await supabase
+			.from("brews")
+			.select("id, name, brew_method, brand_roastery, coffee_beans, brewer_name, created_at")
+			.eq("status", "published")
+			.order("created_at", { ascending: false })
+			.limit(limitBrews);
+		brews = (fallback.data ?? []).map((brew) => ({ ...brew, image_url: null, image_alt: null, tags: [] }));
+	}
+
+	const brewIds = brews.map((brew) => brew.id);
 	const { data: reviewAggregates } =
 		brewIds.length > 0
 			? await supabase.from("brew_reviews").select("brew_id, overall").in("brew_id", brewIds)
@@ -88,7 +140,7 @@ export async function getHomeShowcase(limitBrews = 6, limitReviews = 6) {
 		aggregateMap.set(row.brew_id, existing);
 	}
 
-	const featuredBrews = (brews ?? []).map((brew) => {
+	const featuredBrews = brews.map((brew) => {
 		const aggregate = aggregateMap.get(brew.id);
 		return {
 			...brew,

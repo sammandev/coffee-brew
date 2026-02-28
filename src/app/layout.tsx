@@ -4,6 +4,7 @@ import Script from "next/script";
 import { AppPreferencesProvider } from "@/components/providers/app-preferences-provider";
 import { getServerPreferences } from "@/lib/i18n/server";
 import { getSiteSettings } from "@/lib/site-settings";
+import { resolveTabIconUrl } from "@/lib/tab-icons";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -19,6 +20,7 @@ const manrope = Manrope({
 export async function generateMetadata(): Promise<Metadata> {
 	const settings = await getSiteSettings();
 	const baseTitle = settings.tab_title.trim().length > 0 ? settings.tab_title : settings.app_name;
+	const tabIconUrl = resolveTabIconUrl(settings.tab_icon_url);
 
 	return {
 		title: {
@@ -27,9 +29,9 @@ export async function generateMetadata(): Promise<Metadata> {
 		},
 		description: "Coffee brew recipes, catalog, community, and reviews.",
 		icons: {
-			icon: "/coffee-brew-mark.svg",
-			shortcut: "/coffee-brew-mark.svg",
-			apple: "/coffee-brew-mark.svg",
+			icon: tabIconUrl,
+			shortcut: tabIconUrl,
+			apple: tabIconUrl,
 		},
 	};
 }
@@ -45,9 +47,7 @@ function getThemeBootstrapScript() {
   }
 
   const savedTheme = readCookie('cb_theme');
-  const resolved = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)
-    ? 'dark'
-    : 'light';
+  const resolved = savedTheme === 'dark' ? 'dark' : 'light';
 
   document.documentElement.dataset.theme = resolved;
 })();`;

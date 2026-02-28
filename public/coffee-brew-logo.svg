@@ -9,5 +9,5 @@
   <path d="M48 18C35.31 18 25.01 28.3 25.01 40.99C25.01 53.68 35.31 63.98 48 63.98C60.69 63.98 70.99 53.68 70.99 40.99C70.99 28.3 60.69 18 48 18Z" fill="url(#logo-bean-gradient)"/>
   <path d="M53.2 23.3C48.9 29.4 46.8 34 46.8 40.9C46.8 48.2 48.8 53.2 53.9 59.6" stroke="#F8F1E8" stroke-width="4" stroke-linecap="round"/>
   <text x="116" y="45" fill="#3A2518" font-size="36" font-family="Fraunces, Georgia, serif" font-weight="700">Coffee</text>
-  <text x="116" y="79" fill="#5F6D4F" font-size="30" font-family="Manrope, Arial, sans-serif" font-weight="700" letter-spacing="1.5">BREW</text>
+  <text x="116" y="79" fill="#5F6D4F" font-size="30" font-family="Fraunces, Georgia, serif" font-weight="700" letter-spacing="1.5">Brew</text>
 </svg>

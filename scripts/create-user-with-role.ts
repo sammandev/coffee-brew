@@ -26,6 +26,14 @@ interface AuthUserLike {
 	user_metadata?: Record<string, unknown> | null;
 }
 
+function createAdminClient(supabaseUrl: string, serviceRoleKey: string) {
+	return createClient(supabaseUrl, serviceRoleKey, {
+		auth: { autoRefreshToken: false, persistSession: false },
+	});
+}
+
+type AdminClient = ReturnType<typeof createAdminClient>;
+
 function parseEnvLine(line: string): ParsedEnvLine | null {
 	const trimmed = line.trim();
 	if (!trimmed || trimmed.startsWith("#")) {
@@ -123,10 +131,7 @@ function isValidRole(value: string): value is ValidRole {
 	return VALID_ROLES.has(value as ValidRole);
 }
 
-async function findAuthUserByEmail(
-	adminClient: ReturnType<typeof createClient>,
-	email: string,
-): Promise<AuthUserLike | null> {
+async function findAuthUserByEmail(adminClient: AdminClient, email: string): Promise<AuthUserLike | null> {
 	let page = 1;
 	const perPage = 1000;
 	const targetEmail = email.toLowerCase();
@@ -155,7 +160,7 @@ async function findAuthUserByEmail(
 }
 
 async function waitForProfile(
-	adminClient: ReturnType<typeof createClient>,
+	adminClient: AdminClient,
 	userId: string,
 	maxAttempts = 20,
 	delayMs = 250,
@@ -212,9 +217,7 @@ async function main(): Promise<void> {
 		throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.");
 	}
 
-	const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-		auth: { autoRefreshToken: false, persistSession: false },
-	});
+	const adminClient = createAdminClient(supabaseUrl, serviceRoleKey);
 
 	const { data: roles, error: rolesError } = await adminClient.from("roles").select("name");
 	if (rolesError) {

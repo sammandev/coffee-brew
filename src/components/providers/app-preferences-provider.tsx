@@ -23,18 +23,6 @@ interface AppPreferencesProviderProps {
 	initialThemePreference: ThemePreference;
 }
 
-function resolveInitialTheme(initialThemePreference: ThemePreference): ThemePreference {
-	if (typeof document !== "undefined") {
-		const existingTheme = document.documentElement.dataset.theme;
-
-		if (existingTheme === "light" || existingTheme === "dark") {
-			return existingTheme;
-		}
-	}
-
-	return initialThemePreference;
-}
-
 export function AppPreferencesProvider({
 	children,
 	initialLocale,
@@ -42,9 +30,7 @@ export function AppPreferencesProvider({
 }: AppPreferencesProviderProps) {
 	const router = useRouter();
 	const [locale, setLocaleState] = useState<Locale>(initialLocale);
-	const [themePreference, setThemePreferenceState] = useState<ThemePreference>(() =>
-		resolveInitialTheme(initialThemePreference),
-	);
+	const [themePreference, setThemePreferenceState] = useState<ThemePreference>(initialThemePreference);
 
 	const value = useMemo<AppPreferencesValue>(() => {
 		const setLocale = (nextLocale: Locale) => {

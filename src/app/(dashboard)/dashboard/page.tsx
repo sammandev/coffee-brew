@@ -49,6 +49,17 @@ export default async function DashboardOverviewPage() {
 
 			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 				<Link
+					href="/dashboard/brews"
+					className="rounded-3xl border bg-[var(--surface-elevated)] p-6 hover:bg-[var(--surface)]"
+				>
+					<h3 className="font-heading text-2xl text-[var(--espresso)]">{locale === "id" ? "Brew" : "Brews"}</h3>
+					<CardDescription className="mt-2">
+						{locale === "id"
+							? "Kelola brew milik sendiri dan moderasi visibilitas brew pengguna lain."
+							: "Manage own brews and moderate visibility of other users' brews."}
+					</CardDescription>
+				</Link>
+				<Link
 					href="/dashboard/landing"
 					className="rounded-3xl border bg-[var(--surface-elevated)] p-6 hover:bg-[var(--surface)]"
 				>

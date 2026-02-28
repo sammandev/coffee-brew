@@ -26,6 +26,15 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 				<p className="text-[var(--muted)]">
 					{locale === "id" ? "Oleh" : "By"} {brew.brewer_name}
 				</p>
+				{Array.isArray(brew.tags) && brew.tags.length > 0 ? (
+					<div className="flex flex-wrap gap-2">
+						{brew.tags.map((tag: string) => (
+							<span key={`${brew.id}-${tag}`} className="rounded-full border px-2.5 py-1 text-xs text-[var(--muted)]">
+								#{tag}
+							</span>
+						))}
+					</div>
+				) : null}
 			</header>
 
 			<div className="overflow-hidden rounded-3xl border bg-[var(--surface-elevated)]">
