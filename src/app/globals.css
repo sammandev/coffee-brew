@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+:root {
+	--espresso: #3a2518;
+	--crema: #d9a96d;
+	--oat: #f8f1e8;
+	--sand: #dcc3a5;
+	--moss: #5f6d4f;
+	--charcoal: #2f2621;
+
+	--background: #f8f1e8;
+	--foreground: #2f2621;
+	--surface: #fffaf3;
+	--surface-elevated: #ffffff;
+	--muted: #705f50;
+	--border: color-mix(in oklab, #dcc3a5 48%, transparent);
+	--accent: #5f6d4f;
+	--danger: #8f2626;
+	--overlay: rgba(42, 26, 17, 0.58);
+}
+
+:root[data-theme="dark"] {
+	--espresso: #f2dfcb;
+	--crema: #e2b172;
+	--oat: #14100d;
+	--sand: #4f3d2f;
+	--moss: #92a884;
+	--charcoal: #f2e7db;
+
+	--background: #14100d;
+	--foreground: #f2e7db;
+	--surface: #1c1511;
+	--surface-elevated: #251b16;
+	--muted: #b7a89a;
+	--border: color-mix(in oklab, #7f654d 42%, transparent);
+	--accent: #92a884;
+	--danger: #dc6d6d;
+	--overlay: rgba(10, 8, 7, 0.7);
+}
+
+@theme inline {
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--font-heading: var(--font-heading);
+	--font-sans: var(--font-body);
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+* {
+	border-color: var(--border);
+}
+
+html,
+body {
+	min-height: 100%;
+}
+
+body {
+	min-height: 100vh;
+	background: var(--background);
+	color: var(--foreground);
+	font-family: var(--font-body), sans-serif;
+}
+
+.font-heading {
+	font-family: var(--font-heading), serif;
+}
+
+@keyframes fade-up {
+	from {
+		opacity: 0;
+		transform: translateY(16px);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.fade-up {
+	animation: fade-up 0.6s ease-out both;
+}
