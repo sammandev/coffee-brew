@@ -1,6 +1,6 @@
 "use client";
 
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -54,9 +54,18 @@ export function NavbarMessages({ userId, mobile = false }: NavbarMessagesProps) 
 		}
 		const channel = supabase
 			.channel(`dm-unread:${userId}`)
-			.on("postgres_changes", { event: "*", schema: "public", table: "dm_messages" }, () => {
+			.on("postgres_changes", { event: "*", schema: "public", table: "dm_messages" }, (payload) => {
 				if (generation !== unreadSubscriptionGenerationRef.current) return;
-				void loadUnreadCount();
+				const messagePayload = payload as RealtimePostgresChangesPayload<Record<string, unknown>>;
+				if (messagePayload.eventType !== "INSERT") {
+					void loadUnreadCount();
+					return;
+				}
+				const senderId = typeof messagePayload.new?.sender_id === "string" ? messagePayload.new.sender_id : null;
+				if (!senderId || senderId === userId || pathname.startsWith("/messages")) {
+					return;
+				}
+				setUnreadCount((current) => current + 1);
 			})
 			.on(
 				"postgres_changes",
@@ -74,7 +83,7 @@ export function NavbarMessages({ userId, mobile = false }: NavbarMessagesProps) 
 			unreadChannelRef.current = null;
 			void supabase.removeChannel(channel);
 		};
-	}, [loadUnreadCount, userId]);
+	}, [loadUnreadCount, pathname, userId]);
 
 	useEffect(() => {
 		if (!pathname.startsWith("/messages")) return;

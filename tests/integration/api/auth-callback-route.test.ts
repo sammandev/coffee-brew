@@ -27,7 +27,9 @@ describe("GET /api/auth/callback", () => {
 		);
 
 		expect(response.status).toBe(307);
-		expect(response.headers.get("location")).toBe("http://localhost/login?error=auth_callback_nonce_invalid");
+		expect(response.headers.get("location")).toBe(
+			"http://localhost/login?error=auth_callback_nonce_invalid&context=oauth_callback",
+		);
 		expect(mockCookieStore.get).toHaveBeenCalledWith(AUTH_CALLBACK_NONCE_COOKIE);
 		expect(mockCookieStore.set).toHaveBeenCalledWith(
 			expect.objectContaining({

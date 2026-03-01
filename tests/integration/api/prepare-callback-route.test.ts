@@ -79,4 +79,25 @@ describe("POST /api/auth/prepare-callback", () => {
 			identifier: "unknown",
 		});
 	});
+
+	it("returns a dedicated one-tap nonce when one_tap flow is requested", async () => {
+		const response = await POST(
+			new Request("http://localhost/api/auth/prepare-callback", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					origin: "http://localhost",
+				},
+				body: JSON.stringify({ next: "/session/resolve", flow: "one_tap" }),
+			}),
+		);
+		const body = (await response.json()) as { flow?: string; next?: string; oneTapNonce?: string; callbackUrl?: string };
+
+		expect(response.status).toBe(200);
+		expect(body.flow).toBe("one_tap");
+		expect(body.next).toBe("/session/resolve");
+		expect(typeof body.oneTapNonce).toBe("string");
+		expect(body.oneTapNonce?.length).toBeGreaterThan(0);
+		expect(body.callbackUrl).toBeUndefined();
+	});
 });

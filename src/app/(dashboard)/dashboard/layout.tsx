@@ -1,7 +1,6 @@
 import { requireRole } from "@/components/auth-guard";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { getServerI18n } from "@/lib/i18n/server";
-import { touchUserPresence } from "@/lib/presence";
 import { getSiteSettings } from "@/lib/site-settings";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -20,7 +19,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
 		.maybeSingle<{ avatar_url: string | null; display_name: string | null }>();
 
 	const displayName = profile?.display_name?.trim() || session.email.split("@")[0] || "User";
-	await touchUserPresence(session.userId).catch(() => null);
 
 	return (
 		<DashboardShell

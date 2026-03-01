@@ -1,7 +1,5 @@
+import { ONLINE_WINDOW_MS, PRESENCE_TOUCH_INTERVAL_MS } from "@/lib/presence-constants";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-export const ONLINE_WINDOW_MS = 5 * 60 * 1000;
-export const PRESENCE_TOUCH_INTERVAL_MS = 60 * 1000;
 
 export function isOnlineByLastActive(lastActiveAt: string | null | undefined) {
 	if (!lastActiveAt) return false;

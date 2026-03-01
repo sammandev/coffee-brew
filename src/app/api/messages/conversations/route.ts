@@ -1,5 +1,6 @@
 import { apiError, apiOk } from "@/lib/api";
 import { canCreateDirectConversation, requireActiveDmSession, resolveDirectKey } from "@/lib/dm-service";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { dmConversationListQuerySchema, dmConversationStartSchema } from "@/lib/validators";
 
 function firstParam(value: string | string[] | null) {
@@ -249,6 +250,7 @@ export async function POST(request: Request) {
 	const auth = await requireActiveDmSession();
 	if ("response" in auth) return auth.response;
 	const { context, supabase } = auth;
+	const supabaseAdmin = createSupabaseAdminClient();
 
 	const body = await request.json().catch(() => null);
 	const parsed = dmConversationStartSchema.safeParse(body);
@@ -261,7 +263,7 @@ export async function POST(request: Request) {
 		return apiError("Could not start conversation", 400, "Cannot create direct message with yourself.");
 	}
 
-	const { data: recipient } = await supabase
+	const { data: recipient } = await supabaseAdmin
 		.from("profiles")
 		.select("id, status")
 		.eq("id", recipientId)
@@ -280,7 +282,7 @@ export async function POST(request: Request) {
 
 	const directKey = resolveDirectKey(context.userId, recipientId);
 
-	const { data: existingConversation } = await supabase
+	const { data: existingConversation } = await supabaseAdmin
 		.from("dm_conversations")
 		.select("id")
 		.eq("conversation_type", "direct")
@@ -288,7 +290,7 @@ export async function POST(request: Request) {
 		.maybeSingle<{ id: string }>();
 
 	if (existingConversation) {
-		await supabase.from("dm_participants").upsert(
+		await supabaseAdmin.from("dm_participants").upsert(
 			[
 				{
 					conversation_id: existingConversation.id,
@@ -306,7 +308,7 @@ export async function POST(request: Request) {
 		return apiOk({ conversation_id: existingConversation.id, created: false });
 	}
 
-	const { data: createdConversation, error: conversationError } = await supabase
+	const { data: createdConversation, error: conversationError } = await supabaseAdmin
 		.from("dm_conversations")
 		.insert({
 			conversation_type: "direct",
@@ -321,7 +323,7 @@ export async function POST(request: Request) {
 		return apiError("Could not start conversation", 400, conversationError?.message);
 	}
 
-	const { error: participantError } = await supabase.from("dm_participants").insert([
+	const { error: participantError } = await supabaseAdmin.from("dm_participants").insert([
 		{
 			conversation_id: createdConversation.id,
 			user_id: context.userId,

@@ -242,6 +242,7 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 						/>
 					</div>
 				)}
+
 				{validationIssues.length > 0 ? (
 					<Card className="space-y-2 border-(--danger)/40 bg-(--danger)/5 p-4">
 						<p className="text-sm font-semibold text-(--danger)">
@@ -265,12 +266,31 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 								: `Retry in ${magicCooldownSeconds}s`
 							: t("auth.sendMagicLink")}
 				</Button>
+
 				{mode === "magic" && magicCooldownSeconds > 0 ? (
 					<p className="text-xs text-(--muted)">
 						{locale === "id"
 							? `Pengiriman magic link dibatasi sementara. Silakan tunggu ${magicCooldownSeconds} detik.`
 							: `Magic link requests are temporarily throttled. Please wait ${magicCooldownSeconds} seconds.`}
 					</p>
+				) : null}
+
+				{error ? <Card className="border-(--danger)/40 bg-(--danger)/5 p-4 text-sm text-(--danger)">{error}</Card> : null}
+				{success ? (
+					<Card className="border-(--accent)/40 bg-(--accent)/10 p-4 text-sm text-(--accent)">{success}</Card>
+				) : null}
+
+				{mode === "magic" && magicSentEmail ? (
+					<Card className="space-y-2 rounded-3xl border border-(--accent)/30 bg-(--surface-elevated) p-5">
+						<p className="text-sm font-semibold text-(--espresso)">
+							{locale === "id" ? "Periksa inbox email Anda" : "Check Your Email Inbox"}
+						</p>
+						<p className="text-sm text-(--muted)">
+							{locale === "id"
+								? `Kami baru saja mengirim magic link ke ${magicSentEmail}. Buka inbox (dan folder spam/junk) lalu klik tautannya untuk masuk.`
+								: `We just sent a magic link to ${magicSentEmail}. Open your inbox (and spam/junk folder) and click the link to sign in.`}
+						</p>
+					</Card>
 				) : null}
 
 				<div className="relative py-1">
@@ -299,24 +319,7 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 						{t("auth.continueGoogle")}
 					</Button>
 				)}
-				{error ? <Card className="border-(--danger)/40 bg-(--danger)/5 p-4 text-sm text-(--danger)">{error}</Card> : null}
-				{success ? (
-					<Card className="border-(--accent)/40 bg-(--accent)/10 p-4 text-sm text-(--accent)">{success}</Card>
-				) : null}
 			</form>
-
-			{mode === "magic" && magicSentEmail ? (
-				<Card className="space-y-2 rounded-3xl border border-(--accent)/30 bg-(--surface-elevated) p-5">
-					<p className="text-sm font-semibold text-(--espresso)">
-						{locale === "id" ? "Periksa inbox email Anda" : "Check Your Email Inbox"}
-					</p>
-					<p className="text-sm text-(--muted)">
-						{locale === "id"
-							? `Kami baru saja mengirim magic link ke ${magicSentEmail}. Buka inbox (dan folder spam/junk) lalu klik tautannya untuk masuk.`
-							: `We just sent a magic link to ${magicSentEmail}. Open your inbox (and spam/junk folder) and click the link to sign in.`}
-					</p>
-				</Card>
-			) : null}
 		</div>
 	);
 }

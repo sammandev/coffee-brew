@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeAuthCallbackNextPath } from "@/lib/auth-callback";
+import { isAuthPrepareFlow, normalizeAuthCallbackNextPath } from "@/lib/auth-callback";
 
 describe("normalizeAuthCallbackNextPath", () => {
 	it("keeps valid internal paths", () => {
@@ -16,5 +16,12 @@ describe("normalizeAuthCallbackNextPath", () => {
 	it("rejects control characters and backslashes", () => {
 		expect(normalizeAuthCallbackNextPath("/path\\evil")).toBe("/session/resolve");
 		expect(normalizeAuthCallbackNextPath("/path\nnext")).toBe("/session/resolve");
+	});
+
+	it("accepts only supported auth preparation flows", () => {
+		expect(isAuthPrepareFlow("callback")).toBe(true);
+		expect(isAuthPrepareFlow("one_tap")).toBe(true);
+		expect(isAuthPrepareFlow("oauth")).toBe(false);
+		expect(isAuthPrepareFlow(null)).toBe(false);
 	});
 });

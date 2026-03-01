@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BrewReviewsLiveRefresh } from "@/components/brew/brew-reviews-live-refresh";
 import { FlavorRadarChart } from "@/components/brew/flavor-radar-chart";
 import { MethodRecommendationChips } from "@/components/brew/method-recommendation-chips";
 import { WishlistToggleButton } from "@/components/brew/wishlist-toggle-button";
@@ -154,6 +155,8 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 
 	return (
 		<div className="space-y-8">
+			<BrewReviewsLiveRefresh brewId={brew.id} />
+
 			{/* Breadcrumb */}
 			<nav aria-label="Breadcrumb" className="text-sm text-(--muted)">
 				<ol className="flex items-center gap-1.5">

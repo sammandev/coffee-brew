@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { MAGIC_LINK_COOLDOWN_KEY, ONE_TAP_STATUS_KEY } from "@/lib/auth-diagnostics";
+import { MAGIC_LINK_COOLDOWN_KEY, ONE_TAP_ERROR_KEY, ONE_TAP_STATUS_KEY } from "@/lib/auth-diagnostics";
 
 interface AuthDiagnosticsProps {
 	oneTapClientIdDetected: boolean;
@@ -14,7 +14,10 @@ function resolveSessionPath(redirectPath?: string) {
 }
 
 export function AuthDiagnostics({ oneTapClientIdDetected, redirectPath }: AuthDiagnosticsProps) {
+	const isDevelopment = process.env.NODE_ENV === "development";
+
 	const [oneTapStatus, setOneTapStatus] = useState<string>("idle");
+	const [oneTapError, setOneTapError] = useState<string | null>(null);
 	const [cooldownSeconds, setCooldownSeconds] = useState(0);
 	const [origin, setOrigin] = useState("");
 
@@ -24,11 +27,14 @@ export function AuthDiagnostics({ oneTapClientIdDetected, redirectPath }: AuthDi
 	);
 
 	useEffect(() => {
+		if (!isDevelopment) return;
+
 		setOrigin(window.location.origin);
 
 		const tick = () => {
 			const status = window.sessionStorage.getItem(ONE_TAP_STATUS_KEY) ?? "idle";
 			setOneTapStatus(status);
+			setOneTapError(window.sessionStorage.getItem(ONE_TAP_ERROR_KEY));
 
 			const cooldownRaw = window.sessionStorage.getItem(MAGIC_LINK_COOLDOWN_KEY);
 			if (!cooldownRaw) {
@@ -53,7 +59,11 @@ export function AuthDiagnostics({ oneTapClientIdDetected, redirectPath }: AuthDi
 		tick();
 		const interval = window.setInterval(tick, 1000);
 		return () => window.clearInterval(interval);
-	}, []);
+	}, [isDevelopment]);
+
+	if (!isDevelopment) {
+		return null;
+	}
 
 	return (
 		<div className="rounded-2xl border border-dashed bg-(--surface-elevated) p-4 text-xs text-(--muted)">
@@ -65,6 +75,10 @@ export function AuthDiagnostics({ oneTapClientIdDetected, redirectPath }: AuthDi
 				</p>
 				<p>
 					<span className="font-medium text-(--espresso)">One Tap status:</span> {oneTapStatus}
+				</p>
+				<p>
+					<span className="font-medium text-(--espresso)">One Tap error:</span>{" "}
+					{oneTapError === "nonce_mismatch" ? "nonce mismatch (id_token nonce vs passed nonce)" : (oneTapError ?? "none")}
 				</p>
 				<p>
 					<span className="font-medium text-(--espresso)">Callback URL in use:</span> {origin || "(loading...)"}

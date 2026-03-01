@@ -145,6 +145,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 						<BlogReactionPanel
 							postId={dbPost.id}
 							canReact={Boolean(session)}
+							currentUserId={session?.userId ?? null}
 							initialCounts={reactionCounts}
 							initialMyReaction={myReaction}
 							loginHref={`/login?next=${encodeURIComponent(`/blog/${slug}`)}`}

@@ -1,5 +1,12 @@
 export const AUTH_CALLBACK_NONCE_COOKIE = "cb_auth_nonce";
 export const AUTH_CALLBACK_NONCE_TTL_SECONDS = 10 * 60;
+export const ONE_TAP_NONCE_TTL_SECONDS = 5 * 60;
+
+export type AuthPrepareFlow = "callback" | "one_tap";
+
+export function isAuthPrepareFlow(value: unknown): value is AuthPrepareFlow {
+	return value === "callback" || value === "one_tap";
+}
 
 export function normalizeAuthCallbackNextPath(rawNext: string | null | undefined) {
 	const value = typeof rawNext === "string" ? rawNext.trim() : "";

@@ -10,13 +10,14 @@ export async function GET(request: Request) {
 	const tokenHash = searchParams.get("token_hash");
 	const type = searchParams.get("type");
 	const callbackNonce = searchParams.get("cb_nonce")?.trim() ?? "";
+	const hasCallbackNonce = callbackNonce.length > 0;
 	const safePath = normalizeAuthCallbackNextPath(searchParams.get("next"));
 
 	const cookieStore = await cookies();
 	const expectedNonce = cookieStore.get(AUTH_CALLBACK_NONCE_COOKIE)?.value ?? "";
 	const hasAuthPayload = Boolean(code || tokenHash);
 
-	if (hasAuthPayload && (!callbackNonce || !expectedNonce || callbackNonce !== expectedNonce)) {
+	if (hasAuthPayload && (!hasCallbackNonce || !expectedNonce || callbackNonce !== expectedNonce)) {
 		cookieStore.set({
 			name: AUTH_CALLBACK_NONCE_COOKIE,
 			value: "",
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
 			path: "/api/auth/callback",
 			maxAge: 0,
 		});
-		return NextResponse.redirect(`${origin}/login?error=auth_callback_nonce_invalid`);
+		return NextResponse.redirect(`${origin}/login?error=auth_callback_nonce_invalid&context=oauth_callback`);
 	}
 
 	cookieStore.set({

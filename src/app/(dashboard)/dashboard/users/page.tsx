@@ -4,6 +4,7 @@ import { UserDisplayNameEditor } from "@/components/forms/user-display-name-edit
 import { UserRoleControls } from "@/components/forms/user-role-controls";
 import { UserStatusControls } from "@/components/forms/user-status-controls";
 import { Card } from "@/components/ui/card";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { getServerI18n } from "@/lib/i18n/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Role, UserStatus } from "@/lib/types";
@@ -177,7 +178,16 @@ export default async function DashboardUsersPage({ searchParams }: DashboardUser
 									<span className="rounded-full border bg-(--surface) px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-(--muted)">
 										{currentRole}
 									</span>
-									<UserDisplayNameEditor displayName={user.display_name ?? user.email} userId={user.id} />
+									<div className="flex min-w-0 items-center gap-2">
+										<UserDisplayNameEditor displayName={user.display_name ?? user.email} userId={user.id} />
+										{user.is_verified ? (
+											<VerifiedBadge
+												showLabel
+												label={locale === "id" ? "Terverifikasi" : "Verified"}
+												title={locale === "id" ? "Pengguna terverifikasi" : "Verified user"}
+											/>
+										) : null}
+									</div>
 								</div>
 								<p className="text-xs text-(--muted)">{user.email}</p>
 								<p className="text-xs text-(--muted)">

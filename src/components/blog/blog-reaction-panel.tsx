@@ -1,12 +1,15 @@
 "use client";
 
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { FORUM_REACTION_TYPES, type ForumReactionType, REACTION_EMOJI } from "@/lib/constants";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 interface BlogReactionPanelProps {
 	canReact: boolean;
+	currentUserId?: string | null;
 	initialCounts: Record<ForumReactionType, number>;
 	initialMyReaction: ForumReactionType | null;
 	loginHref: string;
@@ -15,6 +18,7 @@ interface BlogReactionPanelProps {
 
 export function BlogReactionPanel({
 	canReact,
+	currentUserId = null,
 	initialCounts,
 	initialMyReaction,
 	loginHref,
@@ -25,6 +29,72 @@ export function BlogReactionPanel({
 	const [myReaction, setMyReaction] = useState<ForumReactionType | null>(initialMyReaction);
 	const [loadingReaction, setLoadingReaction] = useState<ForumReactionType | null>(null);
 	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		let generation = 1;
+		const supabase = createSupabaseBrowserClient();
+		const channel: RealtimeChannel = supabase
+			.channel(`blog-reactions:${postId}`)
+			.on(
+				"postgres_changes",
+				{ event: "*", schema: "public", table: "blog_reactions", filter: `post_id=eq.${postId}` },
+				(payload) => {
+					if (generation !== 1) return;
+					const nextRow = payload.new as Record<string, unknown> | undefined;
+					const oldRow = payload.old as Record<string, unknown> | undefined;
+					const actorId =
+						typeof nextRow?.user_id === "string"
+							? nextRow.user_id
+							: typeof oldRow?.user_id === "string"
+								? oldRow.user_id
+								: null;
+					if (currentUserId && actorId === currentUserId) return;
+
+					const nextReaction =
+						typeof nextRow?.reaction === "string" && FORUM_REACTION_TYPES.includes(nextRow.reaction as ForumReactionType)
+							? (nextRow.reaction as ForumReactionType)
+							: null;
+					const oldReaction =
+						typeof oldRow?.reaction === "string" && FORUM_REACTION_TYPES.includes(oldRow.reaction as ForumReactionType)
+							? (oldRow.reaction as ForumReactionType)
+							: null;
+
+					setCounts((current) => {
+						const nextCounts = { ...current };
+						if (payload.eventType === "DELETE") {
+							if (oldReaction) {
+								nextCounts[oldReaction] = Math.max(0, (nextCounts[oldReaction] ?? 0) - 1);
+							}
+							return nextCounts;
+						}
+
+						if (payload.eventType === "INSERT") {
+							if (nextReaction) {
+								nextCounts[nextReaction] = (nextCounts[nextReaction] ?? 0) + 1;
+							}
+							return nextCounts;
+						}
+
+						if (payload.eventType === "UPDATE") {
+							if (oldReaction && oldReaction !== nextReaction) {
+								nextCounts[oldReaction] = Math.max(0, (nextCounts[oldReaction] ?? 0) - 1);
+							}
+							if (nextReaction && oldReaction !== nextReaction) {
+								nextCounts[nextReaction] = (nextCounts[nextReaction] ?? 0) + 1;
+							}
+						}
+
+						return nextCounts;
+					});
+				},
+			)
+			.subscribe();
+
+		return () => {
+			generation = 0;
+			void supabase.removeChannel(channel);
+		};
+	}, [currentUserId, postId]);
 
 	async function submitReaction(nextReaction: ForumReactionType) {
 		if (!canReact) return;
@@ -63,15 +133,7 @@ export function BlogReactionPanel({
 		const payload = (await response.json().catch(() => ({}))) as {
 			reaction?: ForumReactionType | null;
 		};
-		const finalReaction = (payload.reaction ?? null) as ForumReactionType | null;
-		const nextCounts = { ...counts };
-		if (previousReaction) {
-			nextCounts[previousReaction] = Math.max(0, (nextCounts[previousReaction] ?? 0) - 1);
-		}
-		if (finalReaction) {
-			nextCounts[finalReaction] = (nextCounts[finalReaction] ?? 0) + 1;
-		}
-		setCounts(nextCounts);
+		const finalReaction = (payload.reaction ?? optimisticReaction ?? null) as ForumReactionType | null;
 		setMyReaction(finalReaction);
 		setLoadingReaction(null);
 	}

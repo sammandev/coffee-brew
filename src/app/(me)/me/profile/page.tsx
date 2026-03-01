@@ -33,7 +33,7 @@ export default async function MeProfilePage() {
 					{ label: locale === "id" ? "Profil" : "Profile" },
 				]}
 			/>
-			<h1 className="font-heading text-4xl text-[var(--espresso)]">{locale === "id" ? "Profil" : "Profile"}</h1>
+			<h1 className="font-heading text-4xl text-(--espresso)">{locale === "id" ? "Profil" : "Profile"}</h1>
 			<ProfileSettingsPanel
 				avatarUrl={profile?.avatar_url ?? null}
 				displayName={displayName}

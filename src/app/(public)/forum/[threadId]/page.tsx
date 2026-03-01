@@ -14,9 +14,11 @@ import { ReactionBar } from "@/components/forum/reaction-bar";
 import { ThreadTypingIndicator } from "@/components/forum/thread-typing-indicator";
 import { Badge } from "@/components/ui/badge";
 import { RichTextContent } from "@/components/ui/rich-text-content";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { getSessionContext } from "@/lib/auth";
 import { FORUM_REACTION_TYPES, type ForumReactionType } from "@/lib/constants";
 import { getServerI18n } from "@/lib/i18n/server";
+import { isOnlineByLastActive } from "@/lib/presence";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ForumPollRecord } from "@/lib/types";
@@ -203,7 +205,9 @@ export default async function ThreadDetailPage({ params, searchParams }: ThreadD
 		profileIds.length > 0
 			? supabaseAdmin
 					.from("profiles")
-					.select("id, display_name, email, avatar_url, created_at, is_verified, karma_points, mention_handle")
+					.select(
+						"id, display_name, email, avatar_url, created_at, is_verified, karma_points, mention_handle, show_online_status, last_active_at",
+					)
 					.in("id", profileIds)
 			: Promise.resolve({
 					data: [] as Array<{
@@ -215,6 +219,8 @@ export default async function ThreadDetailPage({ params, searchParams }: ThreadD
 						is_verified: boolean;
 						karma_points: number;
 						mention_handle: string | null;
+						last_active_at: string | null;
+						show_online_status: boolean;
 					}>,
 				}),
 		profileIds.length > 0
@@ -244,8 +250,10 @@ export default async function ThreadDetailPage({ params, searchParams }: ThreadD
 			{
 				avatarUrl: profileRow.avatar_url,
 				joinedAt: profileRow.created_at,
+				lastActiveAt: profileRow.last_active_at,
 				mentionHandle: profileRow.mention_handle,
 				name: resolveUserDisplayName(profileRow),
+				showOnlineStatus: Boolean(profileRow.show_online_status),
 				topBadge: topBadgeByUserId.get(profileRow.id) ?? null,
 				totalReviews: reviewerCountByUserId.get(profileRow.id) ?? 0,
 				verified: Boolean(profileRow.is_verified),
@@ -256,8 +264,10 @@ export default async function ThreadDetailPage({ params, searchParams }: ThreadD
 	const authorInfo = profileById.get(thread.author_id) ?? {
 		avatarUrl: null,
 		joinedAt: thread.created_at,
+		lastActiveAt: null,
 		mentionHandle: null,
 		name: "Unknown User",
+		showOnlineStatus: false,
 		topBadge: null,
 		totalReviews: 0,
 		verified: false,
@@ -317,13 +327,17 @@ export default async function ThreadDetailPage({ params, searchParams }: ThreadD
 			const commentAuthor = profileById.get(comment.author_id) ?? {
 				avatarUrl: null,
 				joinedAt: comment.created_at,
+				lastActiveAt: null,
 				mentionHandle: null,
 				name: "Unknown User",
+				showOnlineStatus: false,
 				topBadge: null,
 				totalReviews: 0,
 				verified: false,
 				karma: 0,
 			};
+			const commentAuthorOnline =
+				Boolean(session) && commentAuthor.showOnlineStatus && isOnlineByLastActive(commentAuthor.lastActiveAt);
 			const isReply = Boolean(comment.parent_comment_id);
 			const children = commentsByParent.get(comment.id) ?? [];
 			const isLastChild = index === rows.length - 1;
@@ -349,27 +363,37 @@ export default async function ThreadDetailPage({ params, searchParams }: ThreadD
 							{/* Comment Header */}
 							<div className="flex items-start justify-between gap-3">
 								<div className="flex items-center gap-2.5">
-									{commentAuthor.avatarUrl ? (
-										<Image
-											src={commentAuthor.avatarUrl}
-											alt=""
-											width={28}
-											height={28}
-											unoptimized
-											className="h-7 w-7 rounded-full object-cover"
-										/>
-									) : (
-										<div className="flex h-7 w-7 items-center justify-center rounded-full bg-(--accent)/10 text-xs font-bold text-(--accent)">
-											{commentAuthor.name.charAt(0).toUpperCase()}
-										</div>
-									)}
-									<div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-										<span className="text-sm font-semibold text-(--espresso)">{commentAuthor.name}</span>
-										{commentAuthor.verified ? (
-											<span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-												✓
-											</span>
+									<div className="relative h-7 w-7">
+										{commentAuthor.avatarUrl ? (
+											<Image
+												src={commentAuthor.avatarUrl}
+												alt=""
+												width={28}
+												height={28}
+												sizes="28px"
+												className="h-7 w-7 rounded-full object-cover"
+											/>
+										) : (
+											<div className="flex h-7 w-7 items-center justify-center rounded-full bg-(--accent)/10 text-xs font-bold text-(--accent)">
+												{commentAuthor.name.charAt(0).toUpperCase()}
+											</div>
+										)}
+										{commentAuthorOnline ? (
+											<span className="absolute right-0 bottom-0 h-2.5 w-2.5 rounded-full border border-(--surface-elevated) bg-emerald-500" />
 										) : null}
+									</div>
+									<div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+										{session ? (
+											<Link
+												href={`/users/${comment.author_id}`}
+												className="text-sm font-semibold text-(--espresso) hover:underline"
+											>
+												{commentAuthor.name}
+											</Link>
+										) : (
+											<span className="text-sm font-semibold text-(--espresso)">{commentAuthor.name}</span>
+										)}
+										{commentAuthor.verified ? <VerifiedBadge /> : null}
 										{commentAuthor.topBadge ? (
 											<span className="rounded-full bg-(--accent)/10 px-1.5 py-0.5 text-[10px] font-semibold text-(--accent)">
 												{commentAuthor.topBadge}
@@ -388,7 +412,12 @@ export default async function ThreadDetailPage({ params, searchParams }: ThreadD
 
 							{/* Comment Footer */}
 							<div className="mt-2">
-								<ReactionBar targetType="comment" targetId={comment.id} counts={commentReactionCounts} />
+								<ReactionBar
+									targetType="comment"
+									targetId={comment.id}
+									counts={commentReactionCounts}
+									currentUserId={session?.userId ?? null}
+								/>
 							</div>
 
 							{/* Reply toggle inline */}
@@ -425,7 +454,6 @@ export default async function ThreadDetailPage({ params, searchParams }: ThreadD
 				tableFilters={[
 					{ table: "forum_threads", filter: `id=eq.${thread.id}` },
 					{ table: "forum_comments", filter: `thread_id=eq.${thread.id}` },
-					{ table: "forum_reactions", filter: `thread_id=eq.${thread.id}` },
 				]}
 			/>
 
@@ -489,28 +517,35 @@ export default async function ThreadDetailPage({ params, searchParams }: ThreadD
 				{/* Author Info */}
 				<div className="flex items-center justify-between gap-3">
 					<div className="flex items-center gap-3">
-						{authorInfo.avatarUrl ? (
-							<Image
-								src={authorInfo.avatarUrl}
-								alt=""
-								width={36}
-								height={36}
-								unoptimized
-								className="h-9 w-9 rounded-full object-cover"
-							/>
-						) : (
-							<div className="flex h-9 w-9 items-center justify-center rounded-full bg-(--accent)/10 text-sm font-bold text-(--accent)">
-								{authorInfo.name.charAt(0).toUpperCase()}
-							</div>
-						)}
+						<div className="relative h-9 w-9">
+							{authorInfo.avatarUrl ? (
+								<Image
+									src={authorInfo.avatarUrl}
+									alt=""
+									width={36}
+									height={36}
+									sizes="36px"
+									className="h-9 w-9 rounded-full object-cover"
+								/>
+							) : (
+								<div className="flex h-9 w-9 items-center justify-center rounded-full bg-(--accent)/10 text-sm font-bold text-(--accent)">
+									{authorInfo.name.charAt(0).toUpperCase()}
+								</div>
+							)}
+							{Boolean(session) && authorInfo.showOnlineStatus && isOnlineByLastActive(authorInfo.lastActiveAt) ? (
+								<span className="absolute right-0 bottom-0 h-3 w-3 rounded-full border border-(--surface-elevated) bg-emerald-500" />
+							) : null}
+						</div>
 						<div>
 							<div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-								<span className="text-sm font-semibold text-(--espresso)">{authorInfo.name}</span>
-								{authorInfo.verified ? (
-									<span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-										✓
-									</span>
-								) : null}
+								{session ? (
+									<Link href={`/users/${thread.author_id}`} className="text-sm font-semibold text-(--espresso) hover:underline">
+										{authorInfo.name}
+									</Link>
+								) : (
+									<span className="text-sm font-semibold text-(--espresso)">{authorInfo.name}</span>
+								)}
+								{authorInfo.verified ? <VerifiedBadge /> : null}
 								{authorInfo.topBadge ? (
 									<span className="rounded-full bg-(--accent)/10 px-1.5 py-0.5 text-[10px] font-semibold text-(--accent)">
 										{authorInfo.topBadge}
@@ -533,7 +568,12 @@ export default async function ThreadDetailPage({ params, searchParams }: ThreadD
 
 				{/* Reactions */}
 				<div className="mt-4 border-t border-(--border) pt-3">
-					<ReactionBar targetType="thread" targetId={thread.id} counts={threadReactionCounts} />
+					<ReactionBar
+						targetType="thread"
+						targetId={thread.id}
+						counts={threadReactionCounts}
+						currentUserId={session?.userId ?? null}
+					/>
 				</div>
 			</div>
 

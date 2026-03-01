@@ -396,7 +396,7 @@ export default async function ForumPage({ searchParams }: ForumPageProps) {
 													alt=""
 													width={40}
 													height={40}
-													unoptimized
+													sizes="40px"
 													className="h-10 w-10 rounded-full object-cover"
 												/>
 											) : (

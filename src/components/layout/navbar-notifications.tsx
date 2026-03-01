@@ -1,5 +1,6 @@
 "use client";
 
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Bell } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -81,6 +82,8 @@ export function NavbarNotifications({ userId, mobile = false }: NavbarNotificati
 	const [workingId, setWorkingId] = useState<string | null>(null);
 	const [items, setItems] = useState<NotificationItem[]>([]);
 	const [unreadCount, setUnreadCount] = useState(0);
+	const notificationsChannelRef = useRef<RealtimeChannel | null>(null);
+	const notificationsSubscriptionGenerationRef = useRef(0);
 
 	const eventLabelLookup = useMemo(
 		() => ({
@@ -113,6 +116,15 @@ export function NavbarNotifications({ userId, mobile = false }: NavbarNotificati
 		setLoading(false);
 	}, []);
 
+	const reconcileUnreadCount = useCallback(async () => {
+		const response = await fetch("/api/notifications?limit=1&view=active", { method: "GET" }).catch(() => null);
+		if (!response?.ok) return;
+		const body = (await response.json().catch(() => ({}))) as Partial<NotificationsResponse>;
+		if (typeof body.unread_count === "number") {
+			setUnreadCount(body.unread_count);
+		}
+	}, []);
+
 	useEffect(() => {
 		void loadNotifications(view);
 	}, [view, loadNotifications]);
@@ -143,13 +155,41 @@ export function NavbarNotifications({ userId, mobile = false }: NavbarNotificati
 	}, [open]);
 
 	useEffect(() => {
+		function handleVisibilityOrReconnect() {
+			if (document.visibilityState !== "visible") return;
+			if (open) {
+				void loadNotifications(view);
+				return;
+			}
+			void reconcileUnreadCount();
+		}
+
+		window.addEventListener("focus", handleVisibilityOrReconnect);
+		window.addEventListener("online", handleVisibilityOrReconnect);
+		document.addEventListener("visibilitychange", handleVisibilityOrReconnect);
+
+		return () => {
+			window.removeEventListener("focus", handleVisibilityOrReconnect);
+			window.removeEventListener("online", handleVisibilityOrReconnect);
+			document.removeEventListener("visibilitychange", handleVisibilityOrReconnect);
+		};
+	}, [loadNotifications, open, reconcileUnreadCount, view]);
+
+	useEffect(() => {
+		notificationsSubscriptionGenerationRef.current += 1;
+		const generation = notificationsSubscriptionGenerationRef.current;
 		const supabase = createSupabaseBrowserClient();
+		if (notificationsChannelRef.current) {
+			void supabase.removeChannel(notificationsChannelRef.current);
+			notificationsChannelRef.current = null;
+		}
 		const channel = supabase
 			.channel(`notifications:${userId}`)
 			.on(
 				"postgres_changes",
 				{ event: "INSERT", schema: "public", table: "user_notifications", filter: `recipient_id=eq.${userId}` },
 				(payload) => {
+					if (generation !== notificationsSubscriptionGenerationRef.current) return;
 					const notification = normalizeNotification(payload.new as Record<string, unknown>);
 					if (!notification) return;
 
@@ -167,6 +207,7 @@ export function NavbarNotifications({ userId, mobile = false }: NavbarNotificati
 				"postgres_changes",
 				{ event: "UPDATE", schema: "public", table: "user_notifications", filter: `recipient_id=eq.${userId}` },
 				(payload) => {
+					if (generation !== notificationsSubscriptionGenerationRef.current) return;
 					const updated = normalizeNotification(payload.new as Record<string, unknown>);
 					if (!updated) return;
 
@@ -200,6 +241,7 @@ export function NavbarNotifications({ userId, mobile = false }: NavbarNotificati
 				"postgres_changes",
 				{ event: "DELETE", schema: "public", table: "user_notifications", filter: `recipient_id=eq.${userId}` },
 				(payload) => {
+					if (generation !== notificationsSubscriptionGenerationRef.current) return;
 					const oldReadAt = typeof payload.old?.read_at === "string" ? payload.old.read_at : null;
 					const oldArchivedAt = typeof payload.old?.archived_at === "string" ? payload.old.archived_at : null;
 					if (!oldReadAt && !oldArchivedAt) {
@@ -210,12 +252,28 @@ export function NavbarNotifications({ userId, mobile = false }: NavbarNotificati
 					setItems((previous) => previous.filter((item) => item.id !== oldId));
 				},
 			)
-			.subscribe();
+			.subscribe((status) => {
+				if (generation !== notificationsSubscriptionGenerationRef.current) return;
+				if (status === "SUBSCRIBED") {
+					void reconcileUnreadCount();
+					return;
+				}
+				if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+					if (open) {
+						void loadNotifications(view);
+						return;
+					}
+					void reconcileUnreadCount();
+				}
+			});
+		notificationsChannelRef.current = channel;
 
 		return () => {
+			notificationsSubscriptionGenerationRef.current += 1;
+			notificationsChannelRef.current = null;
 			void supabase.removeChannel(channel);
 		};
-	}, [userId, view]);
+	}, [loadNotifications, open, reconcileUnreadCount, userId, view]);
 
 	async function markOneAsRead(notificationId: string) {
 		const response = await fetch(`/api/notifications/${notificationId}/read`, {

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { formatDate } from "@/lib/utils";
 
 interface UserIdentitySummaryProps {
@@ -76,7 +77,7 @@ export function UserIdentitySummary({
 			<div className="min-w-0 space-y-1">
 				<div className="flex flex-wrap items-center gap-1.5">
 					<NameNode href={profileHref ?? `/users/${userId}`} name={displayName} />
-					{isVerified ? <span className="rounded-full border px-1 text-[10px]">✓</span> : null}
+					{isVerified ? <VerifiedBadge /> : null}
 					{topBadge ? (
 						<span className="rounded-full border border-(--border) bg-(--sand)/25 px-1.5 py-0.5 text-[10px] font-medium text-(--muted)">
 							{topBadge}

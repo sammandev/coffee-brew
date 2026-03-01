@@ -1,18 +1,36 @@
 "use client";
 
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import type { ForumReactionType } from "@/lib/constants";
 import { FORUM_REACTION_TYPES, REACTION_EMOJI } from "@/lib/constants";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 interface ReactionBarProps {
 	counts?: Partial<Record<ForumReactionType, number>>;
+	currentUserId?: string | null;
 	myReaction?: ForumReactionType | null;
 	targetType: "thread" | "comment";
 	targetId: string;
 }
 
-export function ReactionBar({ counts, myReaction = null, targetType, targetId }: ReactionBarProps) {
+function isReactionType(value: unknown): value is ForumReactionType {
+	return typeof value === "string" && FORUM_REACTION_TYPES.includes(value as ForumReactionType);
+}
+
+function getRowValue(row: Record<string, unknown> | null | undefined, key: string): unknown {
+	if (!row || typeof row !== "object") return undefined;
+	return row[key];
+}
+
+export function ReactionBar({
+	counts,
+	currentUserId = null,
+	myReaction = null,
+	targetType,
+	targetId,
+}: ReactionBarProps) {
 	const { locale } = useAppPreferences();
 	const [loading, setLoading] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -26,6 +44,76 @@ export function ReactionBar({ counts, myReaction = null, targetType, targetId }:
 	useEffect(() => {
 		setLocalMyReaction(myReaction);
 	}, [myReaction]);
+
+	useEffect(() => {
+		let generation = 1;
+		const supabase = createSupabaseBrowserClient();
+		const channel: RealtimeChannel = supabase
+			.channel(`forum-reactions:${targetType}:${targetId}`)
+			.on(
+				"postgres_changes",
+				{ event: "*", schema: "public", table: "forum_reactions", filter: `target_id=eq.${targetId}` },
+				(payload) => {
+					if (generation !== 1) return;
+					const nextRow = payload.new as Record<string, unknown> | undefined;
+					const oldRow = payload.old as Record<string, unknown> | undefined;
+
+					const nextTargetType = getRowValue(nextRow, "target_type");
+					const oldTargetType = getRowValue(oldRow, "target_type");
+					if (nextTargetType && nextTargetType !== targetType) return;
+					if (!nextTargetType && oldTargetType && oldTargetType !== targetType) return;
+
+					const actorId =
+						typeof getRowValue(nextRow, "user_id") === "string"
+							? (getRowValue(nextRow, "user_id") as string)
+							: typeof getRowValue(oldRow, "user_id") === "string"
+								? (getRowValue(oldRow, "user_id") as string)
+								: null;
+					if (currentUserId && actorId === currentUserId) return;
+
+					const nextReaction = isReactionType(getRowValue(nextRow, "reaction"))
+						? (getRowValue(nextRow, "reaction") as ForumReactionType)
+						: null;
+					const oldReaction = isReactionType(getRowValue(oldRow, "reaction"))
+						? (getRowValue(oldRow, "reaction") as ForumReactionType)
+						: null;
+
+					setLocalCounts((current) => {
+						const nextCounts = { ...current };
+						if (payload.eventType === "DELETE") {
+							if (oldReaction) {
+								nextCounts[oldReaction] = Math.max(0, (nextCounts[oldReaction] ?? 0) - 1);
+							}
+							return nextCounts;
+						}
+
+						if (payload.eventType === "INSERT") {
+							if (nextReaction) {
+								nextCounts[nextReaction] = (nextCounts[nextReaction] ?? 0) + 1;
+							}
+							return nextCounts;
+						}
+
+						if (payload.eventType === "UPDATE") {
+							if (oldReaction && oldReaction !== nextReaction) {
+								nextCounts[oldReaction] = Math.max(0, (nextCounts[oldReaction] ?? 0) - 1);
+							}
+							if (nextReaction && oldReaction !== nextReaction) {
+								nextCounts[nextReaction] = (nextCounts[nextReaction] ?? 0) + 1;
+							}
+						}
+
+						return nextCounts;
+					});
+				},
+			)
+			.subscribe();
+
+		return () => {
+			generation = 0;
+			void supabase.removeChannel(channel);
+		};
+	}, [currentUserId, targetId, targetType]);
 
 	async function addReaction(reaction: (typeof FORUM_REACTION_TYPES)[number]) {
 		const previousReaction = localMyReaction;

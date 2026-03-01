@@ -1,10 +1,11 @@
 import { CalendarDays, Lock } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PrivateProfileLockCard } from "@/components/profile/private-profile-lock-card";
 import { PublicProfileTabs } from "@/components/profile/public-profile-tabs";
 import { StartMessageButton } from "@/components/profile/start-message-button";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { getSessionContext } from "@/lib/auth";
 import { FORUM_REACTION_TYPES, type ForumReactionType } from "@/lib/constants";
 import { getServerI18n } from "@/lib/i18n/server";
@@ -549,7 +550,13 @@ export default async function PublicProfilePage({ params, searchParams }: Public
 						<div className="min-w-0 space-y-2">
 							<div className="flex flex-wrap items-center gap-2">
 								<h1 className="font-heading text-3xl text-(--espresso)">{displayName}</h1>
-								{targetProfile.is_verified ? <Badge>Verified</Badge> : null}
+								{targetProfile.is_verified ? (
+									<VerifiedBadge
+										showLabel
+										label={locale === "id" ? "Terverifikasi" : "Verified"}
+										title={locale === "id" ? "Pengguna terverifikasi" : "Verified user"}
+									/>
+								) : null}
 								{targetTopBadge ? <Badge>{targetTopBadge}</Badge> : null}
 								{targetProfile.mention_handle ? <Badge>@{targetProfile.mention_handle}</Badge> : null}
 							</div>
@@ -589,13 +596,7 @@ export default async function PublicProfilePage({ params, searchParams }: Public
 			</header>
 
 			{isPrivateForViewer ? (
-				<Card>
-					<p className="text-sm text-(--muted)">
-						{locale === "id"
-							? "Pengguna ini mengaktifkan profil privat. Detail publik tidak dapat ditampilkan."
-							: "This user has enabled a private profile. Public details are not available."}
-					</p>
-				</Card>
+				<PrivateProfileLockCard locale={locale} />
 			) : (
 				<PublicProfileTabs
 					activeReviewsTab={activeReviewsTab}

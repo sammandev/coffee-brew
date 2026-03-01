@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
 	AUTH_CALLBACK_NONCE_COOKIE,
 	AUTH_CALLBACK_NONCE_TTL_SECONDS,
+	isAuthPrepareFlow,
 	normalizeAuthCallbackNextPath,
 } from "@/lib/auth-callback";
 import { consumeDbRateLimit } from "@/lib/rate-limit";
@@ -47,9 +48,15 @@ export async function POST(request: Request) {
 	}
 
 	const body = await request.json().catch(() => ({}));
+	const flow = isAuthPrepareFlow(body?.flow) ? body.flow : "callback";
 	const requestedNext = typeof body?.next === "string" ? body.next : null;
 	const safePath = normalizeAuthCallbackNextPath(requestedNext);
 	const nonce = crypto.randomUUID();
+
+	if (flow === "one_tap") {
+		return NextResponse.json({ oneTapNonce: nonce, next: safePath, flow });
+	}
+
 	const callbackUrl = `${origin}/api/auth/callback?next=${encodeURIComponent(safePath)}&cb_nonce=${encodeURIComponent(nonce)}`;
 
 	const response = NextResponse.json({ callbackUrl });

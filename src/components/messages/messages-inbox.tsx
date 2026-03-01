@@ -1,11 +1,13 @@
 "use client";
 
+import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { Archive, ArchiveRestore, Loader2, MessageCircle, Search } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { formatDate } from "@/lib/utils";
 
 type InboxView = "active" | "archived";
@@ -47,6 +49,8 @@ export function MessagesInbox({ locale }: MessagesInboxProps) {
 	const [error, setError] = useState<string | null>(null);
 	const [conversations, setConversations] = useState<ConversationItem[]>([]);
 	const [unreadCount, setUnreadCount] = useState(0);
+	const inboxChannelRef = useRef<RealtimeChannel | null>(null);
+	const inboxSubscriptionGenerationRef = useRef(0);
 
 	const copy = useMemo(
 		() => ({
@@ -87,12 +91,93 @@ export function MessagesInbox({ locale }: MessagesInboxProps) {
 		[locale],
 	);
 
+	const patchFromMessage = useCallback(
+		(payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+			if (payload.eventType !== "INSERT") {
+				void loadConversations(view, query);
+				return;
+			}
+
+			const nextRow = payload.new;
+			const conversationId = typeof nextRow?.conversation_id === "string" ? nextRow.conversation_id : null;
+			const senderId = typeof nextRow?.sender_id === "string" ? nextRow.sender_id : null;
+			const messageId = typeof nextRow?.id === "string" ? nextRow.id : null;
+			const createdAt = typeof nextRow?.created_at === "string" ? nextRow.created_at : null;
+			const bodyText = typeof nextRow?.body_text === "string" ? nextRow.body_text : "";
+
+			if (!conversationId || !senderId || !messageId || !createdAt) {
+				void loadConversations(view, query);
+				return;
+			}
+
+			let foundConversation = false;
+			setConversations((current) => {
+				const patched = current.map((conversation) => {
+					if (conversation.id !== conversationId) return conversation;
+					foundConversation = true;
+					return {
+						...conversation,
+						last_message_at: createdAt,
+						last_message: {
+							id: messageId,
+							sender_id: senderId,
+							body_text: bodyText,
+							created_at: createdAt,
+						},
+						unread_hint: true,
+					};
+				});
+
+				if (!foundConversation) return current;
+				const target = patched.find((conversation) => conversation.id === conversationId);
+				if (!target) return patched;
+				const withoutTarget = patched.filter((conversation) => conversation.id !== conversationId);
+				return [target, ...withoutTarget];
+			});
+
+			if (!foundConversation) {
+				void loadConversations(view, query);
+				return;
+			}
+		},
+		[loadConversations, query, view],
+	);
+
 	useEffect(() => {
 		const handle = setTimeout(() => {
 			void loadConversations(view, query);
 		}, 250);
 		return () => clearTimeout(handle);
 	}, [query, view, loadConversations]);
+
+	useEffect(() => {
+		inboxSubscriptionGenerationRef.current += 1;
+		const generation = inboxSubscriptionGenerationRef.current;
+		const supabase = createSupabaseBrowserClient();
+		if (inboxChannelRef.current) {
+			void supabase.removeChannel(inboxChannelRef.current);
+			inboxChannelRef.current = null;
+		}
+
+		const channel = supabase
+			.channel("dm-inbox")
+			.on("postgres_changes", { event: "*", schema: "public", table: "dm_messages" }, (payload) => {
+				if (generation !== inboxSubscriptionGenerationRef.current) return;
+				patchFromMessage(payload as RealtimePostgresChangesPayload<Record<string, unknown>>);
+			})
+			.on("postgres_changes", { event: "*", schema: "public", table: "dm_participants" }, () => {
+				if (generation !== inboxSubscriptionGenerationRef.current) return;
+				void loadConversations(view, query);
+			})
+			.subscribe();
+		inboxChannelRef.current = channel;
+
+		return () => {
+			inboxSubscriptionGenerationRef.current += 1;
+			inboxChannelRef.current = null;
+			void supabase.removeChannel(channel);
+		};
+	}, [loadConversations, patchFromMessage, query, view]);
 
 	async function archiveConversation(conversationId: string, archived: boolean) {
 		setWorkingId(conversationId);

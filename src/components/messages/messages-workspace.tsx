@@ -1,12 +1,13 @@
 "use client";
 
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { Archive, ArchiveRestore, Loader2, MessageCircle, Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageThread } from "@/components/messages/message-thread";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -49,6 +50,13 @@ interface MessagesWorkspaceProps {
 }
 
 const PAGE_SIZE = 20;
+type RealtimeRow = Record<string, unknown> | null | undefined;
+
+function getRealtimeString(row: RealtimeRow, key: string) {
+	if (!row || typeof row !== "object") return null;
+	const value = row[key];
+	return typeof value === "string" ? value : null;
+}
 
 function initials(name: string) {
 	const first = name.trim().charAt(0).toUpperCase();
@@ -77,8 +85,18 @@ export function MessagesWorkspace({
 	const [error, setError] = useState<string | null>(null);
 	const [hasMore, setHasMore] = useState(false);
 	const [nextCursor, setNextCursor] = useState<string | null>(null);
+	const conversationsRef = useRef<ConversationItem[]>([]);
 	const workspaceChannelRef = useRef<RealtimeChannel | null>(null);
 	const workspaceSubscriptionGenerationRef = useRef(0);
+	const selectedConversationIdRef = useRef<string | null>(initialConversationId);
+
+	useEffect(() => {
+		selectedConversationIdRef.current = selectedConversationId;
+	}, [selectedConversationId]);
+
+	useEffect(() => {
+		conversationsRef.current = conversations;
+	}, [conversations]);
 
 	const copy = useMemo(
 		() => ({
@@ -133,9 +151,11 @@ export function MessagesWorkspace({
 	);
 
 	const loadConversations = useCallback(
-		async ({ reset, cursor }: { cursor?: string | null; reset: boolean }) => {
+		async ({ reset, cursor, silent = false }: { cursor?: string | null; reset: boolean; silent?: boolean }) => {
 			if (reset) {
-				setLoading(true);
+				if (!silent && conversationsRef.current.length === 0) {
+					setLoading(true);
+				}
 			} else {
 				setLoadingMore(true);
 			}
@@ -172,12 +192,176 @@ export function MessagesWorkspace({
 		[locale, query, view],
 	);
 
+	const moveConversationToTop = useCallback((target: ConversationItem, previous: ConversationItem[]) => {
+		const withoutTarget = previous.filter((conversation) => conversation.id !== target.id);
+		return [target, ...withoutTarget];
+	}, []);
+
+	const patchConversationByMessage = useCallback(
+		(payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+			const nextRow = payload.new;
+			const oldRow = payload.old;
+			const eventType = payload.eventType;
+
+			const conversationIdRaw =
+				getRealtimeString(nextRow, "conversation_id") ?? getRealtimeString(oldRow, "conversation_id");
+			if (!conversationIdRaw) return;
+
+			if (eventType === "DELETE") {
+				setConversations((current) => {
+					const activeConversation = current.find((conversation) => conversation.id === conversationIdRaw);
+					if (!activeConversation?.last_message?.id) return current;
+					const deletedMessageId = getRealtimeString(oldRow, "id");
+					if (!deletedMessageId || activeConversation.last_message.id !== deletedMessageId) return current;
+					void loadConversations({ reset: true, silent: true });
+					return current;
+				});
+				return;
+			}
+
+			if (eventType === "INSERT") {
+				const senderId = getRealtimeString(nextRow, "sender_id");
+				const createdAt = getRealtimeString(nextRow, "created_at");
+				const bodyText = getRealtimeString(nextRow, "body_text") ?? "";
+				const messageId = getRealtimeString(nextRow, "id");
+
+				if (!senderId || !createdAt || !messageId) {
+					void loadConversations({ reset: true, silent: true });
+					return;
+				}
+
+				let foundConversation = false;
+				const incrementUnread =
+					senderId !== currentUserId && selectedConversationIdRef.current !== conversationIdRaw && view === "active";
+
+				setConversations((current) => {
+					const patched = current.map((conversation) => {
+						if (conversation.id !== conversationIdRaw) return conversation;
+						foundConversation = true;
+						const nextUnreadCount = Math.max(0, (conversation.unread_count ?? 0) + (incrementUnread ? 1 : 0));
+						return {
+							...conversation,
+							last_message_at: createdAt,
+							last_message: {
+								id: messageId,
+								sender_id: senderId,
+								body_text: bodyText,
+								created_at: createdAt,
+							},
+							unread_count: nextUnreadCount,
+							unread_hint: nextUnreadCount > 0,
+						};
+					});
+					if (!foundConversation) return current;
+					const target = patched.find((conversation) => conversation.id === conversationIdRaw);
+					if (!target) return patched;
+					return moveConversationToTop(target, patched);
+				});
+
+				if (!foundConversation) {
+					void loadConversations({ reset: true, silent: true });
+					return;
+				}
+
+				if (incrementUnread) {
+					setUnreadCount((current) => current + 1);
+				}
+				return;
+			}
+
+			if (eventType === "UPDATE") {
+				const messageId = getRealtimeString(nextRow, "id");
+				const bodyText = getRealtimeString(nextRow, "body_text");
+				if (!messageId || bodyText === null) {
+					void loadConversations({ reset: true, silent: true });
+					return;
+				}
+
+				setConversations((current) =>
+					current.map((conversation) => {
+						if (conversation.id !== conversationIdRaw) return conversation;
+						const existingLastMessage = conversation.last_message;
+						if (!existingLastMessage || existingLastMessage.id !== messageId) return conversation;
+						return {
+							...conversation,
+							last_message: {
+								...existingLastMessage,
+								body_text: bodyText,
+							},
+						};
+					}),
+				);
+			}
+		},
+		[currentUserId, loadConversations, moveConversationToTop, view],
+	);
+
+	const patchConversationByParticipant = useCallback(
+		(payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+			const eventType = payload.eventType;
+			const nextRow = payload.new;
+			const oldRow = payload.old;
+
+			const conversationId = getRealtimeString(nextRow, "conversation_id") ?? getRealtimeString(oldRow, "conversation_id");
+			if (!conversationId) return;
+
+			if (eventType !== "UPDATE") {
+				void loadConversations({ reset: true, silent: true });
+				return;
+			}
+
+			const nextArchivedAt = getRealtimeString(nextRow, "archived_at");
+			const oldArchivedAt = getRealtimeString(oldRow, "archived_at");
+			if ((nextArchivedAt ?? null) !== (oldArchivedAt ?? null)) {
+				void loadConversations({ reset: true, silent: true });
+				return;
+			}
+
+			const nextLastReadAt = getRealtimeString(nextRow, "last_read_at");
+			const oldLastReadAt = getRealtimeString(oldRow, "last_read_at");
+			if ((nextLastReadAt ?? null) === (oldLastReadAt ?? null)) {
+				return;
+			}
+
+			let clearedUnread = 0;
+			setConversations((current) => {
+				const patched = current.map((conversation) => {
+					if (conversation.id !== conversationId) return conversation;
+					clearedUnread = conversation.unread_count ?? (conversation.unread_hint ? 1 : 0);
+					return {
+						...conversation,
+						last_read_at: nextLastReadAt,
+						unread_count: 0,
+						unread_hint: false,
+					};
+				});
+				return patched;
+			});
+			if (clearedUnread > 0) {
+				setUnreadCount((value) => Math.max(0, value - clearedUnread));
+			}
+		},
+		[loadConversations],
+	);
+
 	useEffect(() => {
 		const handle = setTimeout(() => {
 			void loadConversations({ reset: true });
 		}, 220);
 		return () => clearTimeout(handle);
 	}, [loadConversations]);
+
+	useEffect(() => {
+		const currentQuery = searchParams.get("q") ?? "";
+		const trimmedQuery = query.trim();
+		if (currentQuery === trimmedQuery) {
+			return;
+		}
+		const handle = setTimeout(() => {
+			syncUrl({ q: query });
+		}, 220);
+		return () => clearTimeout(handle);
+	}, [query, searchParams, syncUrl]);
 
 	useEffect(() => {
 		workspaceSubscriptionGenerationRef.current += 1;
@@ -189,16 +373,16 @@ export function MessagesWorkspace({
 		}
 		const channel = supabase
 			.channel(`dm-workspace:${currentUserId}`)
-			.on("postgres_changes", { event: "*", schema: "public", table: "dm_messages" }, () => {
+			.on("postgres_changes", { event: "*", schema: "public", table: "dm_messages" }, (payload) => {
 				if (generation !== workspaceSubscriptionGenerationRef.current) return;
-				void loadConversations({ reset: true });
+				patchConversationByMessage(payload as RealtimePostgresChangesPayload<Record<string, unknown>>);
 			})
 			.on(
 				"postgres_changes",
 				{ event: "*", schema: "public", table: "dm_participants", filter: `user_id=eq.${currentUserId}` },
-				() => {
+				(payload) => {
 					if (generation !== workspaceSubscriptionGenerationRef.current) return;
-					void loadConversations({ reset: true });
+					patchConversationByParticipant(payload as RealtimePostgresChangesPayload<Record<string, unknown>>);
 				},
 			)
 			.subscribe();
@@ -209,7 +393,7 @@ export function MessagesWorkspace({
 			workspaceChannelRef.current = null;
 			void supabase.removeChannel(channel);
 		};
-	}, [currentUserId, loadConversations]);
+	}, [currentUserId, patchConversationByMessage, patchConversationByParticipant]);
 
 	useEffect(() => {
 		const currentView = searchParams.get("view");
@@ -263,7 +447,7 @@ export function MessagesWorkspace({
 	}
 
 	return (
-		<div className="flex h-full w-full min-h-[calc(100dvh-6.2rem)] gap-3">
+		<div className="flex h-[calc(100dvh-6.2rem)] max-h-[calc(100dvh-6.2rem)] w-full min-h-[calc(100dvh-6.2rem)] gap-3 overflow-hidden">
 			<aside
 				className={cn(
 					"flex h-[calc(100dvh-6.2rem)] w-full flex-col overflow-hidden rounded-2xl border bg-(--surface-elevated) shadow-sm lg:w-90 lg:max-w-90 xl:w-97.5 xl:max-w-97.5",
@@ -314,7 +498,6 @@ export function MessagesWorkspace({
 							onChange={(event) => {
 								const nextValue = event.currentTarget.value;
 								setQuery(nextValue);
-								syncUrl({ q: nextValue });
 							}}
 							placeholder={copy.searchPlaceholder}
 							aria-label={copy.searchPlaceholder}
@@ -366,9 +549,9 @@ export function MessagesWorkspace({
 											</span>
 											<span className="min-w-0 flex-1">
 												<span className="flex items-center justify-between gap-2">
-													<span className="truncate text-sm font-semibold text-(--espresso)">
-														{counterpartName}
-														{conversation.counterpart?.is_verified ? " ✓" : ""}
+													<span className="flex min-w-0 items-center gap-1.5">
+														<span className="truncate text-sm font-semibold text-(--espresso)">{counterpartName}</span>
+														{conversation.counterpart?.is_verified ? <VerifiedBadge /> : null}
 													</span>
 													<span className="shrink-0 text-[11px] text-(--muted)">
 														{conversation.last_message_at ? formatDate(conversation.last_message_at, locale) : ""}
@@ -434,7 +617,7 @@ export function MessagesWorkspace({
 
 			<section
 				className={cn(
-					"min-w-0 flex-1 overflow-hidden rounded-2xl border bg-(--surface-elevated) shadow-sm",
+					"min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl border bg-(--surface-elevated) shadow-sm",
 					selectedConversationId ? "flex" : "hidden lg:flex",
 				)}
 			>

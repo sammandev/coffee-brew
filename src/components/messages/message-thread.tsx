@@ -1,13 +1,14 @@
 "use client";
 
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { EllipsisVertical, Flag, Loader2, Pencil, Send, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FormModal } from "@/components/ui/form-modal";
 import { Input } from "@/components/ui/input";
 import { RichTextContent } from "@/components/ui/rich-text-content";
-import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
+import { sanitizeForStorage, toPlainText } from "@/lib/rich-text";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -78,6 +79,7 @@ interface ThreadTimelineProps {
 	currentUserId: string;
 	counterpartReadAtMs: number;
 	hasMore: boolean;
+	isTyping: boolean;
 	loading: boolean;
 	loadingOlder: boolean;
 	locale: "en" | "id";
@@ -89,13 +91,22 @@ interface ThreadTimelineProps {
 }
 
 interface ThreadComposerProps {
-	composerHtml: string;
+	canSend: boolean;
+	composerText: string;
 	editingMessageId: string | null;
 	locale: "en" | "id";
 	onCancelEdit: () => void;
-	onChange: (nextHtml: string) => void;
+	onChange: (nextText: string) => void;
 	onSend: () => Promise<void>;
 	sending: boolean;
+}
+
+type RealtimeRow = Record<string, unknown> | null | undefined;
+
+function getRealtimeString(row: RealtimeRow, key: string) {
+	if (!row || typeof row !== "object") return null;
+	const value = row[key];
+	return typeof value === "string" ? value : null;
 }
 
 function toInitial(name: string) {
@@ -112,6 +123,16 @@ function mergeUniqueMessages(current: ThreadMessage[], nextRows: ThreadMessage[]
 		map.set(message.id, message);
 	}
 	return Array.from(map.values()).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+}
+
+function TypingDots({ className }: { className?: string }) {
+	return (
+		<span className={cn("inline-flex items-center gap-1", className)} aria-hidden="true">
+			<span className="h-1.5 w-1.5 rounded-full bg-current opacity-70 animate-bounce [animation-delay:0ms]" />
+			<span className="h-1.5 w-1.5 rounded-full bg-current opacity-70 animate-bounce [animation-delay:140ms]" />
+			<span className="h-1.5 w-1.5 rounded-full bg-current opacity-70 animate-bounce [animation-delay:280ms]" />
+		</span>
+	);
 }
 
 export function ThreadHeader({
@@ -152,11 +173,14 @@ export function ThreadHeader({
 					)}
 				</span>
 				<div className="min-w-0">
-					<p className="truncate text-sm font-semibold text-(--espresso)">
-						{counterpartName}
-						{counterpartVerified ? " ✓" : ""}
+					<div className="flex min-w-0 items-center gap-1.5">
+						<p className="truncate text-sm font-semibold text-(--espresso)">{counterpartName}</p>
+						{counterpartVerified ? <VerifiedBadge className="shrink-0" /> : null}
+					</div>
+					<p className={cn("truncate text-xs", isTyping ? "text-(--accent)" : "text-(--muted)")}>
+						{isTyping ? <TypingDots className="mr-1.5 align-middle" /> : null}
+						{presenceText}
 					</p>
-					<p className="truncate text-xs text-(--muted)">{presenceText}</p>
 				</div>
 			</div>
 		</header>
@@ -167,6 +191,7 @@ export function ThreadTimeline({
 	currentUserId,
 	counterpartReadAtMs,
 	hasMore,
+	isTyping,
 	loading,
 	loadingOlder,
 	locale,
@@ -188,7 +213,7 @@ export function ThreadTimeline({
 	}, [menuMessageId]);
 
 	return (
-		<div className="flex flex-1 flex-col overflow-y-auto bg-[linear-gradient(160deg,color-mix(in_oklab,var(--sand)_10%,transparent),transparent_45%)] p-3 sm:p-4">
+		<div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-[linear-gradient(160deg,color-mix(in_oklab,var(--sand)_10%,transparent),transparent_45%)] p-3 sm:p-4">
 			<div className="mb-2 flex justify-center">
 				<Button
 					type="button"
@@ -335,6 +360,15 @@ export function ThreadTimeline({
 							</div>
 						);
 					})}
+
+					{isTyping ? (
+						<article className="flex justify-start">
+							<div className="inline-flex max-w-[70%] items-center gap-2 rounded-2xl border border-(--border) bg-(--surface) px-3 py-2 text-xs text-(--muted)">
+								<TypingDots className="text-(--muted)" />
+								<span>{locale === "id" ? "sedang mengetik..." : "typing..."}</span>
+							</div>
+						</article>
+					) : null}
 				</div>
 			)}
 		</div>
@@ -342,7 +376,8 @@ export function ThreadTimeline({
 }
 
 export function ThreadComposer({
-	composerHtml,
+	canSend,
+	composerText,
 	editingMessageId,
 	locale,
 	onCancelEdit,
@@ -350,32 +385,42 @@ export function ThreadComposer({
 	onSend,
 	sending,
 }: ThreadComposerProps) {
+	const placeholder = locale === "id" ? "Ketik pesan..." : "Type a message...";
+
 	return (
-		<div className="sticky bottom-0 z-20 border-t border-(--border) bg-(--surface-elevated)/95 p-2 backdrop-blur-sm sm:p-3">
-			<div className="rounded-xl border border-(--border) bg-(--surface) p-2">
-				<RichTextEditor
-					variant="chat"
-					value={composerHtml}
-					onChange={onChange}
-					enableImageUpload
-					imageUploadEndpoint="/api/messages/media"
-					minPlainTextLength={0}
-					maxPlainTextLength={12000}
-				/>
+		<div className="sticky bottom-0 z-20 shrink-0 border-t border-(--border) bg-(--surface-elevated)/95 p-2 backdrop-blur-sm sm:p-3">
+			<div className="rounded-xl border border-(--border) bg-(--surface) p-2.5">
+				<div className="flex items-end gap-2">
+					<textarea
+						value={composerText}
+						onChange={(event) => onChange(event.currentTarget.value)}
+						onKeyDown={(event) => {
+							if (event.key !== "Enter" || event.shiftKey) return;
+							event.preventDefault();
+							void onSend();
+						}}
+						placeholder={placeholder}
+						rows={1}
+						className="max-h-36 min-h-10 w-full resize-y rounded-lg border border-(--border) bg-(--surface-elevated) px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-(--accent)/40"
+					/>
+					<Button type="button" size="sm" onClick={() => void onSend()} disabled={sending || !canSend}>
+						{sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+						<span className="ml-1">
+							{editingMessageId ? (locale === "id" ? "Simpan" : "Save") : locale === "id" ? "Kirim" : "Send"}
+						</span>
+					</Button>
+				</div>
 				<div className="mt-2 flex items-center justify-between gap-2">
 					{editingMessageId ? (
 						<Button type="button" size="sm" variant="ghost" onClick={onCancelEdit}>
 							{locale === "id" ? "Batal edit" : "Cancel edit"}
 						</Button>
 					) : (
-						<span />
+						<p className="text-[11px] text-(--muted)">
+							{locale === "id" ? "Enter untuk kirim, Shift+Enter baris baru" : "Enter to send, Shift+Enter for new line"}
+						</p>
 					)}
-					<Button type="button" size="sm" onClick={() => void onSend()} disabled={sending}>
-						{sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-						<span className="ml-1">
-							{editingMessageId ? (locale === "id" ? "Simpan" : "Save") : locale === "id" ? "Kirim" : "Send"}
-						</span>
-					</Button>
+					<span className="text-[11px] text-(--muted)">{composerText.trim().length}/12000</span>
 				</div>
 			</div>
 		</div>
@@ -395,11 +440,12 @@ export function MessageThread({
 	const [loadingOlder, setLoadingOlder] = useState(false);
 	const [sending, setSending] = useState(false);
 	const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-	const [composerHtml, setComposerHtml] = useState("<p></p>");
+	const [composerText, setComposerText] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [typingCount, setTypingCount] = useState(0);
 	const typingSentAtRef = useRef(0);
 	const typingStatesRef = useRef<Record<string, number>>({});
+	const typingActiveRef = useRef(false);
 	const messageChannelRef = useRef<RealtimeChannel | null>(null);
 	const typingChannelRef = useRef<RealtimeChannel | null>(null);
 	const typingChannelSubscribedRef = useRef(false);
@@ -411,6 +457,7 @@ export function MessageThread({
 	const [reporting, setReporting] = useState(false);
 	const [hasMore, setHasMore] = useState(false);
 	const [nextCursor, setNextCursor] = useState<string | null>(null);
+	const silentReloadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const counterpart = useMemo(
 		() => participants.find((participant) => participant.user_id !== currentUserId) ?? null,
@@ -422,12 +469,22 @@ export function MessageThread({
 	const counterpartVerified = Boolean(counterpart?.profile?.is_verified);
 	const counterpartLastSeenAt = counterpart?.last_seen_at ?? null;
 	const counterpartReadAtMs = counterpart?.last_read_at ? new Date(counterpart.last_read_at).getTime() : 0;
+	const composerPlainLength = composerText.trim().length;
+	const canSend = composerPlainLength > 0 && composerPlainLength <= 12000;
 
 	const loadMessages = useCallback(
-		async ({ appendOlder, cursor }: { appendOlder: boolean; cursor?: string | null }) => {
+		async ({
+			appendOlder,
+			cursor,
+			silent = false,
+		}: {
+			appendOlder: boolean;
+			cursor?: string | null;
+			silent?: boolean;
+		}) => {
 			if (appendOlder) {
 				setLoadingOlder(true);
-			} else {
+			} else if (!silent) {
 				setLoading(true);
 			}
 			setError(null);
@@ -467,6 +524,36 @@ export function MessageThread({
 		await fetch(`/api/messages/conversations/${conversationId}/read`, { method: "PATCH" }).catch(() => null);
 	}, [conversationId]);
 
+	const queueSilentReload = useCallback(
+		(withMarkRead: boolean) => {
+			if (silentReloadTimeoutRef.current) {
+				clearTimeout(silentReloadTimeoutRef.current);
+			}
+			silentReloadTimeoutRef.current = setTimeout(() => {
+				silentReloadTimeoutRef.current = null;
+				void loadMessages({ appendOlder: false, silent: true }).then(() => {
+					if (!withMarkRead) return;
+					void markRead();
+				});
+			}, 120);
+		},
+		[loadMessages, markRead],
+	);
+
+	const sendTypingSignal = useCallback(
+		(isTyping: boolean) => {
+			if (!typingChannelRef.current || !typingChannelSubscribedRef.current) {
+				return;
+			}
+			void typingChannelRef.current.send({
+				type: "broadcast",
+				event: "typing",
+				payload: { userId: currentUserId, isTyping },
+			});
+		},
+		[currentUserId],
+	);
+
 	useEffect(() => {
 		void loadMessages({ appendOlder: false }).then(() => void markRead());
 	}, [loadMessages, markRead]);
@@ -493,17 +580,44 @@ export function MessageThread({
 			.on(
 				"postgres_changes",
 				{ event: "*", schema: "public", table: "dm_messages", filter: `conversation_id=eq.${conversationId}` },
-				() => {
+				(payload) => {
 					if (generation !== subscriptionGenerationRef.current) return;
-					void loadMessages({ appendOlder: false }).then(() => void markRead());
+					const eventType = (payload as RealtimePostgresChangesPayload<Record<string, unknown>>).eventType;
+					queueSilentReload(eventType === "INSERT");
 				},
 			)
 			.on(
 				"postgres_changes",
 				{ event: "UPDATE", schema: "public", table: "dm_participants", filter: `conversation_id=eq.${conversationId}` },
-				() => {
+				(payload) => {
 					if (generation !== subscriptionGenerationRef.current) return;
-					void loadMessages({ appendOlder: false });
+
+					const typedPayload = payload as RealtimePostgresChangesPayload<Record<string, unknown>>;
+					const userId = getRealtimeString(typedPayload.new, "user_id") ?? getRealtimeString(typedPayload.old, "user_id");
+					if (!userId) {
+						queueSilentReload(false);
+						return;
+					}
+
+					const nextLastReadAt = getRealtimeString(typedPayload.new, "last_read_at");
+					const oldLastReadAt = getRealtimeString(typedPayload.old, "last_read_at");
+					const nextLastSeenAt = getRealtimeString(typedPayload.new, "last_seen_at");
+					const oldLastSeenAt = getRealtimeString(typedPayload.old, "last_seen_at");
+
+					if ((nextLastReadAt ?? null) === (oldLastReadAt ?? null) && (nextLastSeenAt ?? null) === (oldLastSeenAt ?? null)) {
+						return;
+					}
+
+					setParticipants((current) =>
+						current.map((participant) => {
+							if (participant.user_id !== userId) return participant;
+							return {
+								...participant,
+								last_read_at: nextLastReadAt,
+								last_seen_at: nextLastSeenAt,
+							};
+						}),
+					);
 				},
 			)
 			.subscribe();
@@ -515,7 +629,12 @@ export function MessageThread({
 				if (generation !== subscriptionGenerationRef.current) return;
 				const userId = typeof payload?.userId === "string" ? payload.userId : "";
 				if (!userId || userId === currentUserId) return;
-				typingStatesRef.current[userId] = Date.now();
+				const isTyping = typeof payload?.isTyping === "boolean" ? payload.isTyping : true;
+				if (!isTyping) {
+					delete typingStatesRef.current[userId];
+				} else {
+					typingStatesRef.current[userId] = Date.now();
+				}
 				const activeCount = Object.values(typingStatesRef.current).filter((at) => Date.now() - at <= 4000).length;
 				setTypingCount(activeCount);
 			})
@@ -533,7 +652,19 @@ export function MessageThread({
 
 		return () => {
 			subscriptionGenerationRef.current += 1;
+			if (typingActiveRef.current) {
+				void typingChannel.send({
+					type: "broadcast",
+					event: "typing",
+					payload: { userId: currentUserId, isTyping: false },
+				});
+				typingActiveRef.current = false;
+			}
 			clearInterval(interval);
+			if (silentReloadTimeoutRef.current) {
+				clearTimeout(silentReloadTimeoutRef.current);
+				silentReloadTimeoutRef.current = null;
+			}
 			messageChannelRef.current = null;
 			typingChannelRef.current = null;
 			typingChannelSubscribedRef.current = false;
@@ -541,9 +672,13 @@ export function MessageThread({
 			void supabase.removeChannel(messageChannel);
 			void supabase.removeChannel(typingChannel);
 		};
-	}, [conversationId, currentUserId, loadMessages, markRead]);
+	}, [conversationId, currentUserId, queueSilentReload]);
 
 	async function sendMessage() {
+		if (!canSend || sending) return;
+		const bodyHtml = sanitizeForStorage(composerText);
+		if (toPlainText(bodyHtml).length === 0) return;
+
 		setSending(true);
 		setError(null);
 		const endpoint = editingMessageId
@@ -553,7 +688,7 @@ export function MessageThread({
 		const response = await fetch(endpoint, {
 			method,
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ body_html: composerHtml }),
+			body: JSON.stringify({ body_html: bodyHtml }),
 		}).catch(() => null);
 		if (!response?.ok) {
 			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string; details?: string }) : null;
@@ -561,10 +696,14 @@ export function MessageThread({
 			setSending(false);
 			return;
 		}
-		setComposerHtml("<p></p>");
+		setComposerText("");
+		if (typingActiveRef.current) {
+			typingActiveRef.current = false;
+			sendTypingSignal(false);
+		}
 		setEditingMessageId(null);
 		setSending(false);
-		await loadMessages({ appendOlder: false });
+		await loadMessages({ appendOlder: false, silent: true });
 		await markRead();
 	}
 
@@ -576,7 +715,7 @@ export function MessageThread({
 			setError(body?.details || body?.error || (locale === "id" ? "Gagal menghapus pesan." : "Could not delete message."));
 			return;
 		}
-		await loadMessages({ appendOlder: false });
+		await loadMessages({ appendOlder: false, silent: true });
 	}
 
 	async function loadOlder() {
@@ -610,23 +749,27 @@ export function MessageThread({
 		setReporting(false);
 	}
 
-	function handleComposerChange(nextHtml: string) {
-		setComposerHtml(nextHtml);
+	function handleComposerChange(nextText: string) {
+		setComposerText(nextText);
+		const nextTyping = nextText.trim().length > 0;
+		if (nextTyping !== typingActiveRef.current) {
+			typingActiveRef.current = nextTyping;
+			typingSentAtRef.current = Date.now();
+			sendTypingSignal(nextTyping);
+			return;
+		}
+		if (!nextTyping) {
+			return;
+		}
 
 		const now = Date.now();
-		if (now - typingSentAtRef.current < 1200) return;
+		if (now - typingSentAtRef.current < 2000) return;
 		typingSentAtRef.current = now;
-
-		if (!typingChannelRef.current || !typingChannelSubscribedRef.current) return;
-		void typingChannelRef.current.send({
-			type: "broadcast",
-			event: "typing",
-			payload: { userId: currentUserId },
-		});
+		sendTypingSignal(true);
 	}
 
 	return (
-		<div className="flex h-full min-h-0 w-full flex-col">
+		<div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
 			<ThreadHeader
 				counterpartAvatarUrl={counterpartAvatarUrl}
 				counterpartName={counterpartName}
@@ -645,6 +788,7 @@ export function MessageThread({
 				currentUserId={currentUserId}
 				counterpartReadAtMs={counterpartReadAtMs}
 				hasMore={hasMore}
+				isTyping={typingCount > 0}
 				loading={loading}
 				loadingOlder={loadingOlder}
 				locale={locale}
@@ -652,7 +796,7 @@ export function MessageThread({
 				onDelete={deleteMessage}
 				onEdit={(message) => {
 					setEditingMessageId(message.id);
-					setComposerHtml(message.body_html);
+					setComposerText(toPlainText(message.body_html));
 				}}
 				onLoadOlder={loadOlder}
 				onReport={(messageId) => {
@@ -662,12 +806,17 @@ export function MessageThread({
 			/>
 
 			<ThreadComposer
-				composerHtml={composerHtml}
+				canSend={canSend}
+				composerText={composerText}
 				editingMessageId={editingMessageId}
 				locale={locale}
 				onCancelEdit={() => {
 					setEditingMessageId(null);
-					setComposerHtml("<p></p>");
+					setComposerText("");
+					if (typingActiveRef.current) {
+						typingActiveRef.current = false;
+						sendTypingSignal(false);
+					}
 				}}
 				onChange={handleComposerChange}
 				onSend={sendMessage}
