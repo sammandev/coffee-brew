@@ -323,7 +323,7 @@ export function SiteSettingsForm({ settings }: SiteSettingsFormProps) {
 					<img
 						src={previewTabIcon}
 						alt="Tab icon preview"
-						className="h-10 w-10 rounded-md border bg-white object-contain p-1"
+						className="h-10 w-10 rounded-md border bg-(--surface-elevated) object-contain p-1"
 					/>
 					<div className="min-w-0">
 						<p className="truncate text-xs text-(--muted)">{previewTabIcon}</p>

@@ -41,6 +41,7 @@ export function FaqTable({ items }: { items: FaqRow[] }) {
 	}
 
 	async function deleteFaq(id: string) {
+		if (!window.confirm("Are you sure you want to delete this FAQ item?")) return;
 		setLoadingId(id);
 		setError(null);
 
@@ -63,7 +64,7 @@ export function FaqTable({ items }: { items: FaqRow[] }) {
 
 	return (
 		<div className="overflow-x-auto rounded-3xl border bg-(--surface-elevated)">
-			<table className="w-full min-w-190 text-sm">
+			<table className="w-full min-w-160 text-sm">
 				<thead>
 					<tr className="border-b bg-(--surface) text-left">
 						<th className="px-4 py-3">Question (EN)</th>

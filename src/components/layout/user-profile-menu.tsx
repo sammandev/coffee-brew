@@ -161,7 +161,7 @@ export function UserProfileMenu({
 								? "fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4rem)] z-120 max-h-[calc(100dvh-5rem)] overflow-y-auto"
 								: mobile
 									? "mt-2 w-full"
-									: "absolute right-0 top-11 z-80 w-72",
+									: "absolute right-0 top-11 z-80 w-[calc(100vw-2rem)] max-w-72",
 							mobilePanelClassName,
 						)}
 					>

@@ -8,8 +8,8 @@ export default async function MeCreateBrewPage() {
 
 	return (
 		<div className="space-y-4">
-			<h1 className="font-heading text-4xl text-[var(--espresso)]">{locale === "id" ? "Buat Racikan" : "Create Brew"}</h1>
-			<p className="text-[var(--muted)]">
+			<h1 className="font-heading text-4xl text-(--espresso)">{locale === "id" ? "Buat Racikan" : "Create Brew"}</h1>
+			<p className="text-(--muted)">
 				{locale === "id"
 					? "Catat semua parameter, lalu simpan sebagai draft atau publikasikan ke katalog."
 					: "Capture every parameter, then save as draft or publish to catalog."}

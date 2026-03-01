@@ -23,10 +23,10 @@ export default async function AboutPage() {
 		<div className="space-y-6">
 			<header className="space-y-2">
 				<Badge>{t("about.title")}</Badge>
-				<h1 className="font-heading text-4xl text-[var(--espresso)]">
+				<h1 className="font-heading text-4xl text-(--espresso)">
 					{locale === "id" ? "Platform Kopi untuk Pembelajar Serius" : "A Coffee Platform for Serious Learners"}
 				</h1>
-				<p className="text-[var(--muted)]">
+				<p className="text-(--muted)">
 					{locale === "id"
 						? "Coffee Brew dibuat untuk menggabungkan pencatatan resep, komunitas, dan moderasi dalam satu alur kerja."
 						: "Coffee Brew is built to combine recipe tracking, community collaboration, and moderation in one workflow."}
@@ -36,7 +36,7 @@ export default async function AboutPage() {
 			<div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
 				<Card className="space-y-3">
 					{points.map((point) => (
-						<p key={point} className="text-sm text-[var(--muted)]">
+						<p key={point} className="text-sm text-(--muted)">
 							{point}
 						</p>
 					))}

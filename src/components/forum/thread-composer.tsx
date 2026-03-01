@@ -188,7 +188,7 @@ export function ThreadComposer({
 
 		if (!response?.ok) {
 			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
-			setError(body?.error ?? "Could not create thread");
+			setError(body?.error ?? (locale === "id" ? "Tidak dapat membuat thread." : "Could not create thread."));
 			setIsSubmitting(false);
 			return;
 		}

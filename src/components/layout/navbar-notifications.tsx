@@ -317,8 +317,8 @@ export function NavbarNotifications({ userId, mobile = false }: NavbarNotificati
 				type="button"
 				onClick={() => setOpen((current) => !current)}
 				className={cn(
-					"relative inline-flex h-9 items-center rounded-lg border border-(--border) bg-(--surface) text-foreground transition hover:bg-(--sand)/15",
-					mobile ? "w-full justify-between px-3" : "w-9 justify-center",
+					"relative inline-flex h-10 items-center rounded-lg border border-(--border) bg-(--surface) text-foreground transition hover:bg-(--sand)/15",
+					mobile ? "w-full justify-between px-3" : "w-10 justify-center",
 				)}
 				aria-label={t("notifications.title")}
 				aria-expanded={open}

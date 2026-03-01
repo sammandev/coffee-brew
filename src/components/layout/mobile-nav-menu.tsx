@@ -93,7 +93,7 @@ export function MobileNavMenu({
 			</button>
 
 			{open ? (
-				<div role="menu" className="absolute right-0 top-11 z-50 w-72 rounded-xl border bg-(--surface-elevated) p-4">
+				<div role="menu" className="absolute right-0 top-11 z-50 w-[calc(100vw-2rem)] max-w-72 rounded-xl border bg-(--surface-elevated) p-4">
 					<div className="mb-3">
 						<PreferenceControls />
 					</div>

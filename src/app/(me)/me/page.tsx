@@ -25,7 +25,7 @@ export default async function MePage() {
 			<header className="flex flex-wrap items-center justify-between gap-4">
 				<div>
 					<Badge>{t("nav.dashboard")}</Badge>
-					<h1 className="mt-2 font-heading text-4xl text-[var(--espresso)]">{t("dashboard.title")}</h1>
+					<h1 className="mt-2 font-heading text-4xl text-(--espresso)">{t("dashboard.title")}</h1>
 				</div>
 				<div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap sm:gap-3">
 					<Link href="/me/collections" className="rounded-full border px-4 py-2 text-center text-sm font-semibold">
@@ -36,7 +36,7 @@ export default async function MePage() {
 					</Link>
 					<Link
 						href="/me/brews/new"
-						className="rounded-full bg-[var(--espresso)] px-4 py-2 text-center text-sm font-semibold text-[var(--surface-elevated)]"
+						className="rounded-full bg-(--espresso) px-4 py-2 text-center text-sm font-semibold text-(--surface-elevated)"
 					>
 						{t("dashboard.newBrew")}
 					</Link>
@@ -49,13 +49,13 @@ export default async function MePage() {
 						<Card key={brew.id}>
 							<CardTitle>{brew.name}</CardTitle>
 							<CardDescription className="mt-1">{brew.brew_method}</CardDescription>
-							<p className="mt-3 text-sm text-[var(--muted)]">Status: {brew.status}</p>
-							<p className="text-xs text-[var(--muted)]">
+							<p className="mt-3 text-sm text-(--muted)">Status: {brew.status}</p>
+							<p className="text-xs text-(--muted)">
 								{locale === "id" ? "Diperbarui" : "Updated"} {formatDate(brew.updated_at, locale)}
 							</p>
 							<Link
 								href={`/me/brews/${brew.id}/edit`}
-								className="mt-4 inline-block text-sm font-semibold text-[var(--accent)] underline"
+								className="mt-4 inline-block text-sm font-semibold text-(--accent) underline"
 							>
 								{locale === "id" ? "Ubah Racikan" : "Edit Brew"}
 							</Link>

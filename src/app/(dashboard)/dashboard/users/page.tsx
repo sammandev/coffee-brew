@@ -92,7 +92,7 @@ export default async function DashboardUsersPage() {
 	return (
 		<div className="space-y-6">
 			<div className="flex flex-wrap items-center justify-between gap-3">
-				<h1 className="font-heading text-4xl text-[var(--espresso)]">
+				<h1 className="font-heading text-4xl text-(--espresso)">
 					{locale === "id" ? "Manajemen Pengguna" : "User Management"}
 				</h1>
 				<SuperuserUserCreateModal />
@@ -108,10 +108,10 @@ export default async function DashboardUsersPage() {
 									<span className="rounded-full border bg-(--surface) px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-(--muted)">
 										{currentRole}
 									</span>
-									<p className="font-semibold text-[var(--espresso)]">{user.display_name ?? user.email}</p>
+									<p className="font-semibold text-(--espresso)">{user.display_name ?? user.email}</p>
 								</div>
-								<p className="text-xs text-[var(--muted)]">{user.email}</p>
-								<p className="text-xs text-[var(--muted)]">
+								<p className="text-xs text-(--muted)">{user.email}</p>
+								<p className="text-xs text-(--muted)">
 									{locale === "id" ? "Bergabung" : "Joined"} {formatDate(user.created_at, locale)}
 								</p>
 							</div>

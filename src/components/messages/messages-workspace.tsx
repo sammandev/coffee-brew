@@ -252,7 +252,7 @@ export function MessagesWorkspace({
 		<div className="flex h-full w-full min-h-[calc(100dvh-6.2rem)] gap-3">
 			<aside
 				className={cn(
-					"flex h-[calc(100dvh-6.2rem)] w-full flex-col overflow-hidden rounded-2xl border bg-(--surface-elevated) shadow-sm lg:w-[360px] lg:max-w-[360px] xl:w-[390px] xl:max-w-[390px]",
+					"flex h-[calc(100dvh-6.2rem)] w-full flex-col overflow-hidden rounded-2xl border bg-(--surface-elevated) shadow-sm lg:w-90 lg:max-w-90 xl:w-97.5 xl:max-w-97.5",
 					selectedConversationId ? "hidden lg:flex" : "flex",
 				)}
 			>
@@ -303,6 +303,7 @@ export function MessagesWorkspace({
 								syncUrl({ q: nextValue });
 							}}
 							placeholder={copy.searchPlaceholder}
+							aria-label={copy.searchPlaceholder}
 							className="pl-8"
 						/>
 					</div>

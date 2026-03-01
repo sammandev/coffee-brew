@@ -607,7 +607,7 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 					</div>
 
 					<div className="space-y-2">
-						<div className="relative aspect-[16/9] overflow-hidden rounded-2xl border bg-(--surface-elevated)">
+						<div className="relative aspect-video overflow-hidden rounded-2xl border bg-(--surface-elevated)">
 							<Image
 								src={imagePreviewUrl}
 								alt={imageAlt || defaults.name || "Brew image"}
@@ -728,7 +728,7 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 					</div>
 
 					<div className="space-y-2">
-						<div className="relative aspect-[16/9] overflow-hidden rounded-2xl border bg-(--surface-elevated)">
+						<div className="relative aspect-video overflow-hidden rounded-2xl border bg-(--surface-elevated)">
 							<Image
 								src={grindReferenceImagePreviewUrl}
 								alt={grindReferenceImageAlt || defaults.name || "Grind reference image"}

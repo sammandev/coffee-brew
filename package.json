@@ -2,7 +2,7 @@
 	"name": "coffee-brew",
 	"version": "0.1.0",
 	"private": true,
-	"packageManager": "pnpm@10.30.2",
+	"packageManager": "pnpm@10.30.3",
 	"scripts": {
 		"dev": "next dev",
 		"build": "next build",
@@ -34,7 +34,7 @@
 		"next": "16.1.6",
 		"react": "19.2.4",
 		"react-dom": "19.2.4",
-		"resend": "^6.9.2",
+		"resend": "^6.9.3",
 		"sanitize-html": "^2.17.1",
 		"tailwind-merge": "^3.5.0",
 		"zod": "^4.3.6"
@@ -54,7 +54,7 @@
 		"jsdom": "^28.1.0",
 		"supabase": "^2.76.15",
 		"tailwindcss": "^4",
-		"tsx": "^4.20.6",
+		"tsx": "^4.21.0",
 		"typescript": "^5",
 		"vitest": "^4.0.18"
 	}

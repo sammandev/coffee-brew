@@ -26,11 +26,12 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
 					<button
 						type="button"
 						onClick={reset}
+						aria-label="Try again"
 						className="rounded-full bg-(--espresso) px-5 py-2.5 text-sm font-semibold text-(--surface-elevated)"
 					>
 						Try Again
 					</button>
-					<Link href="/" className="rounded-full border px-5 py-2.5 text-sm font-semibold">
+					<Link href="/" aria-label="Back to home" className="rounded-full border px-5 py-2.5 text-sm font-semibold">
 						Back to Home
 					</Link>
 				</div>

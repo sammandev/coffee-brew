@@ -134,6 +134,7 @@ export function MessagesInbox({ locale }: MessagesInboxProps) {
 						value={query}
 						onChange={(event) => setQuery(event.currentTarget.value)}
 						placeholder={copy.searchPlaceholder}
+						aria-label={copy.searchPlaceholder}
 						className="pl-8"
 					/>
 				</div>

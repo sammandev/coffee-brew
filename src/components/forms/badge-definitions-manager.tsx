@@ -1,5 +1,6 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ export function BadgeDefinitionsManager({ badges }: BadgeDefinitionsManagerProps
 		setBusy(false);
 		if (!response?.ok) {
 			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
-			setError(body?.error ?? "Could not create badge.");
+			setError(body?.error ?? (locale === "id" ? "Tidak dapat membuat badge." : "Could not create badge."));
 			return;
 		}
 		window.location.reload();
@@ -56,7 +57,7 @@ export function BadgeDefinitionsManager({ badges }: BadgeDefinitionsManagerProps
 		setBusy(false);
 		if (!response?.ok) {
 			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
-			setError(body?.error ?? "Could not delete badge.");
+			setError(body?.error ?? (locale === "id" ? "Tidak dapat menghapus badge." : "Could not delete badge."));
 			return;
 		}
 		window.location.reload();
@@ -102,7 +103,7 @@ export function BadgeDefinitionsManager({ badges }: BadgeDefinitionsManagerProps
 				</div>
 				<div className="flex justify-end">
 					<Button type="button" onClick={() => void createBadge()} disabled={busy || !key || !labelEn}>
-						{busy ? "..." : locale === "id" ? "Tambah Badge" : "Add Badge"}
+						{busy ? <Loader2 size={14} className="animate-spin" /> : locale === "id" ? "Tambah Badge" : "Add Badge"}
 					</Button>
 				</div>
 			</section>

@@ -36,7 +36,7 @@ export function ForumThreadModerationControls({
 		setLoadingAction(null);
 		if (!response?.ok) {
 			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
-			setError(body?.error ?? "Could not update lock.");
+			setError(body?.error ?? (locale === "id" ? "Tidak dapat memperbarui kunci." : "Could not update lock."));
 			return;
 		}
 		setLocked((current) => !current);
@@ -53,7 +53,7 @@ export function ForumThreadModerationControls({
 		setLoadingAction(null);
 		if (!response?.ok) {
 			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
-			setError(body?.error ?? "Could not update pin.");
+			setError(body?.error ?? (locale === "id" ? "Tidak dapat memperbarui pin." : "Could not update pin."));
 			return;
 		}
 		setPinned((current) => !current);

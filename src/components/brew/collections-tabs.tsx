@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { MethodRecommendationChips } from "@/components/brew/method-recommendation-chips";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 import { resolveBrewImageUrl } from "@/lib/brew-images";
 import { formatDate } from "@/lib/utils";
 
@@ -103,37 +103,41 @@ export function CollectionsTabs({ history, locale, onRemoveWishlist, wishlist }:
 				) : (
 					<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 						{wishlist.map((item) => (
-							<Card key={`wishlist-${item.brew.id}`} className="space-y-2">
-								<div className="relative aspect-[16/10] overflow-hidden rounded-2xl border">
+							<Card key={`wishlist-${item.brew.id}`} className="group flex flex-col overflow-hidden p-0 transition-shadow hover:shadow-md">
+								<div className="relative aspect-16/10 overflow-hidden">
 									<Image
 										src={resolveBrewImageUrl(item.brew.image_url)}
 										alt={item.brew.image_alt || item.brew.name}
 										fill
 										sizes="(max-width: 1280px) 100vw, 33vw"
-										className="object-cover"
+										className="object-cover transition-transform duration-300 group-hover:scale-105"
 									/>
+									<span className="absolute top-3 left-3 z-10 rounded-full bg-(--surface-elevated)/90 px-2.5 py-1 text-xs font-semibold text-(--espresso) shadow-sm backdrop-blur-sm">
+										{item.brew.brew_method}
+									</span>
 								</div>
-								<Link href={`/brew/${item.brew.id}`} className="hover:underline">
-									<CardTitle className="line-clamp-2">{item.brew.name}</CardTitle>
-								</Link>
-								<CardDescription className="line-clamp-1">{item.brew.brew_method}</CardDescription>
-								<MethodRecommendationChips locale={locale} methods={item.brew.recommended_methods ?? []} />
-								<p className="text-xs text-(--muted)">
-									{locale === "id" ? "Disimpan" : "Saved"}: {formatDate(item.saved_at, locale)}
-								</p>
-								{onRemoveWishlist ? (
-									<Button
-										type="button"
-										size="sm"
-										variant="ghost"
-										className="w-full justify-center"
-										onClick={() => {
-											void onRemoveWishlist(item.brew.id);
-										}}
-									>
-										{locale === "id" ? "Hapus dari Wishlist" : "Remove from Wishlist"}
-									</Button>
-								) : null}
+								<div className="flex flex-1 flex-col gap-2 p-4">
+									<Link href={`/brew/${item.brew.id}`} className="hover:underline">
+										<CardTitle className="line-clamp-2 text-base">{item.brew.name}</CardTitle>
+									</Link>
+									<MethodRecommendationChips locale={locale} methods={item.brew.recommended_methods ?? []} />
+									<p className="mt-auto text-xs text-(--muted)">
+										{locale === "id" ? "Disimpan" : "Saved"}: {formatDate(item.saved_at, locale)}
+									</p>
+									{onRemoveWishlist ? (
+										<Button
+											type="button"
+											size="sm"
+											variant="ghost"
+											className="w-full justify-center"
+											onClick={() => {
+												void onRemoveWishlist(item.brew.id);
+											}}
+										>
+											{locale === "id" ? "Hapus dari Wishlist" : "Remove from Wishlist"}
+										</Button>
+									) : null}
+								</div>
 							</Card>
 						))}
 					</div>
@@ -145,27 +149,31 @@ export function CollectionsTabs({ history, locale, onRemoveWishlist, wishlist }:
 			) : (
 				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 					{history.map((item) => (
-						<Card key={`history-${item.brew.id}-${item.last_brewed_at}`} className="space-y-2">
-							<div className="relative aspect-[16/10] overflow-hidden rounded-2xl border">
+						<Card key={`history-${item.brew.id}-${item.last_brewed_at}`} className="group flex flex-col overflow-hidden p-0 transition-shadow hover:shadow-md">
+							<div className="relative aspect-16/10 overflow-hidden">
 								<Image
 									src={resolveBrewImageUrl(item.brew.image_url)}
 									alt={item.brew.image_alt || item.brew.name}
 									fill
 									sizes="(max-width: 1280px) 100vw, 33vw"
-									className="object-cover"
+									className="object-cover transition-transform duration-300 group-hover:scale-105"
 								/>
+								<span className="absolute top-3 left-3 z-10 rounded-full bg-(--surface-elevated)/90 px-2.5 py-1 text-xs font-semibold text-(--espresso) shadow-sm backdrop-blur-sm">
+									{item.brew.brew_method}
+								</span>
+								<span className="absolute top-3 right-3 z-10 inline-flex items-center gap-1 rounded-full bg-(--surface-elevated)/90 px-2 py-1 text-xs font-semibold text-(--accent) shadow-sm backdrop-blur-sm">
+									★ {item.my_overall.toFixed(1)}
+								</span>
 							</div>
-							<Link href={`/brew/${item.brew.id}`} className="hover:underline">
-								<CardTitle className="line-clamp-2">{item.brew.name}</CardTitle>
-							</Link>
-							<CardDescription className="line-clamp-1">{item.brew.brew_method}</CardDescription>
-							<MethodRecommendationChips locale={locale} methods={item.brew.recommended_methods ?? []} />
-							<p className="text-sm text-(--muted)">
-								{locale === "id" ? "Rating Saya" : "My Stars"}: {item.my_overall.toFixed(1)}
-							</p>
-							<p className="text-xs text-(--muted)">
-								{locale === "id" ? "Terakhir diseduh" : "Last brewed"}: {formatDate(item.last_brewed_at, locale)}
-							</p>
+							<div className="flex flex-1 flex-col gap-2 p-4">
+								<Link href={`/brew/${item.brew.id}`} className="hover:underline">
+									<CardTitle className="line-clamp-2 text-base">{item.brew.name}</CardTitle>
+								</Link>
+								<MethodRecommendationChips locale={locale} methods={item.brew.recommended_methods ?? []} />
+								<p className="mt-auto text-xs text-(--muted)">
+									{locale === "id" ? "Terakhir diseduh" : "Last brewed"}: {formatDate(item.last_brewed_at, locale)}
+								</p>
+							</div>
 						</Card>
 					))}
 				</div>

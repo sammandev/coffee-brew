@@ -133,6 +133,7 @@ export function ForumSearchControls({
 						value={query}
 						onChange={(event) => setQuery(event.currentTarget.value)}
 						placeholder={labels.searchPlaceholder}
+						aria-label={labels.searchPlaceholder}
 						className="pl-9"
 					/>
 				</div>

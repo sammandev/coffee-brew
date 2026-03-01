@@ -10,7 +10,7 @@ export default async function DashboardFaqPage() {
 
 	return (
 		<div className="space-y-6">
-			<h1 className="font-heading text-4xl text-[var(--espresso)]">FAQ Manager</h1>
+			<h1 className="font-heading text-4xl text-(--espresso)">FAQ Manager</h1>
 			<FaqManager items={items ?? []} />
 		</div>
 	);

@@ -47,12 +47,12 @@ export function WishlistToggleButton({ brewId, initialWishlisted = false, locale
 				type="button"
 				size="sm"
 				variant={wishlisted ? "secondary" : "outline"}
-				className="gap-2"
+				className={cn("gap-2", wishlisted && "border-(--danger)/30 bg-(--danger)/10 text-(--danger) hover:bg-(--danger)/20")}
 				onClick={() => void onToggle()}
 				disabled={isLoading}
 				aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
 			>
-				<Heart size={14} className={cn(wishlisted ? "fill-current" : "")} />
+				<Heart size={14} className={cn(wishlisted ? "fill-(--danger) text-(--danger)" : "")} />
 				{wishlisted ? (locale === "id" ? "Wishlist" : "Wishlisted") : locale === "id" ? "Simpan" : "Wishlist"}
 			</Button>
 			{error ? <p className="text-xs text-(--danger)">{error}</p> : null}

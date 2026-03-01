@@ -1,13 +1,14 @@
 "use client";
 
-import { GitCompare, Heart, MessageSquare, Search } from "lucide-react";
+import { GitCompare, Heart, MessageSquare, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { MethodRecommendationChips } from "@/components/brew/method-recommendation-chips";
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 import { resolveBrewImageUrl } from "@/lib/brew-images";
+import { getMessage } from "@/lib/i18n/messages";
 import { cn, formatDate } from "@/lib/utils";
 
 interface CatalogBrewRow {
@@ -25,6 +26,7 @@ interface CatalogBrewRow {
 	recommended_methods: string[] | null;
 	review_total: number;
 	tags: string[] | null;
+	wishlist_count: number;
 }
 
 interface CatalogBrewGridProps {
@@ -37,6 +39,28 @@ const COMPARE_STORAGE_KEY = "coffee-brew.compare.ids";
 
 function toNextParam(value: string) {
 	return encodeURIComponent(value);
+}
+
+function StarRating({ rating, count, locale }: { rating: number; count: number; locale: "en" | "id" }) {
+	const fullStars = Math.round(rating);
+	return (
+		<div className="flex items-center gap-1.5">
+			<div className="flex items-center gap-px">
+				{Array.from({ length: 5 }, (_, i) => (
+					<Star
+						key={i}
+						size={14}
+						className={i < fullStars ? "fill-(--crema) text-(--crema)" : "text-(--sand)"}
+					/>
+				))}
+			</div>
+			<span className="text-xs font-medium text-(--muted)">
+				{count > 0
+					? `${rating.toFixed(1)} (${count})`
+					: getMessage(locale, "catalog.noReviews")}
+			</span>
+		</div>
+	);
 }
 
 export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewGridProps) {
@@ -89,7 +113,7 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 		setCompareIds((current) => {
 			if (current.includes(brewId)) return current.filter((value) => value !== brewId);
 			if (current.length >= 3) {
-				setFeedback(locale === "id" ? "Maksimal 3 brew untuk compare." : "Compare supports up to 3 brews.");
+				setFeedback(getMessage(locale, "catalog.maxCompare"));
 				return current;
 			}
 			return [...current, brewId];
@@ -112,7 +136,7 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 		}).catch(() => null);
 		if (!response?.ok) {
 			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
-			setFeedback(body?.error ?? (locale === "id" ? "Gagal memperbarui wishlist." : "Could not update wishlist."));
+			setFeedback(body?.error ?? getMessage(locale, "catalog.wishlistFail"));
 			setWishlistBusyId(null);
 			return;
 		}
@@ -129,11 +153,13 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 	const compareHref =
 		compareIds.length > 0 ? `/catalog/compare?ids=${encodeURIComponent(compareIds.join(","))}` : "/catalog/compare";
 
+	const m = (key: Parameters<typeof getMessage>[1]) => getMessage(locale, key);
+
 	return (
 		<div className="space-y-4">
 			{feedback ? <p className="text-sm text-(--danger)">{feedback}</p> : null}
 
-			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+			<div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
 				{brews.map((brew, index) => {
 					const isWishlisted = wishlistIds.has(brew.id);
 					const inCompare = compareIds.includes(brew.id);
@@ -144,97 +170,103 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 					return (
 						<Card
 							key={brew.id}
-							className="flex h-full flex-col overflow-hidden p-0 transition hover:-translate-y-1 hover:shadow-[0_16px_50px_-25px_var(--overlay)]"
+							className="group flex h-full flex-col overflow-hidden p-0 transition-shadow hover:shadow-[0_20px_60px_-20px_var(--overlay)]"
 						>
-							<Link href={`/brew/${brew.id}`} className="block">
-								<div className="relative aspect-[16/10] w-full">
-									<Image
-										src={resolveBrewImageUrl(brew.image_url)}
-										alt={brew.image_alt || brew.name}
-										fill
-										sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-										loading={index < 3 ? "eager" : "lazy"}
-										fetchPriority={index < 3 ? "high" : "auto"}
-										className="object-cover"
-									/>
+							{/* Image section with overlays */}
+							<div className="relative overflow-hidden">
+								<Link href={`/brew/${brew.id}`} className="block" tabIndex={-1}>
+									<div className="relative aspect-16/10 w-full overflow-hidden">
+										<Image
+											src={resolveBrewImageUrl(brew.image_url)}
+											alt={brew.image_alt || brew.name}
+											fill
+											sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+											loading={index < 3 ? "eager" : "lazy"}
+											fetchPriority={index < 3 ? "high" : "auto"}
+											className="object-cover transition-transform duration-300 group-hover:scale-105"
+										/>
+									</div>
+								</Link>
+								<span className="absolute top-3 left-3 z-10 rounded-full bg-(--surface-elevated)/90 px-2.5 py-1 text-xs font-semibold text-(--espresso) shadow-sm backdrop-blur-sm">
+									{brew.brew_method}
+								</span>
+								{isAuthenticated ? (
+									<button
+										type="button"
+										onClick={() => void toggleWishlist(brew.id)}
+										disabled={wishlistBusyId === brew.id}
+										className="absolute top-3 right-3 z-10 rounded-full bg-(--surface-elevated)/80 p-2 shadow-sm backdrop-blur-sm transition hover:bg-(--surface-elevated) disabled:opacity-50"
+										aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+									>
+										<Heart size={15} className={cn(isWishlisted ? "fill-(--danger) text-(--danger)" : "text-(--muted)")} />
+									</button>
+								) : null}
+							</div>
+
+							{/* Content */}
+							<div className="flex flex-1 flex-col gap-2.5 p-5">
+									<div className="flex items-center justify-between">
+									<StarRating rating={brew.rating_avg} count={brew.review_total} locale={locale} />
+									<span className="inline-flex items-center gap-1 text-xs text-(--muted)" title={`${brew.wishlist_count} ${m("catalog.favorites")}`}>
+										<Heart size={12} className={brew.wishlist_count > 0 ? "fill-(--danger) text-(--danger)" : "text-(--sand)"} />
+										{brew.wishlist_count}
+									</span>
 								</div>
-							</Link>
-							<div className="flex h-full flex-col gap-3 p-5">
-								<div>
-									<Link href={`/brew/${brew.id}`} className="hover:underline">
-										<CardTitle>{brew.name}</CardTitle>
-									</Link>
-									<CardDescription className="mt-1">{brew.brew_method}</CardDescription>
+
+								<Link href={`/brew/${brew.id}`} className="hover:underline">
+									<CardTitle className="line-clamp-2 text-lg">{brew.name}</CardTitle>
+								</Link>
+
+								<div className="space-y-0.5 text-sm text-(--muted)">
+									<p className="line-clamp-1">{brew.coffee_beans}</p>
+									<p className="line-clamp-1">
+										{brew.brand_roastery}
+										{brew.bean_process ? ` · ${brew.bean_process}` : ""}
+									</p>
 								</div>
+
+								<MethodRecommendationChips locale={locale} methods={brew.recommended_methods ?? []} />
 
 								{Array.isArray(brew.tags) && brew.tags.length > 0 ? (
 									<div className="flex flex-wrap gap-1.5">
-										{brew.tags.slice(0, 5).map((tag) => (
-											<span key={`${brew.id}-${tag}`} className="rounded-full border px-2 py-0.5 text-[11px] text-(--muted)">
+										{brew.tags.slice(0, 4).map((tag) => (
+											<span
+												key={`${brew.id}-${tag}`}
+												className="rounded-full bg-(--sand)/15 px-2 py-0.5 text-[11px] font-medium text-(--muted)"
+											>
 												#{tag}
 											</span>
 										))}
 									</div>
 								) : null}
 
-								<MethodRecommendationChips locale={locale} methods={brew.recommended_methods ?? []} />
-
-								<p className="line-clamp-1 text-sm text-(--muted)">Beans: {brew.coffee_beans}</p>
-								<p className="line-clamp-1 text-sm text-(--muted)">Roastery: {brew.brand_roastery}</p>
-								{brew.bean_process ? <p className="line-clamp-1 text-sm text-(--muted)">Process: {brew.bean_process}</p> : null}
-								<p className="text-sm text-(--muted)">
-									{locale === "id" ? "Rating" : "Rating"}:{" "}
-									{brew.review_total > 0
-										? `${brew.rating_avg.toFixed(2)} (${brew.review_total})`
-										: locale === "id"
-											? "Belum ada ulasan"
-											: "No reviews yet"}
-								</p>
-								<p className="mt-auto text-xs text-(--muted)">
-									{locale === "id" ? "Oleh" : "By"} {brew.brewer_name} {locale === "id" ? "pada" : "on"}{" "}
-									{formatDate(brew.created_at, locale)}
+								<p className="mt-auto pt-1 text-xs text-(--muted)">
+									{m("catalog.by")} {brew.brewer_name} · {formatDate(brew.created_at, locale)}
 								</p>
 
-								<div className="grid grid-cols-3 gap-2 pt-1 sm:flex sm:flex-wrap">
-									<Link href={discussHref} className="block sm:inline-flex">
-										<Button
-											type="button"
-											size="sm"
-											variant="outline"
-											className="w-full gap-2 sm:w-auto"
-											aria-label={locale === "id" ? "Diskusikan brew ini" : "Discuss this brew"}
-										>
-											<MessageSquare size={14} />
-											<span className="hidden sm:inline">{locale === "id" ? "Diskusikan" : "Discuss this brew"}</span>
-										</Button>
-									</Link>
-									<Button
-										type="button"
-										size="sm"
-										variant={isWishlisted ? "secondary" : "ghost"}
-										className="w-full gap-2 sm:w-auto"
-										onClick={() => void toggleWishlist(brew.id)}
-										disabled={!isAuthenticated || wishlistBusyId === brew.id}
-										aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+								{/* Actions */}
+								<div className="flex items-center gap-2 border-t pt-3">
+									<Link
+										href={discussHref}
+										className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold text-(--muted) transition hover:bg-(--sand)/15"
 									>
-										<Heart size={14} className={cn(isWishlisted ? "fill-current" : "")} />
-										<span className="hidden sm:inline">
-											{isWishlisted ? (locale === "id" ? "Wishlist" : "Wishlisted") : locale === "id" ? "Simpan" : "Wishlist"}
-										</span>
-									</Button>
-									<Button
+										<MessageSquare size={13} />
+										{m("catalog.discuss")}
+									</Link>
+									<button
 										type="button"
-										size="sm"
-										variant={inCompare ? "secondary" : "ghost"}
-										className="w-full gap-2 sm:w-auto"
 										onClick={() => toggleCompare(brew.id)}
+										className={cn(
+											"inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition",
+											inCompare
+												? "border-(--accent) bg-(--accent)/10 text-(--accent)"
+												: "text-(--muted) hover:bg-(--sand)/15",
+										)}
 										aria-label={inCompare ? "Remove from compare" : "Add to compare"}
 									>
-										<GitCompare size={14} />
-										<span className="hidden sm:inline">
-											{inCompare ? (locale === "id" ? "Dipilih" : "Selected") : locale === "id" ? "Bandingkan" : "Compare"}
-										</span>
-									</Button>
+										<GitCompare size={13} />
+										{inCompare ? m("catalog.selected") : m("catalog.compare")}
+									</button>
 								</div>
 							</div>
 						</Card>
@@ -242,13 +274,21 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 				})}
 			</div>
 
+			{/* Compare Tray */}
 			{compareIds.length > 0 ? (
-				<div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-40 mx-auto max-w-4xl rounded-2xl border bg-(--surface-elevated)/95 p-3 shadow-xl backdrop-blur md:inset-x-6">
+				<div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-40 mx-auto max-w-4xl rounded-2xl border bg-(--surface-elevated)/95 p-4 shadow-xl backdrop-blur md:inset-x-6">
 					<div className="flex flex-wrap items-center justify-between gap-3">
-						<p className="text-sm text-(--muted)">
-							{locale === "id" ? "Compare Tray" : "Compare Tray"}:{" "}
-							{compareIds.map((id) => brewNameMap.get(id) ?? id.slice(0, 8)).join(", ")}
-						</p>
+						<div className="flex items-center gap-2">
+							<span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-(--accent)/15 text-xs font-bold text-(--accent)">
+								{compareIds.length}
+							</span>
+							<p className="text-sm font-medium text-(--espresso)">
+								{m("catalog.compareTray")}
+							</p>
+							<p className="hidden text-sm text-(--muted) sm:block">
+								{compareIds.map((id) => brewNameMap.get(id) ?? id.slice(0, 8)).join(", ")}
+							</p>
+						</div>
 						<div className="flex items-center gap-2">
 							<Button
 								type="button"
@@ -257,12 +297,12 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 								onClick={() => setCompareIds([])}
 								aria-label={locale === "id" ? "Kosongkan compare tray" : "Clear compare tray"}
 							>
-								{locale === "id" ? "Kosongkan" : "Clear"}
+								{m("catalog.clearCompare")}
 							</Button>
 							<Link href={compareHref}>
 								<Button type="button" size="sm" disabled={compareIds.length < 2}>
-									<Search size={14} />
-									{locale === "id" ? "Bandingkan" : "Compare"}
+									<GitCompare size={14} />
+									{m("catalog.compareAction")}
 								</Button>
 							</Link>
 						</div>

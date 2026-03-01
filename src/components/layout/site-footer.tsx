@@ -20,20 +20,20 @@ export async function SiteFooter() {
 				<div className="space-y-2">
 					<div className="flex items-center gap-2">
 						<Image src="/coffee-brew-mark.svg" alt={settings.app_name} width={26} height={26} />
-						<p className="font-heading text-2xl text-[var(--espresso)]">{settings.app_name}</p>
+						<p className="font-heading text-2xl text-(--espresso)">{settings.app_name}</p>
 					</div>
-					<p className="text-[var(--muted)]">{locale === "id" ? settings.footer_tagline_id : settings.footer_tagline_en}</p>
-					<p className="text-[var(--muted)]">
+					<p className="text-(--muted)">{locale === "id" ? settings.footer_tagline_id : settings.footer_tagline_en}</p>
+					<p className="text-(--muted)">
 						{locale === "id" ? settings.footer_description_id : settings.footer_description_en}
 					</p>
 				</div>
 
 				<div>
-					<h3 className="mb-2 font-semibold text-[var(--espresso)]">{t("footer.sitemap")}</h3>
-					<ul className="space-y-1 text-[var(--muted)]">
+					<h3 className="mb-2 font-semibold text-(--espresso)">{t("footer.sitemap")}</h3>
+					<ul className="space-y-1 text-(--muted)">
 						{grouped.sitemap.map((link) => (
 							<li key={`${link.group}-${link.href}`}>
-								<Link href={link.href} className="hover:text-[var(--accent)]">
+								<Link href={link.href} className="hover:text-(--accent)">
 									{locale === "id" ? link.label_id : link.label_en}
 								</Link>
 							</li>
@@ -42,11 +42,11 @@ export async function SiteFooter() {
 				</div>
 
 				<div>
-					<h3 className="mb-2 font-semibold text-[var(--espresso)]">{t("footer.community")}</h3>
-					<ul className="space-y-1 text-[var(--muted)]">
+					<h3 className="mb-2 font-semibold text-(--espresso)">{t("footer.community")}</h3>
+					<ul className="space-y-1 text-(--muted)">
 						{grouped.community.map((link) => (
 							<li key={`${link.group}-${link.href}`}>
-								<Link href={link.href} className="hover:text-[var(--accent)]">
+								<Link href={link.href} className="hover:text-(--accent)">
 									{locale === "id" ? link.label_id : link.label_en}
 								</Link>
 							</li>
@@ -55,11 +55,11 @@ export async function SiteFooter() {
 				</div>
 
 				<div>
-					<h3 className="mb-2 font-semibold text-[var(--espresso)]">{t("footer.support")}</h3>
-					<ul className="space-y-1 text-[var(--muted)]">
+					<h3 className="mb-2 font-semibold text-(--espresso)">{t("footer.support")}</h3>
+					<ul className="space-y-1 text-(--muted)">
 						{grouped.support.map((link) => (
 							<li key={`${link.group}-${link.href}`}>
-								<Link href={link.href} className="hover:text-[var(--accent)]">
+								<Link href={link.href} className="hover:text-(--accent)">
 									{locale === "id" ? link.label_id : link.label_en}
 								</Link>
 							</li>
@@ -67,7 +67,7 @@ export async function SiteFooter() {
 					</ul>
 				</div>
 			</div>
-			<div className="border-t px-4 py-4 text-center text-xs text-[var(--muted)] sm:px-6 lg:px-8">
+			<div className="border-t px-4 py-4 text-center text-xs text-(--muted) sm:px-6 lg:px-8">
 				© {year} {settings.app_name}. {t("footer.rights")}
 			</div>
 		</footer>

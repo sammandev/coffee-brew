@@ -136,7 +136,7 @@ export function Select({
 				aria-haspopup="listbox"
 				aria-expanded={isOpen}
 				className={cn(
-					"inline-flex h-11 w-full items-center rounded-xl border bg-(--surface) px-3 text-left text-sm text-foreground transition hover:border-(--accent)/55 focus:outline-none focus:ring-2 focus:ring-(--accent)/25 disabled:cursor-not-allowed disabled:opacity-55",
+					"inline-flex h-11 w-full items-center rounded-xl border bg-(--surface) px-3 text-left text-sm text-foreground transition hover:border-(--accent)/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--accent)/25 disabled:cursor-not-allowed disabled:opacity-55",
 					showIndicator ? "justify-between gap-2" : "justify-center gap-0",
 					className,
 				)}
@@ -153,15 +153,14 @@ export function Select({
 						menuClassName,
 					)}
 				>
-					<ul aria-labelledby={id} className="grid gap-0.5">
+					<ul role="listbox" aria-labelledby={id} className="grid gap-0.5">
 						{options.map((option) => {
 							const isSelected = option.value === selectedValue;
 
 							return (
-								<li key={option.value}>
-									<button
-										type="button"
-										aria-pressed={isSelected}
+							<li key={option.value} role="option" aria-selected={isSelected}>
+								<button
+									type="button"
 										disabled={option.disabled}
 										onClick={() => chooseOption(option.value)}
 										className={cn(

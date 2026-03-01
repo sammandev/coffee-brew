@@ -5,6 +5,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getSessionContext } from "@/lib/auth";
 import { normalizeCatalogSort, sortCatalogRows } from "@/lib/brew-catalog";
 import { getServerI18n } from "@/lib/i18n/server";
+import { getMessage } from "@/lib/i18n/messages";
 import { getPublishedBrews } from "@/lib/queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -62,6 +63,15 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 		aggregateMap.set(reviewRow.brew_id, aggregate);
 	}
 
+	const { data: wishlistCountRows } =
+		brewIds.length > 0
+			? await supabase.rpc("get_brew_wishlist_counts", { brew_ids: brewIds })
+			: { data: [] as Array<{ brew_id: string; wishlist_count: number }> };
+	const wishlistCountMap = new Map<string, number>();
+	for (const row of wishlistCountRows ?? []) {
+		wishlistCountMap.set(row.brew_id, Number(row.wishlist_count));
+	}
+
 	const preparedBrews = brews.map((brew) => {
 		const aggregate = aggregateMap.get(brew.id);
 		const reviewTotal = aggregate?.count ?? 0;
@@ -70,6 +80,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 			...brew,
 			rating_avg: ratingAverage,
 			review_total: reviewTotal,
+			wishlist_count: wishlistCountMap.get(brew.id) ?? 0,
 		};
 	});
 
@@ -98,13 +109,18 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 		})
 		.filter((brew) => brew.rating_avg >= minRating);
 	const filteredAndSortedBrews = sortCatalogRows(filteredBrews, sort);
+	const m = (key: Parameters<typeof getMessage>[1]) => getMessage(locale, key);
+
+	const hasActiveFilters = q.length > 0 || tag.length > 0 || method.length > 0 || roastery.length > 0 || brewer.length > 0 || minRating > 0;
 
 	return (
-		<div className="space-y-6">
-			<header className="space-y-3">
-				<Badge>{t("nav.catalog")}</Badge>
-				<h1 className="font-heading text-4xl text-(--espresso)">{t("catalog.title")}</h1>
-				<p className="text-(--muted)">{t("catalog.subtitle")}</p>
+		<div className="space-y-8">
+			<header className="space-y-4">
+				<div className="space-y-2">
+					<Badge>{t("nav.catalog")}</Badge>
+					<h1 className="font-heading text-4xl text-(--espresso)">{t("catalog.title")}</h1>
+					<p className="max-w-2xl text-(--muted)">{t("catalog.subtitle")}</p>
+				</div>
 				<CatalogSearchControls
 					locale={locale}
 					initialQuery={q}
@@ -119,21 +135,38 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 			</header>
 
 			{brews.length === 0 ? (
-				<Card>
-					<CardTitle>{locale === "id" ? "Belum ada racikan publik" : "No published brews yet"}</CardTitle>
-					<CardDescription>
-						{locale === "id"
-							? "Jadilah yang pertama mempublikasikan racikan dari dashboard."
-							: "Be the first to publish one from your dashboard."}
-					</CardDescription>
+				<Card className="flex flex-col items-center py-16 text-center">
+					<div className="mb-4 rounded-full bg-(--sand)/20 p-4">
+						<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-(--muted)">
+							<path d="M17 8h1a4 4 0 1 1 0 8h-1" /><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" /><line x1="6" x2="6" y1="2" y2="4" /><line x1="10" x2="10" y1="2" y2="4" /><line x1="14" x2="14" y1="2" y2="4" />
+						</svg>
+					</div>
+					<CardTitle>{m("catalog.noPublishedTitle")}</CardTitle>
+					<CardDescription className="mt-2">{m("catalog.noPublishedDescription")}</CardDescription>
+					<a href="/dashboard/brews/new" className="mt-5 inline-flex items-center gap-2 rounded-full bg-(--espresso) px-5 py-2.5 text-sm font-semibold text-(--oat) transition hover:opacity-90">
+						{m("catalog.goToDashboard")}
+					</a>
 				</Card>
 			) : filteredBrews.length === 0 ? (
-				<Card>
+				<Card className="flex flex-col items-center py-16 text-center">
+					<div className="mb-4 rounded-full bg-(--sand)/20 p-4">
+						<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-(--muted)">
+							<circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /><path d="M11 8v6" /><path d="M8 11h6" />
+						</svg>
+					</div>
 					<CardTitle>{t("catalog.noResultsTitle")}</CardTitle>
-					<CardDescription>{t("catalog.noResultsDescription")}</CardDescription>
+					<CardDescription className="mt-2">{m("catalog.adjustFilters")}</CardDescription>
 				</Card>
 			) : (
-				<CatalogBrewGrid brews={filteredAndSortedBrews} locale={locale} isAuthenticated={Boolean(session)} />
+				<>
+					{hasActiveFilters ? (
+						<p className="text-sm text-(--muted)">
+							<span className="font-semibold text-(--espresso)">{filteredAndSortedBrews.length}</span>{" "}
+							{m("catalog.brewsFound")}
+						</p>
+					) : null}
+					<CatalogBrewGrid brews={filteredAndSortedBrews} locale={locale} isAuthenticated={Boolean(session)} />
+				</>
 			)}
 		</div>
 	);

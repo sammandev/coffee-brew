@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 interface ModalProps {
+	ariaLabelledBy?: string;
 	backdropClassName?: string;
 	children: React.ReactNode;
 	className?: string;
@@ -23,6 +24,7 @@ function getFocusableNodes(root: HTMLElement | null) {
 }
 
 export function Modal({
+	ariaLabelledBy,
 	backdropClassName,
 	children,
 	className,
@@ -115,8 +117,9 @@ export function Modal({
 				ref={panelRef}
 				role="dialog"
 				aria-modal="true"
+				aria-labelledby={ariaLabelledBy}
 				className={cn(
-					"relative w-full overflow-hidden bg-(--surface-elevated) shadow-[0_24px_64px_-36px_var(--overlay)]",
+					"relative w-full animate-[fade-up_0.2s_ease-out] overflow-hidden bg-(--surface-elevated) shadow-[0_24px_64px_-36px_var(--overlay)]",
 					fullscreen
 						? "h-screen max-h-none max-w-none rounded-none border-0"
 						: "max-h-[calc(100dvh-2rem)] rounded-3xl border border-(--border) sm:max-h-[calc(100dvh-3rem)]",

@@ -8,8 +8,9 @@ import { FormModal } from "@/components/ui/form-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { normalizeCatalogSort } from "@/lib/brew-catalog";
+import { type CatalogSortValue, normalizeCatalogSort } from "@/lib/brew-catalog";
 import { getMessage } from "@/lib/i18n/messages";
+import { cn } from "@/lib/utils";
 
 interface CatalogSearchControlsProps {
 	initialBrewer: string;
@@ -33,6 +34,14 @@ function toQueryString(entries: Record<string, string>) {
 	const serialized = params.toString();
 	return serialized.length > 0 ? `?${serialized}` : "";
 }
+
+const SORT_OPTIONS: Array<{ labelKey: "sortLatest" | "sortSmart" | "sortHighestRated" | "sortMostReviewed" | "sortOldest"; value: CatalogSortValue }> = [
+	{ value: "newest", labelKey: "sortLatest" },
+	{ value: "smart", labelKey: "sortSmart" },
+	{ value: "highest_stars", labelKey: "sortHighestRated" },
+	{ value: "most_reviews", labelKey: "sortMostReviewed" },
+	{ value: "oldest", labelKey: "sortOldest" },
+];
 
 export function CatalogSearchControls({
 	initialBrewer,
@@ -132,6 +141,7 @@ export function CatalogSearchControls({
 						value={query}
 						onChange={(event) => setQuery(event.currentTarget.value)}
 						placeholder={labels.searchPlaceholder}
+						aria-label={labels.searchPlaceholder}
 						className="pl-9"
 					/>
 				</div>
@@ -157,6 +167,28 @@ export function CatalogSearchControls({
 					<span className="sr-only sm:not-sr-only sm:ml-0">{labels.advancedButton}</span>
 				</Button>
 			</form>
+
+			<div className="flex flex-wrap items-center gap-1.5">
+				<span className="mr-1 text-xs font-semibold text-(--muted)">{labels.sort}:</span>
+				{SORT_OPTIONS.map((option) => (
+					<button
+						key={option.value}
+						type="button"
+						onClick={() => {
+							setSort(option.value);
+							pushWithFilters({ q: query, tag, method, roastery, brewer, minRating, sort: option.value });
+						}}
+						className={cn(
+							"rounded-full px-3 py-1 text-xs font-semibold transition",
+							sort === option.value
+								? "bg-(--espresso) text-(--oat)"
+								: "bg-(--sand)/15 text-(--muted) hover:bg-(--sand)/30",
+						)}
+					>
+						{labels[option.labelKey]}
+					</button>
+				))}
+			</div>
 
 			<div className="flex flex-wrap items-center gap-2">
 				<span className="inline-flex items-center gap-2 text-xs font-semibold text-(--muted)">

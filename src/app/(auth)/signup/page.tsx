@@ -8,8 +8,8 @@ export default async function SignupPage() {
 
 	return (
 		<div className="space-y-4">
-			<h1 className="font-heading text-4xl text-[var(--espresso)]">{t("auth.signupTitle")}</h1>
-			<p className="text-[var(--muted)]">{t("auth.signupDescription")}</p>
+			<h1 className="font-heading text-4xl text-(--espresso)">{t("auth.signupTitle")}</h1>
+			<p className="text-(--muted)">{t("auth.signupDescription")}</p>
 			{settings.enable_signup ? (
 				<SignupForm enableGoogleLogin={settings.enable_google_login} />
 			) : (

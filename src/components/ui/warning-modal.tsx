@@ -5,22 +5,26 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 
 interface WarningModalProps {
+	cancelLabel?: string;
 	confirmLabel?: string;
 	description: string;
 	isSubmitting?: boolean;
 	onClose: () => void;
 	onConfirm: () => void;
 	open: boolean;
+	processingLabel?: string;
 	title: string;
 }
 
 export function WarningModal({
+	cancelLabel = "Cancel",
 	confirmLabel = "Continue",
 	description,
 	isSubmitting = false,
 	onClose,
 	onConfirm,
 	open,
+	processingLabel = "Processing...",
 	title,
 }: WarningModalProps) {
 	return (
@@ -44,10 +48,10 @@ export function WarningModal({
 
 				<div className="flex justify-end gap-2 pt-2">
 					<Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
-						Cancel
+						{cancelLabel}
 					</Button>
 					<Button type="button" variant="outline" onClick={onConfirm} disabled={isSubmitting}>
-						{isSubmitting ? "Processing..." : confirmLabel}
+						{isSubmitting ? processingLabel : confirmLabel}
 					</Button>
 				</div>
 			</div>

@@ -93,8 +93,8 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 						</span>
 					))}
 				</div>
-				<h1 className="font-heading text-4xl leading-tight text-[var(--espresso)] md:text-5xl">{title}</h1>
-				<div className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
+				<h1 className="font-heading text-4xl leading-tight text-(--espresso) md:text-5xl">{title}</h1>
+				<div className="flex flex-wrap items-center gap-2 text-xs text-(--muted)">
 					<span>
 						{locale === "id" ? "Dibuat oleh" : "Posted by"} {authorName}
 					</span>
@@ -122,7 +122,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 			</header>
 
 			<div className="relative overflow-hidden rounded-3xl border">
-				<div className="relative h-[300px] md:h-[420px]">
+				<div className="relative h-75 md:h-105">
 					<Image
 						src={dbPost ? dbPost.hero_image_url : (staticPost?.imageUrl ?? "")}
 						alt={imageAlt}
@@ -136,7 +136,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
 			<div className="grid gap-4 lg:grid-cols-[1fr_320px]">
 				<Card className="space-y-4">
-					<RichTextContent html={body} className="text-[var(--muted)]" />
+					<RichTextContent html={body} className="text-(--muted)" />
 				</Card>
 
 				<div className="space-y-4">

@@ -88,7 +88,7 @@ export function NavbarMessages({ userId, mobile = false }: NavbarMessagesProps) 
 		<Link
 			href="/messages"
 			className={cn(
-				"relative inline-flex h-9 items-center justify-center rounded-lg border border-(--border) bg-(--surface) px-3 text-sm font-semibold transition hover:bg-(--sand)/15",
+				"relative inline-flex h-10 items-center justify-center rounded-lg border border-(--border) bg-(--surface) px-3 text-sm font-semibold transition hover:bg-(--sand)/15",
 				mobile && "w-full justify-start gap-2",
 			)}
 			aria-label="Direct messages"
