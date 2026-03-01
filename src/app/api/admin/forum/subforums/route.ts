@@ -1,4 +1,6 @@
 import { apiError, apiOk } from "@/lib/api";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { requirePermission } from "@/lib/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { forumSubforumSchema } from "@/lib/validators";
@@ -53,6 +55,7 @@ export async function POST(request: Request) {
 	if (error) {
 		return apiError("Could not create sub-forum", 400, error.message);
 	}
+	revalidatePublicCache([CACHE_TAGS.FORUM]);
 	return apiOk({ subforum: data }, 201);
 }
 
@@ -87,6 +90,7 @@ export async function PUT(request: Request) {
 	if (error) {
 		return apiError("Could not update sub-forum", 400, error.message);
 	}
+	revalidatePublicCache([CACHE_TAGS.FORUM]);
 	return apiOk({ subforum: data });
 }
 
@@ -105,5 +109,6 @@ export async function DELETE(request: Request) {
 	if (error) {
 		return apiError("Could not delete sub-forum", 400, error.message);
 	}
+	revalidatePublicCache([CACHE_TAGS.FORUM]);
 	return apiOk({ success: true });
 }

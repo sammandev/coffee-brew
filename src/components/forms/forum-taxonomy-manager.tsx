@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Button } from "@/components/ui/button";
@@ -28,8 +29,16 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 	const [subforumCategoryId, setSubforumCategoryId] = useState(categories[0]?.id ?? "");
 	const [subforumNameEn, setSubforumNameEn] = useState("");
 	const [subforumNameId, setSubforumNameId] = useState("");
-	const [busy, setBusy] = useState<null | "category" | "subforum">(null);
+	const [busy, setBusy] = useState<null | string>(null);
 	const [error, setError] = useState<string | null>(null);
+
+	const [editingCategory, setEditingCategory] = useState<string | null>(null);
+	const [editCatNameEn, setEditCatNameEn] = useState("");
+	const [editCatNameId, setEditCatNameId] = useState("");
+
+	const [editingSubforum, setEditingSubforum] = useState<string | null>(null);
+	const [editSubNameEn, setEditSubNameEn] = useState("");
+	const [editSubNameId, setEditSubNameId] = useState("");
 
 	const categoryMap = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
 
@@ -84,6 +93,156 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 			return;
 		}
 		window.location.reload();
+	}
+
+	async function toggleCategoryVisibility(category: ForumCategory) {
+		setBusy(`toggle-cat-${category.id}`);
+		setError(null);
+		const response = await fetch("/api/admin/forum/categories", {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				id: category.id,
+				slug: category.slug,
+				name_en: category.name_en,
+				name_id: category.name_id,
+				description_en: category.description_en,
+				description_id: category.description_id,
+				order_index: category.order_index,
+				is_visible: !category.is_visible,
+			}),
+		}).catch(() => null);
+		setBusy(null);
+		if (!response?.ok) {
+			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
+			setError(body?.error ?? "Could not update category.");
+			return;
+		}
+		window.location.reload();
+	}
+
+	async function saveCategory(category: ForumCategory) {
+		setBusy(`edit-cat-${category.id}`);
+		setError(null);
+		const response = await fetch("/api/admin/forum/categories", {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				id: category.id,
+				slug: slugify(editCatNameEn || category.name_en),
+				name_en: editCatNameEn || category.name_en,
+				name_id: editCatNameId || category.name_id,
+				description_en: category.description_en,
+				description_id: category.description_id,
+				order_index: category.order_index,
+				is_visible: category.is_visible,
+			}),
+		}).catch(() => null);
+		setBusy(null);
+		if (!response?.ok) {
+			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
+			setError(body?.error ?? "Could not update category.");
+			return;
+		}
+		setEditingCategory(null);
+		window.location.reload();
+	}
+
+	async function deleteCategory(id: string) {
+		setBusy(`del-cat-${id}`);
+		setError(null);
+		const response = await fetch(`/api/admin/forum/categories?id=${encodeURIComponent(id)}`, {
+			method: "DELETE",
+		}).catch(() => null);
+		setBusy(null);
+		if (!response?.ok) {
+			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
+			setError(body?.error ?? "Could not delete category.");
+			return;
+		}
+		window.location.reload();
+	}
+
+	async function toggleSubforumVisibility(subforum: ForumSubforum) {
+		setBusy(`toggle-sub-${subforum.id}`);
+		setError(null);
+		const response = await fetch("/api/admin/forum/subforums", {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				id: subforum.id,
+				category_id: subforum.category_id,
+				slug: subforum.slug,
+				name_en: subforum.name_en,
+				name_id: subforum.name_id,
+				description_en: subforum.description_en,
+				description_id: subforum.description_id,
+				order_index: subforum.order_index,
+				is_visible: !subforum.is_visible,
+			}),
+		}).catch(() => null);
+		setBusy(null);
+		if (!response?.ok) {
+			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
+			setError(body?.error ?? "Could not update sub-forum.");
+			return;
+		}
+		window.location.reload();
+	}
+
+	async function saveSubforum(subforum: ForumSubforum) {
+		setBusy(`edit-sub-${subforum.id}`);
+		setError(null);
+		const response = await fetch("/api/admin/forum/subforums", {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				id: subforum.id,
+				category_id: subforum.category_id,
+				slug: slugify(editSubNameEn || subforum.name_en),
+				name_en: editSubNameEn || subforum.name_en,
+				name_id: editSubNameId || subforum.name_id,
+				description_en: subforum.description_en,
+				description_id: subforum.description_id,
+				order_index: subforum.order_index,
+				is_visible: subforum.is_visible,
+			}),
+		}).catch(() => null);
+		setBusy(null);
+		if (!response?.ok) {
+			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
+			setError(body?.error ?? "Could not update sub-forum.");
+			return;
+		}
+		setEditingSubforum(null);
+		window.location.reload();
+	}
+
+	async function deleteSubforum(id: string) {
+		setBusy(`del-sub-${id}`);
+		setError(null);
+		const response = await fetch(`/api/admin/forum/subforums?id=${encodeURIComponent(id)}`, {
+			method: "DELETE",
+		}).catch(() => null);
+		setBusy(null);
+		if (!response?.ok) {
+			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
+			setError(body?.error ?? "Could not delete sub-forum.");
+			return;
+		}
+		window.location.reload();
+	}
+
+	function startEditCategory(category: ForumCategory) {
+		setEditingCategory(category.id);
+		setEditCatNameEn(category.name_en);
+		setEditCatNameId(category.name_id);
+	}
+
+	function startEditSubforum(subforum: ForumSubforum) {
+		setEditingSubforum(subforum.id);
+		setEditSubNameEn(subforum.name_en);
+		setEditSubNameId(subforum.name_id);
 	}
 
 	return (
@@ -167,17 +326,159 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 				<div className="space-y-3">
 					{categories.map((category) => (
 						<div key={category.id} className="rounded-2xl border bg-(--surface-elevated) p-4">
-							<p className="font-semibold text-(--espresso)">{locale === "id" ? category.name_id : category.name_en}</p>
-							<p className="text-xs text-(--muted)">/{category.slug}</p>
+							{editingCategory === category.id ? (
+								<div className="grid gap-2">
+									<div className="grid gap-2 md:grid-cols-2">
+										<Input
+											value={editCatNameEn}
+											onChange={(e) => setEditCatNameEn(e.currentTarget.value)}
+											placeholder="Name (EN)"
+										/>
+										<Input
+											value={editCatNameId}
+											onChange={(e) => setEditCatNameId(e.currentTarget.value)}
+											placeholder="Name (ID)"
+										/>
+									</div>
+									<div className="flex gap-2">
+										<Button type="button" size="sm" onClick={() => void saveCategory(category)} disabled={busy !== null}>
+											{locale === "id" ? "Simpan" : "Save"}
+										</Button>
+										<Button type="button" size="sm" variant="ghost" onClick={() => setEditingCategory(null)}>
+											{locale === "id" ? "Batal" : "Cancel"}
+										</Button>
+									</div>
+								</div>
+							) : (
+								<div className="flex flex-wrap items-start justify-between gap-2">
+									<div>
+										<p className="font-semibold text-(--espresso)">
+											{locale === "id" ? category.name_id : category.name_en}
+											{!category.is_visible && (
+												<span className="ml-2 text-xs text-(--muted)">({locale === "id" ? "Tersembunyi" : "Hidden"})</span>
+											)}
+										</p>
+										<p className="text-xs text-(--muted)">/{category.slug}</p>
+									</div>
+									<div className="flex items-center gap-1">
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											onClick={() => void toggleCategoryVisibility(category)}
+											disabled={busy !== null}
+											title={
+												category.is_visible ? (locale === "id" ? "Sembunyikan" : "Hide") : locale === "id" ? "Tampilkan" : "Show"
+											}
+										>
+											{category.is_visible ? <EyeOff size={14} /> : <Eye size={14} />}
+										</Button>
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											onClick={() => startEditCategory(category)}
+											disabled={busy !== null}
+											title={locale === "id" ? "Edit" : "Edit"}
+										>
+											<Pencil size={14} />
+										</Button>
+										<Button
+											type="button"
+											variant="destructive"
+											size="sm"
+											onClick={() => void deleteCategory(category.id)}
+											disabled={busy !== null}
+											title={locale === "id" ? "Hapus" : "Delete"}
+										>
+											<Trash2 size={14} />
+										</Button>
+									</div>
+								</div>
+							)}
 							<div className="mt-2 grid gap-2">
 								{subforums
 									.filter((subforum) => subforum.category_id === category.id)
 									.map((subforum) => (
 										<div key={subforum.id} className="rounded-xl border bg-(--surface) px-3 py-2 text-sm">
-											<p className="font-medium text-(--espresso)">{locale === "id" ? subforum.name_id : subforum.name_en}</p>
-											<p className="text-xs text-(--muted)">
-												/{category.slug}/f/{subforum.slug} · {categoryMap.get(subforum.category_id)?.slug}
-											</p>
+											{editingSubforum === subforum.id ? (
+												<div className="grid gap-2">
+													<div className="grid gap-2 md:grid-cols-2">
+														<Input
+															value={editSubNameEn}
+															onChange={(e) => setEditSubNameEn(e.currentTarget.value)}
+															placeholder="Name (EN)"
+														/>
+														<Input
+															value={editSubNameId}
+															onChange={(e) => setEditSubNameId(e.currentTarget.value)}
+															placeholder="Name (ID)"
+														/>
+													</div>
+													<div className="flex gap-2">
+														<Button type="button" size="sm" onClick={() => void saveSubforum(subforum)} disabled={busy !== null}>
+															{locale === "id" ? "Simpan" : "Save"}
+														</Button>
+														<Button type="button" size="sm" variant="ghost" onClick={() => setEditingSubforum(null)}>
+															{locale === "id" ? "Batal" : "Cancel"}
+														</Button>
+													</div>
+												</div>
+											) : (
+												<div className="flex flex-wrap items-center justify-between gap-2">
+													<div>
+														<p className="font-medium text-(--espresso)">
+															{locale === "id" ? subforum.name_id : subforum.name_en}
+															{!subforum.is_visible && (
+																<span className="ml-2 text-xs text-(--muted)">({locale === "id" ? "Tersembunyi" : "Hidden"})</span>
+															)}
+														</p>
+														<p className="text-xs text-(--muted)">
+															/{category.slug}/f/{subforum.slug} · {categoryMap.get(subforum.category_id)?.slug}
+														</p>
+													</div>
+													<div className="flex items-center gap-1">
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															onClick={() => void toggleSubforumVisibility(subforum)}
+															disabled={busy !== null}
+															title={
+																subforum.is_visible
+																	? locale === "id"
+																		? "Sembunyikan"
+																		: "Hide"
+																	: locale === "id"
+																		? "Tampilkan"
+																		: "Show"
+															}
+														>
+															{subforum.is_visible ? <EyeOff size={14} /> : <Eye size={14} />}
+														</Button>
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															onClick={() => startEditSubforum(subforum)}
+															disabled={busy !== null}
+															title={locale === "id" ? "Edit" : "Edit"}
+														>
+															<Pencil size={14} />
+														</Button>
+														<Button
+															type="button"
+															variant="destructive"
+															size="sm"
+															onClick={() => void deleteSubforum(subforum.id)}
+															disabled={busy !== null}
+															title={locale === "id" ? "Hapus" : "Delete"}
+														>
+															<Trash2 size={14} />
+														</Button>
+													</div>
+												</div>
+											)}
 										</div>
 									))}
 							</div>

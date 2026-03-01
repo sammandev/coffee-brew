@@ -1,5 +1,7 @@
 import { apiError, apiOk } from "@/lib/api";
 import { BLOG_IMAGE_BUCKET, toManagedBlogImagePath } from "@/lib/blog-images";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { requirePermission } from "@/lib/guards";
 import { sanitizeForStorage, validatePlainTextLength } from "@/lib/rich-text";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -113,6 +115,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 		}
 	}
 
+	revalidatePublicCache([CACHE_TAGS.BLOG]);
+
 	return apiOk({ post: data });
 }
 
@@ -133,6 +137,8 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 	if (previousPath) {
 		await createSupabaseAdminClient().storage.from(BLOG_IMAGE_BUCKET).remove([previousPath]);
 	}
+
+	revalidatePublicCache([CACHE_TAGS.BLOG]);
 
 	return apiOk({ success: true });
 }

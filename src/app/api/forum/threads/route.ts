@@ -1,5 +1,7 @@
 import { apiError, apiOk } from "@/lib/api";
 import { getSessionContext } from "@/lib/auth";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { buildForumThreadSlug, isLikelyUuid, normalizeTagList } from "@/lib/forum";
 import { notifyMentions } from "@/lib/forum-mentions";
 import { applyForumReputation } from "@/lib/forum-reputation";
@@ -282,6 +284,8 @@ export async function POST(request: Request) {
 			metadata: { auto_flagged: true },
 		});
 	}
+
+	revalidatePublicCache([CACHE_TAGS.FORUM, CACHE_TAGS.LANDING]);
 
 	return apiOk({ thread: data }, 201);
 }

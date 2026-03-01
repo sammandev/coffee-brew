@@ -1,5 +1,7 @@
 import { apiError, apiOk } from "@/lib/api";
 import { getSessionContext } from "@/lib/auth";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { requirePermission } from "@/lib/guards";
 import { createNotifications } from "@/lib/notifications";
 import { toOverallScore } from "@/lib/rating";
@@ -115,6 +117,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ brew
 			},
 		]);
 	}
+
+	revalidatePublicCache([CACHE_TAGS.BREWS, CACHE_TAGS.BREW_DETAIL, CACHE_TAGS.LANDING]);
 
 	return apiOk({ review: data });
 }

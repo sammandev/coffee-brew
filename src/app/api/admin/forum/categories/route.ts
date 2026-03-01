@@ -1,4 +1,6 @@
 import { apiError, apiOk } from "@/lib/api";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { requirePermission } from "@/lib/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { forumCategorySchema } from "@/lib/validators";
@@ -44,6 +46,7 @@ export async function POST(request: Request) {
 	if (error) {
 		return apiError("Could not create category", 400, error.message);
 	}
+	revalidatePublicCache([CACHE_TAGS.FORUM]);
 	return apiOk({ category: data }, 201);
 }
 
@@ -77,6 +80,7 @@ export async function PUT(request: Request) {
 	if (error) {
 		return apiError("Could not update category", 400, error.message);
 	}
+	revalidatePublicCache([CACHE_TAGS.FORUM]);
 	return apiOk({ category: data });
 }
 
@@ -95,5 +99,6 @@ export async function DELETE(request: Request) {
 	if (error) {
 		return apiError("Could not delete category", 400, error.message);
 	}
+	revalidatePublicCache([CACHE_TAGS.FORUM]);
 	return apiOk({ success: true });
 }

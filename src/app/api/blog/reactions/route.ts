@@ -1,5 +1,7 @@
 import { apiError, apiOk } from "@/lib/api";
 import { requireSessionContext, type SessionContext } from "@/lib/auth";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { ForumReactionType } from "@/lib/constants";
 import { AccountDisabledError, UnauthorizedError } from "@/lib/errors";
 import { applyForumReputation } from "@/lib/forum-reputation";
@@ -118,6 +120,8 @@ export async function POST(request: Request) {
 			]);
 		}
 	}
+
+	revalidatePublicCache([CACHE_TAGS.BLOG]);
 
 	return apiOk({
 		success: true,

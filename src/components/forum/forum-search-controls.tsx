@@ -134,14 +134,14 @@ export function ForumSearchControls({
 						onChange={(event) => setQuery(event.currentTarget.value)}
 						placeholder={labels.searchPlaceholder}
 						aria-label={labels.searchPlaceholder}
-						className="pl-9"
+						className="rounded-xl pl-9"
 					/>
 				</div>
 				<Button
 					type="submit"
 					variant="secondary"
 					size="sm"
-					className="shrink-0 px-2 sm:px-4"
+					className="shrink-0 rounded-xl px-2 sm:px-4"
 					aria-label={labels.searchButton}
 				>
 					<Search size={14} />
@@ -152,7 +152,7 @@ export function ForumSearchControls({
 					variant="outline"
 					size="sm"
 					onClick={() => setAdvancedOpen(true)}
-					className="inline-flex shrink-0 gap-0 px-2 sm:gap-2 sm:px-4"
+					className="inline-flex shrink-0 gap-0 rounded-xl px-2 sm:gap-2 sm:px-4"
 					aria-label={labels.advancedButton}
 				>
 					<SlidersHorizontal size={14} />
@@ -160,33 +160,39 @@ export function ForumSearchControls({
 				</Button>
 			</form>
 
-			<div className="flex flex-wrap items-center gap-2">
-				<span className="inline-flex items-center gap-2 text-xs font-semibold text-(--muted)">
-					<Tag size={13} />
-					{labels.popularTags}
-				</span>
-				{popularTags.map((popularTag) => (
-					<button
-						key={popularTag}
-						type="button"
-						onClick={() => {
-							setTag(popularTag);
-							pushWithFilters({
-								q: query,
-								tag: popularTag,
-								author,
-								minReactions,
-								sort,
-								from,
-								to,
-							});
-						}}
-						className="rounded-full border px-2.5 py-1 text-xs font-semibold text-(--muted) transition hover:bg-(--sand)/20"
-					>
-						#{popularTag}
-					</button>
-				))}
-			</div>
+			{popularTags.length > 0 ? (
+				<div className="flex flex-wrap items-center gap-1.5">
+					<span className="inline-flex items-center gap-1.5 text-xs font-semibold text-(--muted)">
+						<Tag size={12} />
+						{labels.popularTags}:
+					</span>
+					{popularTags.map((popularTag) => (
+						<button
+							key={popularTag}
+							type="button"
+							onClick={() => {
+								setTag(popularTag);
+								pushWithFilters({
+									q: query,
+									tag: popularTag,
+									author,
+									minReactions,
+									sort,
+									from,
+									to,
+								});
+							}}
+							className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition ${
+								tag === popularTag
+									? "bg-(--accent)/15 text-(--accent)"
+									: "bg-(--sand)/20 text-(--muted) hover:bg-(--sand)/35 hover:text-(--espresso)"
+							}`}
+						>
+							#{popularTag}
+						</button>
+					))}
+				</div>
+			) : null}
 
 			<FormModal
 				open={advancedOpen}

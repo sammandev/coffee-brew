@@ -1,4 +1,6 @@
 import { apiError, apiOk } from "@/lib/api";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { requirePermission } from "@/lib/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { faqItemSchema } from "@/lib/validators";
@@ -48,6 +50,8 @@ export async function POST(request: Request) {
 		return apiError("Could not create FAQ item", 400, error.message);
 	}
 
+	revalidatePublicCache([CACHE_TAGS.FAQ, CACHE_TAGS.LANDING]);
+
 	return apiOk({ item: data }, 201);
 }
 
@@ -92,6 +96,8 @@ export async function PUT(request: Request) {
 		return apiError("Could not update FAQ item", 400, error.message);
 	}
 
+	revalidatePublicCache([CACHE_TAGS.FAQ, CACHE_TAGS.LANDING]);
+
 	return apiOk({ item: data });
 }
 
@@ -111,6 +117,8 @@ export async function DELETE(request: Request) {
 	if (error) {
 		return apiError("Could not delete FAQ item", 400, error.message);
 	}
+
+	revalidatePublicCache([CACHE_TAGS.FAQ, CACHE_TAGS.LANDING]);
 
 	return apiOk({ success: true });
 }

@@ -3,7 +3,7 @@
 import { X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { isActivePath, navItemClassName } from "@/lib/navigation";
+import { navItemClassName } from "@/lib/navigation";
 import type { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -73,10 +73,7 @@ export function DashboardSidebar({ locale, onClose, open, role }: DashboardSideb
 	const sections = buildSections(locale, role);
 
 	function isLinkActive(href: string) {
-		if (href === "/dashboard") {
-			return pathname === "/dashboard";
-		}
-		return isActivePath(pathname, href);
+		return pathname === href;
 	}
 
 	function onLinkNavigate() {
@@ -140,7 +137,7 @@ export function DashboardSidebar({ locale, onClose, open, role }: DashboardSideb
 			{open ? (
 				<button
 					type="button"
-					className="fixed inset-0 z-[90] bg-(--overlay)/40 lg:hidden"
+					className="fixed inset-0 z-90 bg-(--overlay)/40 lg:hidden"
 					onClick={onClose}
 					aria-label={locale === "id" ? "Tutup sidebar" : "Close sidebar"}
 				/>
@@ -148,7 +145,7 @@ export function DashboardSidebar({ locale, onClose, open, role }: DashboardSideb
 
 			<aside
 				className={cn(
-					"fixed inset-y-0 left-0 z-[100] w-[86vw] max-w-80 border-r border-(--border) bg-(--surface-elevated) p-4 shadow-2xl transition-transform duration-200 lg:hidden",
+					"fixed inset-y-0 left-0 z-100 w-[86vw] max-w-80 border-r border-(--border) bg-(--surface-elevated) p-4 shadow-2xl transition-transform duration-200 lg:hidden",
 					open ? "translate-x-0" : "-translate-x-full",
 				)}
 			>

@@ -48,9 +48,13 @@ export function ForumReportAction({ targetId, targetType }: ForumReportActionPro
 
 	return (
 		<>
-			<Button type="button" size="sm" variant="ghost" onClick={() => setOpen(true)}>
+			<button
+				type="button"
+				onClick={() => setOpen(true)}
+				className="rounded-full px-2.5 py-1 text-xs text-(--muted) transition hover:bg-(--sand)/20 hover:text-(--espresso)"
+			>
 				{locale === "id" ? "Laporkan" : "Report"}
-			</Button>
+			</button>
 			<FormModal
 				open={open}
 				onClose={() => setOpen(false)}

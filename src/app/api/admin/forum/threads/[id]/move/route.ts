@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { apiError, apiOk } from "@/lib/api";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { requirePermission } from "@/lib/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -37,6 +39,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 	if (error) {
 		return apiError("Could not move thread", 400, error.message);
 	}
+
+	revalidatePublicCache([CACHE_TAGS.FORUM]);
 
 	return apiOk({ thread: data });
 }

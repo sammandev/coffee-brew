@@ -35,7 +35,7 @@ describe("PreferenceControls", () => {
 		render(<PreferenceControls />);
 		const selector = screen.getByLabelText("Language");
 		fireEvent.click(selector);
-		fireEvent.click(screen.getByRole("button", { name: "ID" }));
+		fireEvent.click(screen.getByRole("option", { name: "ID" }));
 		expect(mockSetLocale).toHaveBeenCalledWith("id");
 	});
 

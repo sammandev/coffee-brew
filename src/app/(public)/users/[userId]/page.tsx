@@ -16,6 +16,30 @@ import { formatDate } from "@/lib/utils";
 
 interface PublicProfilePageProps {
 	params: Promise<{ userId: string }>;
+	searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+type TabId = "brews" | "blogs" | "threads" | "reviews";
+type ReviewsTabId = "received" | "given";
+
+const PROFILE_TAB_LIMIT = 40;
+const PROFILE_REVIEW_LIMIT = 80;
+const PROFILE_REVIEW_BREW_SCOPE_LIMIT = 200;
+
+function firstParam(value: string | string[] | undefined) {
+	if (Array.isArray(value)) return value[0] ?? "";
+	return value ?? "";
+}
+
+function normalizeProfileTab(value: string): TabId {
+	if (value === "blogs" || value === "threads" || value === "reviews") {
+		return value;
+	}
+	return "brews";
+}
+
+function normalizeReviewsTab(value: string): ReviewsTabId {
+	return value === "given" ? "given" : "received";
 }
 
 interface BrewReviewRow {
@@ -27,8 +51,15 @@ interface BrewReviewRow {
 	updated_at: string;
 }
 
-export default async function PublicProfilePage({ params }: PublicProfilePageProps) {
-	const [{ userId }, { locale }, session] = await Promise.all([params, getServerI18n(), getSessionContext()]);
+export default async function PublicProfilePage({ params, searchParams }: PublicProfilePageProps) {
+	const [{ userId }, { locale }, session, query] = await Promise.all([
+		params,
+		getServerI18n(),
+		getSessionContext(),
+		searchParams,
+	]);
+	const activeTab = normalizeProfileTab(firstParam(query.tab).trim());
+	const activeReviewsTab = normalizeReviewsTab(firstParam(query.reviews).trim());
 	const supabaseAdmin = createSupabaseAdminClient();
 
 	const [{ data: targetProfile }, viewerProfileResult] = await Promise.all([
@@ -104,317 +135,387 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
 	const isOnline = isOnlineByLastActive(targetProfile.last_active_at ?? null);
 	const showOnlineDot = canSeeTargetOnlineStatus && isOnline;
 
-	const [brewRowsResult, blogRowsResult, threadRowsResult] = await Promise.all([
-		(isPrivateForViewer
-			? Promise.resolve({ data: [] as Array<Record<string, unknown>> })
-			: (() => {
-					const query = supabaseAdmin
-						.from("brews")
-						.select("id, name, brew_method, owner_id, status, created_at")
-						.eq("owner_id", targetProfile.id)
-						.order("created_at", { ascending: false })
-						.limit(120);
-					if (!canBypassPrivacy) {
-						query.eq("status", "published");
-					}
-					return query;
-				})()) as PromiseLike<{ data: Array<Record<string, unknown>> | null }>,
-		(isPrivateForViewer
-			? Promise.resolve({ data: [] as Array<Record<string, unknown>> })
-			: (() => {
-					const query = supabaseAdmin
-						.from("blog_posts")
-						.select("id, slug, title_en, title_id, status, published_at, updated_at")
-						.eq("author_id", targetProfile.id)
-						.order("updated_at", { ascending: false })
-						.limit(120);
-					if (!canBypassPrivacy) {
-						query.eq("status", "published");
-					}
-					return query;
-				})()) as PromiseLike<{ data: Array<Record<string, unknown>> | null }>,
-		(isPrivateForViewer
-			? Promise.resolve({ data: [] as Array<Record<string, unknown>> })
-			: (() => {
-					const query = supabaseAdmin
-						.from("forum_threads")
-						.select("id, title, status, created_at, updated_at")
-						.eq("author_id", targetProfile.id)
-						.order("updated_at", { ascending: false })
-						.limit(120);
-					if (!canBypassPrivacy) {
-						query.eq("status", "visible");
-					}
-					return query;
-				})()) as PromiseLike<{ data: Array<Record<string, unknown>> | null }>,
-	]);
+	let brews: Array<{
+		id: string;
+		name: string;
+		brew_method: string;
+		status: string;
+		created_at: string;
+		rating_avg: number;
+		review_count: number;
+	}> = [];
+	let blogs: Array<{
+		id: string;
+		slug: string;
+		title_en: string;
+		title_id: string;
+		status: string;
+		published_at: string | null;
+		updated_at: string;
+	}> = [];
+	let threads: Array<{
+		id: string;
+		title: string;
+		status: string;
+		created_at: string;
+		updated_at: string;
+		reaction_counts: Partial<Record<ForumReactionType, number>>;
+	}> = [];
+	let reviewsReceived: Array<{
+		brew_id: string;
+		brew_name: string;
+		id: string;
+		identity_avatar_url: string | null;
+		identity_badge: string | null;
+		identity_display_name: string;
+		identity_is_verified: boolean;
+		identity_joined_at: string;
+		identity_karma: number;
+		identity_mention_handle: string | null;
+		identity_total_reviews: number;
+		identity_user_id: string;
+		notes_preview: string;
+		overall: number;
+		updated_at: string;
+	}> = [];
+	let reviewsGiven: typeof reviewsReceived = [];
 
-	const brewRows = brewRowsResult.data ?? [];
-	const blogRows = blogRowsResult.data ?? [];
-	const threadRows = threadRowsResult.data ?? [];
-	const brewIds = brewRows.map((brewRow) => String(brewRow.id));
-	const threadIds = threadRows.map((threadRow) => String(threadRow.id));
+	let brewCount = 0;
+	let blogCount = 0;
+	let threadCount = 0;
+	let reviewsGivenCount = 0;
+	let reviewsReceivedCount = 0;
 
-	const [reviewsReceivedResult, reviewsGivenResult, threadReactionRowsResult] = await Promise.all([
-		isPrivateForViewer || brewIds.length === 0
-			? Promise.resolve({ data: [] as BrewReviewRow[] })
-			: supabaseAdmin
-					.from("brew_reviews")
-					.select("id, brew_id, reviewer_id, overall, notes, updated_at")
-					.in("brew_id", brewIds)
-					.order("updated_at", { ascending: false })
-					.limit(300),
-		isPrivateForViewer
-			? Promise.resolve({ data: [] as BrewReviewRow[] })
-			: supabaseAdmin
-					.from("brew_reviews")
-					.select("id, brew_id, reviewer_id, overall, notes, updated_at")
-					.eq("reviewer_id", targetProfile.id)
-					.order("updated_at", { ascending: false })
-					.limit(300),
-		threadIds.length > 0
-			? supabaseAdmin
-					.from("forum_reactions")
-					.select("target_id, reaction")
-					.eq("target_type", "thread")
-					.in("target_id", threadIds)
-			: Promise.resolve({ data: [] as Array<{ target_id: string; reaction: ForumReactionType }> }),
-	]);
+	if (!isPrivateForViewer) {
+		const brewCountQuery = supabaseAdmin
+			.from("brews")
+			.select("id", { count: "exact", head: true })
+			.eq("owner_id", targetProfile.id);
+		const blogCountQuery = supabaseAdmin
+			.from("blog_posts")
+			.select("id", { count: "exact", head: true })
+			.eq("author_id", targetProfile.id);
+		const threadCountQuery = supabaseAdmin
+			.from("forum_threads")
+			.select("id", { count: "exact", head: true })
+			.eq("author_id", targetProfile.id);
+		const reviewsGivenCountQuery = supabaseAdmin
+			.from("brew_reviews")
+			.select("id", { count: "exact", head: true })
+			.eq("reviewer_id", targetProfile.id);
 
-	const reviewsReceivedRows = (reviewsReceivedResult.data ?? []) as BrewReviewRow[];
-	const reviewsGivenRowsRaw = (reviewsGivenResult.data ?? []) as BrewReviewRow[];
-	const threadReactionRows = threadReactionRowsResult.data ?? [];
+		let reviewsReceivedCountQuery = supabaseAdmin
+			.from("brew_reviews")
+			.select("id, brews!inner(owner_id)", { count: "exact", head: true })
+			.eq("brews.owner_id", targetProfile.id);
 
-	const reviewAggregateByBrewId = new Map<string, { count: number; score: number }>();
-	for (const reviewRow of reviewsReceivedRows) {
-		const current = reviewAggregateByBrewId.get(reviewRow.brew_id) ?? { count: 0, score: 0 };
-		current.count += 1;
-		current.score += Number(reviewRow.overall);
-		reviewAggregateByBrewId.set(reviewRow.brew_id, current);
-	}
-
-	const reactionCountsByThreadId = new Map<string, Partial<Record<ForumReactionType, number>>>();
-	for (const threadId of threadIds) {
-		reactionCountsByThreadId.set(
-			threadId,
-			Object.fromEntries(FORUM_REACTION_TYPES.map((reactionType) => [reactionType, 0])) as Partial<
-				Record<ForumReactionType, number>
-			>,
-		);
-	}
-	for (const reactionRow of threadReactionRows) {
-		const map = reactionCountsByThreadId.get(reactionRow.target_id) ?? {};
-		if (!FORUM_REACTION_TYPES.includes(reactionRow.reaction as ForumReactionType)) {
-			continue;
+		if (!canBypassPrivacy) {
+			brewCountQuery.eq("status", "published");
+			blogCountQuery.eq("status", "published");
+			threadCountQuery.eq("status", "visible");
+			reviewsReceivedCountQuery = reviewsReceivedCountQuery.eq("brews.status", "published");
 		}
-		const reactionType = reactionRow.reaction as ForumReactionType;
-		map[reactionType] = (map[reactionType] ?? 0) + 1;
-		reactionCountsByThreadId.set(reactionRow.target_id, map);
+
+		const [brewCountResult, blogCountResult, threadCountResult, reviewsGivenCountResult, reviewsReceivedCountResult] =
+			await Promise.all([
+				brewCountQuery,
+				blogCountQuery,
+				threadCountQuery,
+				reviewsGivenCountQuery,
+				reviewsReceivedCountQuery,
+			]);
+
+		brewCount = brewCountResult.count ?? 0;
+		blogCount = blogCountResult.count ?? 0;
+		threadCount = threadCountResult.count ?? 0;
+		reviewsGivenCount = reviewsGivenCountResult.count ?? 0;
+		reviewsReceivedCount = reviewsReceivedCountResult.count ?? 0;
 	}
 
-	const brewById = new Map(
-		brewRows.map((brewRow) => [
-			String(brewRow.id),
-			{
+	if (!isPrivateForViewer && activeTab === "brews") {
+		let brewQuery = supabaseAdmin
+			.from("brews")
+			.select("id, name, brew_method, status, created_at")
+			.eq("owner_id", targetProfile.id)
+			.order("created_at", { ascending: false })
+			.limit(PROFILE_TAB_LIMIT);
+		if (!canBypassPrivacy) {
+			brewQuery = brewQuery.eq("status", "published");
+		}
+		const { data: brewRows } = await brewQuery;
+		const brewIds = (brewRows ?? []).map((brewRow) => String(brewRow.id));
+		const { data: brewReviewRows } =
+			brewIds.length > 0
+				? await supabaseAdmin.from("brew_reviews").select("brew_id, overall").in("brew_id", brewIds).limit(600)
+				: { data: [] as Array<{ brew_id: string; overall: number }> };
+
+		const aggregateByBrewId = new Map<string, { count: number; score: number }>();
+		for (const reviewRow of brewReviewRows ?? []) {
+			const current = aggregateByBrewId.get(reviewRow.brew_id) ?? { count: 0, score: 0 };
+			current.count += 1;
+			current.score += Number(reviewRow.overall);
+			aggregateByBrewId.set(reviewRow.brew_id, current);
+		}
+
+		brews = (brewRows ?? []).map((brewRow) => {
+			const aggregate = aggregateByBrewId.get(String(brewRow.id)) ?? { count: 0, score: 0 };
+			return {
 				id: String(brewRow.id),
 				name: String(brewRow.name ?? ""),
 				brew_method: String(brewRow.brew_method ?? ""),
-				owner_id: String(brewRow.owner_id ?? targetProfile.id),
 				status: String(brewRow.status ?? "published"),
 				created_at: String(brewRow.created_at ?? new Date().toISOString()),
-			},
-		]),
-	);
-	const givenBrewIds = Array.from(new Set(reviewsGivenRowsRaw.map((review) => review.brew_id)));
-	const missingGivenBrewIds = givenBrewIds.filter((brewId) => !brewById.has(brewId));
-	if (missingGivenBrewIds.length > 0) {
-		let missingBrewsQuery = supabaseAdmin
+				rating_avg: aggregate.count > 0 ? aggregate.score / aggregate.count : 0,
+				review_count: aggregate.count,
+			};
+		});
+	}
+
+	if (!isPrivateForViewer && activeTab === "blogs") {
+		let blogQuery = supabaseAdmin
+			.from("blog_posts")
+			.select("id, slug, title_en, title_id, status, published_at, updated_at")
+			.eq("author_id", targetProfile.id)
+			.order("updated_at", { ascending: false })
+			.limit(PROFILE_TAB_LIMIT);
+		if (!canBypassPrivacy) {
+			blogQuery = blogQuery.eq("status", "published");
+		}
+		const { data: blogRows } = await blogQuery;
+		blogs = (blogRows ?? []).map((blogRow) => ({
+			id: String(blogRow.id),
+			slug: String(blogRow.slug ?? ""),
+			title_en: String(blogRow.title_en ?? ""),
+			title_id: String(blogRow.title_id ?? ""),
+			status: String(blogRow.status ?? "published"),
+			published_at: typeof blogRow.published_at === "string" ? blogRow.published_at : null,
+			updated_at: String(blogRow.updated_at ?? new Date().toISOString()),
+		}));
+	}
+
+	if (!isPrivateForViewer && activeTab === "threads") {
+		let threadQuery = supabaseAdmin
+			.from("forum_threads")
+			.select("id, title, status, created_at, updated_at")
+			.eq("author_id", targetProfile.id)
+			.order("updated_at", { ascending: false })
+			.limit(PROFILE_TAB_LIMIT);
+		if (!canBypassPrivacy) {
+			threadQuery = threadQuery.eq("status", "visible");
+		}
+		const { data: threadRows } = await threadQuery;
+		const threadIds = (threadRows ?? []).map((threadRow) => String(threadRow.id));
+		const { data: threadReactionRows } =
+			threadIds.length > 0
+				? await supabaseAdmin
+						.from("forum_reactions")
+						.select("target_id, reaction")
+						.eq("target_type", "thread")
+						.in("target_id", threadIds)
+				: { data: [] as Array<{ target_id: string; reaction: ForumReactionType }> };
+
+		const reactionCountsByThreadId = new Map<string, Partial<Record<ForumReactionType, number>>>();
+		for (const threadId of threadIds) {
+			reactionCountsByThreadId.set(
+				threadId,
+				Object.fromEntries(FORUM_REACTION_TYPES.map((reactionType) => [reactionType, 0])) as Partial<
+					Record<ForumReactionType, number>
+				>,
+			);
+		}
+		for (const reactionRow of threadReactionRows ?? []) {
+			if (!FORUM_REACTION_TYPES.includes(reactionRow.reaction as ForumReactionType)) continue;
+			const reactionType = reactionRow.reaction as ForumReactionType;
+			const current = reactionCountsByThreadId.get(reactionRow.target_id) ?? {};
+			current[reactionType] = (current[reactionType] ?? 0) + 1;
+			reactionCountsByThreadId.set(reactionRow.target_id, current);
+		}
+
+		threads = (threadRows ?? []).map((threadRow) => ({
+			id: String(threadRow.id),
+			title: String(threadRow.title ?? ""),
+			status: String(threadRow.status ?? "visible"),
+			created_at: String(threadRow.created_at ?? new Date().toISOString()),
+			updated_at: String(threadRow.updated_at ?? new Date().toISOString()),
+			reaction_counts: reactionCountsByThreadId.get(String(threadRow.id)) ?? {},
+		}));
+	}
+
+	if (!isPrivateForViewer && activeTab === "reviews") {
+		let ownedBrewQuery = supabaseAdmin
 			.from("brews")
 			.select("id, name, owner_id, status, brew_method, created_at")
-			.in("id", missingGivenBrewIds)
-			.limit(200);
+			.eq("owner_id", targetProfile.id)
+			.order("created_at", { ascending: false })
+			.limit(PROFILE_REVIEW_BREW_SCOPE_LIMIT);
 		if (!canBypassPrivacy) {
-			missingBrewsQuery = missingBrewsQuery.eq("status", "published");
+			ownedBrewQuery = ownedBrewQuery.eq("status", "published");
 		}
-		const { data: missingBrews } = await missingBrewsQuery;
-		for (const brewRow of missingBrews ?? []) {
-			brewById.set(String(brewRow.id), {
-				id: String(brewRow.id),
-				name: String(brewRow.name ?? ""),
-				brew_method: String(brewRow.brew_method ?? ""),
-				owner_id: String(brewRow.owner_id ?? targetProfile.id),
-				status: String(brewRow.status ?? "published"),
-				created_at: String(brewRow.created_at ?? new Date().toISOString()),
+		const { data: ownedBrews } = await ownedBrewQuery;
+		const ownedBrewIds = (ownedBrews ?? []).map((brewRow) => String(brewRow.id));
+
+		const [{ data: reviewsReceivedRowsRaw }, { data: reviewsGivenRowsRaw }] = await Promise.all([
+			activeReviewsTab === "received" && ownedBrewIds.length > 0
+				? supabaseAdmin
+						.from("brew_reviews")
+						.select("id, brew_id, reviewer_id, overall, notes, updated_at")
+						.in("brew_id", ownedBrewIds)
+						.order("updated_at", { ascending: false })
+						.limit(PROFILE_REVIEW_LIMIT)
+				: Promise.resolve({ data: [] as BrewReviewRow[] }),
+			activeReviewsTab === "given"
+				? supabaseAdmin
+						.from("brew_reviews")
+						.select("id, brew_id, reviewer_id, overall, notes, updated_at")
+						.eq("reviewer_id", targetProfile.id)
+						.order("updated_at", { ascending: false })
+						.limit(PROFILE_REVIEW_LIMIT)
+				: Promise.resolve({ data: [] as BrewReviewRow[] }),
+		]);
+
+		const reviewsReceivedRows = (reviewsReceivedRowsRaw ?? []) as BrewReviewRow[];
+		const reviewsGivenRows = (reviewsGivenRowsRaw ?? []) as BrewReviewRow[];
+		const reviewBrewIds = Array.from(new Set([...reviewsReceivedRows, ...reviewsGivenRows].map((row) => row.brew_id)));
+		let reviewBrewsQuery =
+			reviewBrewIds.length > 0
+				? supabaseAdmin.from("brews").select("id, name, owner_id, status, brew_method, created_at").in("id", reviewBrewIds)
+				: Promise.resolve({ data: [] as Array<Record<string, unknown>> });
+		if (!canBypassPrivacy && reviewBrewIds.length > 0) {
+			reviewBrewsQuery = supabaseAdmin
+				.from("brews")
+				.select("id, name, owner_id, status, brew_method, created_at")
+				.in("id", reviewBrewIds)
+				.eq("status", "published");
+		}
+		const { data: reviewBrews } = await reviewBrewsQuery;
+
+		const brewById = new Map(
+			(reviewBrews ?? []).map((brewRow) => [
+				String(brewRow.id),
+				{
+					id: String(brewRow.id),
+					name: String(brewRow.name ?? ""),
+					owner_id: String(brewRow.owner_id ?? targetProfile.id),
+				},
+			]),
+		);
+
+		const identityUserIds = new Set<string>();
+		for (const reviewRow of reviewsReceivedRows) {
+			identityUserIds.add(reviewRow.reviewer_id);
+		}
+		for (const reviewRow of reviewsGivenRows) {
+			const brew = brewById.get(reviewRow.brew_id);
+			if (brew) identityUserIds.add(brew.owner_id);
+		}
+		const identityIdList = Array.from(identityUserIds);
+		const { data: identityProfiles } =
+			identityIdList.length > 0
+				? await supabaseAdmin
+						.from("profiles")
+						.select("id, display_name, email, avatar_url, created_at, karma_points, is_verified, mention_handle")
+						.in("id", identityIdList)
+				: {
+						data: [] as Array<{
+							id: string;
+							display_name: string | null;
+							email: string | null;
+							avatar_url: string | null;
+							created_at: string;
+							karma_points: number | null;
+							is_verified: boolean;
+							mention_handle: string | null;
+						}>,
+					};
+
+		const identityMetaById = new Map(
+			(identityProfiles ?? []).map((profile) => [
+				profile.id,
+				{
+					avatar_url: profile.avatar_url,
+					display_name: resolveUserDisplayName(profile),
+					is_verified: Boolean(profile.is_verified),
+					joined_at: profile.created_at,
+					karma: Number(profile.karma_points ?? 0),
+					mention_handle: profile.mention_handle,
+					user_id: profile.id,
+				},
+			]),
+		);
+
+		reviewsReceived = reviewsReceivedRows
+			.filter((review) => brewById.has(review.brew_id))
+			.map((review) => {
+				const reviewer = identityMetaById.get(review.reviewer_id);
+				const brew = brewById.get(review.brew_id);
+				return {
+					brew_id: review.brew_id,
+					brew_name: brew?.name ?? (locale === "id" ? "Brew tidak ditemukan" : "Unknown brew"),
+					id: review.id,
+					identity_avatar_url: reviewer?.avatar_url ?? null,
+					identity_badge: null,
+					identity_display_name: reviewer?.display_name ?? "Unknown user",
+					identity_is_verified: reviewer?.is_verified ?? false,
+					identity_joined_at: reviewer?.joined_at ?? review.updated_at,
+					identity_karma: reviewer?.karma ?? 0,
+					identity_mention_handle: reviewer?.mention_handle ?? null,
+					identity_total_reviews: 0,
+					identity_user_id: reviewer?.user_id ?? review.reviewer_id,
+					notes_preview: clampPlainText(review.notes, 180),
+					overall: Number(review.overall ?? 0),
+					updated_at: review.updated_at,
+				};
 			});
-		}
+
+		reviewsGiven = reviewsGivenRows
+			.filter((review) => brewById.has(review.brew_id))
+			.map((review) => {
+				const brew = brewById.get(review.brew_id);
+				const ownerId = brew?.owner_id ?? targetProfile.id;
+				const owner = identityMetaById.get(ownerId);
+				return {
+					brew_id: review.brew_id,
+					brew_name: brew?.name ?? (locale === "id" ? "Brew tidak ditemukan" : "Unknown brew"),
+					id: review.id,
+					identity_avatar_url: owner?.avatar_url ?? null,
+					identity_badge: null,
+					identity_display_name: owner?.display_name ?? "Unknown user",
+					identity_is_verified: owner?.is_verified ?? false,
+					identity_joined_at: owner?.joined_at ?? review.updated_at,
+					identity_karma: owner?.karma ?? 0,
+					identity_mention_handle: owner?.mention_handle ?? null,
+					identity_total_reviews: 0,
+					identity_user_id: owner?.user_id ?? ownerId,
+					notes_preview: clampPlainText(review.notes, 180),
+					overall: Number(review.overall ?? 0),
+					updated_at: review.updated_at,
+				};
+			});
 	}
 
-	const reviewsGivenRows = reviewsGivenRowsRaw.filter((review) => brewById.has(review.brew_id));
-	const identityUserIds = new Set<string>([targetProfile.id]);
-	for (const reviewRow of reviewsReceivedRows) {
-		identityUserIds.add(reviewRow.reviewer_id);
-	}
-	for (const reviewRow of reviewsGivenRows) {
-		const brew = brewById.get(reviewRow.brew_id);
-		if (brew) identityUserIds.add(brew.owner_id);
-	}
-	const identityIdList = Array.from(identityUserIds);
-
-	const [identityProfilesResult, identityReviewRowsResult, identityBadgesResult] = await Promise.all([
-		identityIdList.length > 0
-			? supabaseAdmin
-					.from("profiles")
-					.select("id, display_name, email, avatar_url, created_at, karma_points, is_verified, mention_handle")
-					.in("id", identityIdList)
-			: Promise.resolve({
-					data: [] as Array<{
-						id: string;
-						display_name: string | null;
-						email: string | null;
-						avatar_url: string | null;
-						created_at: string;
-						karma_points: number | null;
-						is_verified: boolean;
-						mention_handle: string | null;
-					}>,
-				}),
-		identityIdList.length > 0
-			? supabaseAdmin.from("brew_reviews").select("reviewer_id").in("reviewer_id", identityIdList).limit(5000)
-			: Promise.resolve({ data: [] as Array<{ reviewer_id: string }> }),
-		identityIdList.length > 0
-			? supabaseAdmin
-					.from("user_badges")
-					.select("user_id, badge_definitions(label_en, label_id, min_points)")
-					.in("user_id", identityIdList)
-			: Promise.resolve({
-					data: [] as Array<{
-						user_id: string;
-						badge_definitions: { label_en: string; label_id: string; min_points: number } | null;
-					}>,
-				}),
-	]);
-
-	const identityReviewCountMap = new Map<string, number>();
-	for (const row of identityReviewRowsResult.data ?? []) {
-		identityReviewCountMap.set(row.reviewer_id, (identityReviewCountMap.get(row.reviewer_id) ?? 0) + 1);
-	}
-	const topBadgeByUserId = buildHighestBadgeMap(identityBadgesResult.data ?? [], locale);
-	const identityMetaById = new Map(
-		(identityProfilesResult.data ?? []).map((profile) => [
-			profile.id,
-			{
-				avatar_url: profile.avatar_url,
-				display_name: resolveUserDisplayName(profile),
-				is_verified: Boolean(profile.is_verified),
-				joined_at: profile.created_at,
-				karma: Number(profile.karma_points ?? 0),
-				mention_handle: profile.mention_handle,
-				total_reviews: identityReviewCountMap.get(profile.id) ?? 0,
-				top_badge: topBadgeByUserId.get(profile.id) ?? null,
-				user_id: profile.id,
-			},
-		]),
-	);
-
-	const brews = brewRows.map((brewRow) => {
-		const aggregate = reviewAggregateByBrewId.get(String(brewRow.id)) ?? { count: 0, score: 0 };
-		return {
-			id: String(brewRow.id),
-			name: String(brewRow.name ?? ""),
-			brew_method: String(brewRow.brew_method ?? ""),
-			status: String(brewRow.status ?? "published"),
-			created_at: String(brewRow.created_at ?? new Date().toISOString()),
-			rating_avg: aggregate.count > 0 ? aggregate.score / aggregate.count : 0,
-			review_count: aggregate.count,
-		};
-	});
-
-	const blogs = blogRows.map((blogRow) => ({
-		id: String(blogRow.id),
-		slug: String(blogRow.slug ?? ""),
-		title_en: String(blogRow.title_en ?? ""),
-		title_id: String(blogRow.title_id ?? ""),
-		status: String(blogRow.status ?? "published"),
-		published_at: typeof blogRow.published_at === "string" ? blogRow.published_at : null,
-		updated_at: String(blogRow.updated_at ?? new Date().toISOString()),
-	}));
-
-	const threads = threadRows.map((threadRow) => ({
-		id: String(threadRow.id),
-		title: String(threadRow.title ?? ""),
-		status: String(threadRow.status ?? "visible"),
-		created_at: String(threadRow.created_at ?? new Date().toISOString()),
-		updated_at: String(threadRow.updated_at ?? new Date().toISOString()),
-		reaction_counts: reactionCountsByThreadId.get(String(threadRow.id)) ?? {},
-	}));
-
-	const reviewsReceived = reviewsReceivedRows.map((review) => {
-		const reviewer = identityMetaById.get(review.reviewer_id);
-		const brew = brewById.get(review.brew_id);
-		return {
-			brew_id: review.brew_id,
-			brew_name: brew?.name ?? (locale === "id" ? "Brew tidak ditemukan" : "Unknown brew"),
-			id: review.id,
-			identity_avatar_url: reviewer?.avatar_url ?? null,
-			identity_badge: reviewer?.top_badge ?? null,
-			identity_display_name: reviewer?.display_name ?? "Unknown user",
-			identity_is_verified: reviewer?.is_verified ?? false,
-			identity_joined_at: reviewer?.joined_at ?? review.updated_at,
-			identity_karma: reviewer?.karma ?? 0,
-			identity_mention_handle: reviewer?.mention_handle ?? null,
-			identity_total_reviews: reviewer?.total_reviews ?? 0,
-			identity_user_id: reviewer?.user_id ?? review.reviewer_id,
-			notes_preview: clampPlainText(review.notes, 180),
-			overall: Number(review.overall ?? 0),
-			updated_at: review.updated_at,
-		};
-	});
-
-	const reviewsGiven = reviewsGivenRows.map((review) => {
-		const brew = brewById.get(review.brew_id);
-		const ownerId = brew?.owner_id ?? targetProfile.id;
-		const owner = identityMetaById.get(ownerId);
-		return {
-			brew_id: review.brew_id,
-			brew_name: brew?.name ?? (locale === "id" ? "Brew tidak ditemukan" : "Unknown brew"),
-			id: review.id,
-			identity_avatar_url: owner?.avatar_url ?? null,
-			identity_badge: owner?.top_badge ?? null,
-			identity_display_name: owner?.display_name ?? "Unknown user",
-			identity_is_verified: owner?.is_verified ?? false,
-			identity_joined_at: owner?.joined_at ?? review.updated_at,
-			identity_karma: owner?.karma ?? 0,
-			identity_mention_handle: owner?.mention_handle ?? null,
-			identity_total_reviews: owner?.total_reviews ?? 0,
-			identity_user_id: owner?.user_id ?? ownerId,
-			notes_preview: clampPlainText(review.notes, 180),
-			overall: Number(review.overall ?? 0),
-			updated_at: review.updated_at,
-		};
-	});
-
-	const ratingReceivedCount = reviewsReceived.length;
-	const ratingReceivedAverage =
-		ratingReceivedCount > 0
-			? reviewsReceived.reduce((sum, review) => sum + Number(review.overall ?? 0), 0) / ratingReceivedCount
-			: 0;
-	const reviewsGivenCount = reviewsGiven.length;
+	const ratingReceivedCount = reviewsReceivedCount;
+	const ratingReceivedAverage = 0;
+	const { data: targetBadgeRows } = await supabaseAdmin
+		.from("user_badges")
+		.select("user_id, badge_definitions(label_en, label_id, min_points)")
+		.eq("user_id", targetProfile.id);
+	const targetTopBadge = buildHighestBadgeMap(targetBadgeRows ?? [], locale).get(targetProfile.id) ?? null;
 	const metricItems = [
 		{
 			label: locale === "id" ? "Blog" : "Blogs",
-			value: String(blogs.length),
+			value: String(blogCount),
 		},
 		{
 			label: locale === "id" ? "Thread" : "Threads",
-			value: String(threads.length),
+			value: String(threadCount),
 		},
 		{
 			label: locale === "id" ? "Brew" : "Brews",
-			value: String(brews.length),
+			value: String(brewCount),
 		},
 		{
-			label: locale === "id" ? "Rating Diterima" : "Rating Received",
-			value: `${ratingReceivedAverage.toFixed(2)} (${ratingReceivedCount})`,
+			label: locale === "id" ? "Review Diterima" : "Reviews Received",
+			value: String(ratingReceivedCount),
 		},
 		{
 			label: locale === "id" ? "Review Diberikan" : "Reviews Given",
@@ -425,7 +526,7 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
 			value: String(Number(targetProfile.karma_points ?? 0)),
 		},
 	];
-	const targetTopBadge = topBadgeByUserId.get(targetProfile.id) ?? null;
+	void ratingReceivedAverage;
 
 	return (
 		<div className="space-y-6">
@@ -497,12 +598,15 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
 				</Card>
 			) : (
 				<PublicProfileTabs
+					activeReviewsTab={activeReviewsTab}
+					activeTab={activeTab}
 					brews={brews}
 					blogs={blogs}
 					threads={threads}
 					reviewsReceived={reviewsReceived}
 					reviewsGiven={reviewsGiven}
 					locale={locale}
+					basePath={`/users/${targetProfile.id}`}
 					showStatuses={canBypassPrivacy}
 				/>
 			)}

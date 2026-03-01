@@ -1,4 +1,7 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
+import { CACHE_TAGS } from "@/lib/cache-tags";
+import { clientEnv } from "@/lib/config/client";
 import type { SiteFooterLink, SiteNavLink, SiteSettings } from "@/lib/types";
 
 const DEFAULT_NAVBAR_LINKS: SiteNavLink[] = [
@@ -108,32 +111,59 @@ export function getDefaultSiteSettings(): SiteSettings {
 	};
 }
 
-export async function getSiteSettings(): Promise<SiteSettings> {
-	const supabase = await createSupabaseServerClient();
-
-	const { data, error } = await supabase.from("site_settings").select("*").eq("id", true).maybeSingle();
-
-	if (error || !data) {
-		return getDefaultSiteSettings();
-	}
-
+function cloneSiteSettings(settings: SiteSettings): SiteSettings {
 	return {
-		app_name: asString(data.app_name, DEFAULT_SETTINGS.app_name),
-		tab_title: asString(data.tab_title, DEFAULT_SETTINGS.tab_title),
-		home_title_en: asNullableString(data.home_title_en),
-		home_title_id: asNullableString(data.home_title_id),
-		home_subtitle_en: asNullableString(data.home_subtitle_en),
-		home_subtitle_id: asNullableString(data.home_subtitle_id),
-		navbar_links: sanitizeNavbarLinks(data.navbar_links),
-		footer_tagline_en: asString(data.footer_tagline_en, DEFAULT_SETTINGS.footer_tagline_en),
-		footer_tagline_id: asString(data.footer_tagline_id, DEFAULT_SETTINGS.footer_tagline_id),
-		footer_description_en: asString(data.footer_description_en, DEFAULT_SETTINGS.footer_description_en),
-		footer_description_id: asString(data.footer_description_id, DEFAULT_SETTINGS.footer_description_id),
-		footer_links: sanitizeFooterLinks(data.footer_links),
-		enable_google_login: Boolean(data.enable_google_login ?? true),
-		enable_magic_link_login: Boolean(data.enable_magic_link_login ?? true),
-		enable_signup: Boolean(data.enable_signup ?? true),
-		tab_icon_url: asNullableString(data.tab_icon_url),
-		tab_icon_storage_path: asNullableString(data.tab_icon_storage_path),
+		...settings,
+		navbar_links: settings.navbar_links.map((link) => ({ ...link })),
+		footer_links: settings.footer_links.map((link) => ({ ...link })),
 	};
+}
+
+function createSupabasePublicClient() {
+	return createClient(clientEnv.NEXT_PUBLIC_SUPABASE_URL, clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+		auth: {
+			autoRefreshToken: false,
+			detectSessionInUrl: false,
+			persistSession: false,
+		},
+	});
+}
+
+const loadSiteSettings = unstable_cache(
+	async (): Promise<SiteSettings> => {
+		const supabase = createSupabasePublicClient();
+
+		const { data, error } = await supabase.from("site_settings").select("*").eq("id", true).maybeSingle();
+
+		if (error || !data) {
+			return getDefaultSiteSettings();
+		}
+
+		return {
+			app_name: asString(data.app_name, DEFAULT_SETTINGS.app_name),
+			tab_title: asString(data.tab_title, DEFAULT_SETTINGS.tab_title),
+			home_title_en: asNullableString(data.home_title_en),
+			home_title_id: asNullableString(data.home_title_id),
+			home_subtitle_en: asNullableString(data.home_subtitle_en),
+			home_subtitle_id: asNullableString(data.home_subtitle_id),
+			navbar_links: sanitizeNavbarLinks(data.navbar_links),
+			footer_tagline_en: asString(data.footer_tagline_en, DEFAULT_SETTINGS.footer_tagline_en),
+			footer_tagline_id: asString(data.footer_tagline_id, DEFAULT_SETTINGS.footer_tagline_id),
+			footer_description_en: asString(data.footer_description_en, DEFAULT_SETTINGS.footer_description_en),
+			footer_description_id: asString(data.footer_description_id, DEFAULT_SETTINGS.footer_description_id),
+			footer_links: sanitizeFooterLinks(data.footer_links),
+			enable_google_login: Boolean(data.enable_google_login ?? true),
+			enable_magic_link_login: Boolean(data.enable_magic_link_login ?? true),
+			enable_signup: Boolean(data.enable_signup ?? true),
+			tab_icon_url: asNullableString(data.tab_icon_url),
+			tab_icon_storage_path: asNullableString(data.tab_icon_storage_path),
+		};
+	},
+	["site-settings"],
+	{ revalidate: 120, tags: [CACHE_TAGS.SITE_SETTINGS] },
+);
+
+export async function getSiteSettings(): Promise<SiteSettings> {
+	const settings = await loadSiteSettings();
+	return cloneSiteSettings(settings);
 }

@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
+import { getPreparedAuthCallbackUrl } from "@/lib/auth-callback-client";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 interface SignupFormProps {
@@ -31,6 +32,14 @@ export function SignupForm({ enableGoogleLogin = true }: SignupFormProps) {
 		const password = String(formData.get("password") ?? "");
 		const displayName = String(formData.get("displayName") ?? "");
 		const newsletterOptIn = formData.get("newsletter") === "on";
+		let callbackUrl: string;
+
+		try {
+			callbackUrl = await getPreparedAuthCallbackUrl("/session/resolve");
+		} catch (caughtError) {
+			setError(caughtError instanceof Error ? caughtError.message : "Could not prepare secure authentication callback.");
+			return;
+		}
 
 		const supabase = createSupabaseBrowserClient();
 		const { error: signUpError } = await supabase.auth.signUp({
@@ -41,7 +50,7 @@ export function SignupForm({ enableGoogleLogin = true }: SignupFormProps) {
 					display_name: displayName,
 					newsletter_opt_in: newsletterOptIn,
 				},
-				emailRedirectTo: `${window.location.origin}/session/resolve`,
+				emailRedirectTo: callbackUrl,
 			},
 		});
 
@@ -72,17 +81,22 @@ export function SignupForm({ enableGoogleLogin = true }: SignupFormProps) {
 		setError(null);
 		setMessage(null);
 
-		const supabase = createSupabaseBrowserClient();
-		const { error: oauthError } = await supabase.auth.signInWithOAuth({
-			provider: "google",
-			options: {
-				redirectTo: `${window.location.origin}/session/resolve`,
-			},
-		});
+		try {
+			const supabase = createSupabaseBrowserClient();
+			const callbackUrl = await getPreparedAuthCallbackUrl("/session/resolve");
+			const { error: oauthError } = await supabase.auth.signInWithOAuth({
+				provider: "google",
+				options: {
+					redirectTo: callbackUrl,
+				},
+			});
 
-		if (oauthError) {
-			setError(oauthError.message);
-			return;
+			if (oauthError) {
+				setError(oauthError.message);
+				return;
+			}
+		} catch (caughtError) {
+			setError(caughtError instanceof Error ? caughtError.message : "Could not prepare secure authentication callback.");
 		}
 	}
 

@@ -69,13 +69,13 @@ export function DashboardMobileMenu({ locale, userId }: DashboardMobileMenuProps
 				<>
 					<button
 						type="button"
-						className="fixed inset-0 z-[110] bg-(--overlay)/35 lg:hidden"
+						className="fixed inset-0 z-110 bg-(--overlay)/35 lg:hidden"
 						onClick={() => setOpen(false)}
 						aria-label={locale === "id" ? "Tutup menu dashboard" : "Close dashboard menu"}
 					/>
 					<div
 						role="menu"
-						className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4rem)] z-[120] max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-xl border bg-(--surface-elevated) p-4"
+						className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+4rem)] z-120 max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-xl border bg-(--surface-elevated) p-4"
 					>
 						<div className="mb-3">
 							<PreferenceControls />

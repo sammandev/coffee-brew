@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { MethodRecommendationChips } from "@/components/brew/method-recommendation-chips";
 import { Button } from "@/components/ui/button";
-import { Card, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { resolveBrewImageUrl } from "@/lib/brew-images";
 import { formatDate } from "@/lib/utils";
 

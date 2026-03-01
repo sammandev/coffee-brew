@@ -11,17 +11,17 @@ interface ForumBreadcrumbsProps {
 
 export function ForumBreadcrumbs({ items }: ForumBreadcrumbsProps) {
 	return (
-		<nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1 text-xs text-(--muted)">
+		<nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-1.5 text-xs text-(--muted)">
 			{items.map((item, index) => (
-				<span key={`${item.label}-${index}`} className="inline-flex items-center gap-1">
+				<span key={`${item.label}-${index}`} className="inline-flex items-center gap-1.5">
 					{item.href ? (
-						<Link href={item.href} className="hover:text-(--espresso)">
+						<Link href={item.href} className="transition hover:text-(--espresso) hover:underline">
 							{item.label}
 						</Link>
 					) : (
 						<span className="font-semibold text-(--espresso)">{item.label}</span>
 					)}
-					{index < items.length - 1 ? <span>/</span> : null}
+					{index < items.length - 1 ? <span className="opacity-50">/</span> : null}
 				</span>
 			))}
 		</nav>

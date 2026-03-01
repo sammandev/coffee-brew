@@ -1,4 +1,6 @@
 import { apiError, apiOk } from "@/lib/api";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { requirePermission } from "@/lib/guards";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { forumPollCreateSchema } from "@/lib/validators";
@@ -55,6 +57,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 	if (error) {
 		return apiError("Could not create poll", 400, error.message);
 	}
+
+	revalidatePublicCache([CACHE_TAGS.FORUM]);
 
 	return apiOk({ poll: data }, 201);
 }

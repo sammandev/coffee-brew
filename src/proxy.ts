@@ -1,8 +1,30 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { consumeEdgeRateLimit } from "@/lib/rate-limit";
+import { emitRateLimitConsoleLog } from "@/lib/rate-limit-audit";
+import { getRequestIp } from "@/lib/request-ip";
 import { updateSession } from "@/lib/supabase/middleware";
 
 const PUBLIC_FILE_PATTERN = /\.(.*)$/;
+
+const EDGE_RATE_LIMIT_RULES = [
+	{
+		method: "POST",
+		path: "/api/auth/prepare-callback",
+		limit: 30,
+		windowMs: 60 * 1000,
+	},
+	{
+		method: "DELETE",
+		path: "/api/profile/account",
+		limit: 8,
+		windowMs: 15 * 60 * 1000,
+	},
+] as const;
+
+function hasSupabaseAuthCookies(request: NextRequest) {
+	return request.cookies.getAll().some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"));
+}
 
 function isMaintenanceBypassPath(pathname: string) {
 	if (pathname === "/503") return true;
@@ -17,14 +39,54 @@ function isMaintenanceBypassPath(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
+	const { pathname } = request.nextUrl;
+	for (const rule of EDGE_RATE_LIMIT_RULES) {
+		if (request.method !== rule.method || pathname !== rule.path) continue;
+
+		const ip = getRequestIp(request.headers);
+		const key = `edge:${rule.path}:${rule.method}:${ip}`;
+		const result = consumeEdgeRateLimit({
+			key,
+			limit: rule.limit,
+			windowMs: rule.windowMs,
+		});
+
+		if (!result.allowed) {
+			emitRateLimitConsoleLog({
+				source: "edge",
+				endpoint: rule.path,
+				method: rule.method,
+				keyScope: "edge:ip",
+				retryAfterSeconds: result.retryAfterSeconds,
+				identifier: ip,
+			});
+
+			return NextResponse.json(
+				{
+					error: "Rate limit exceeded",
+					details: "Too many requests. Try again shortly.",
+				},
+				{
+					status: 429,
+					headers: {
+						"Retry-After": String(result.retryAfterSeconds),
+					},
+				},
+			);
+		}
+	}
+
 	if (process.env.APP_MAINTENANCE_MODE === "true") {
-		const { pathname } = request.nextUrl;
 		if (!isMaintenanceBypassPath(pathname)) {
 			const redirectUrl = request.nextUrl.clone();
 			redirectUrl.pathname = "/503";
 			redirectUrl.search = "";
 			return NextResponse.redirect(redirectUrl);
 		}
+	}
+
+	if (!hasSupabaseAuthCookies(request)) {
+		return NextResponse.next({ request });
 	}
 
 	return updateSession(request);

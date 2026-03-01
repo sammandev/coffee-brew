@@ -3,6 +3,7 @@ import { logAuditEvent, logTransactionalEmailEvent } from "@/lib/audit";
 import { requireSessionContext } from "@/lib/auth";
 import { sendTransactionalEmail } from "@/lib/email/resend";
 import { assertPermission } from "@/lib/permissions";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function requireManageUsersPermission() {
@@ -59,9 +60,13 @@ export async function updateUserStatus(params: {
 }
 
 export async function deleteUserLifecycle(params: { actorId: string; targetUserId: string; reason?: string }) {
-	const supabase = await createSupabaseServerClient();
+	return hardDeleteUserAccount(params);
+}
 
-	const { data: profile, error: profileError } = await supabase
+export async function hardDeleteUserAccount(params: { actorId: string; targetUserId: string; reason?: string }) {
+	const supabaseAdmin = createSupabaseAdminClient();
+
+	const { data: profile, error: profileError } = await supabaseAdmin
 		.from("profiles")
 		.select("id, email, display_name, status")
 		.eq("id", params.targetUserId)
@@ -75,7 +80,19 @@ export async function deleteUserLifecycle(params: { actorId: string; targetUserI
 		return { ok: false, error: "User not found" };
 	}
 
-	const { error: archiveError } = await supabase.from("deleted_users_archive").insert({
+	try {
+		await logAuditEvent({
+			actorId: params.actorId,
+			action: "users.delete",
+			targetType: "user",
+			targetId: params.targetUserId,
+			metadata: { reason: params.reason },
+		});
+	} catch {
+		// Keep lifecycle action successful even if audit logging fails.
+	}
+
+	const { error: archiveError } = await supabaseAdmin.from("deleted_users_archive").insert({
 		user_id: profile.id,
 		email: profile.email,
 		display_name: profile.display_name,
@@ -88,26 +105,9 @@ export async function deleteUserLifecycle(params: { actorId: string; targetUserI
 		return { ok: false, error: archiveError.message };
 	}
 
-	const { error: roleDeleteError } = await supabase.from("user_roles").delete().eq("user_id", params.targetUserId);
-	if (roleDeleteError) {
-		return { ok: false, error: roleDeleteError.message };
-	}
-
-	const { error: profileDeleteError } = await supabase.from("profiles").delete().eq("id", params.targetUserId);
-	if (profileDeleteError) {
-		return { ok: false, error: profileDeleteError.message };
-	}
-
-	try {
-		await logAuditEvent({
-			actorId: params.actorId,
-			action: "users.delete",
-			targetType: "user",
-			targetId: params.targetUserId,
-			metadata: { reason: params.reason },
-		});
-	} catch {
-		// Keep lifecycle action successful even if audit logging fails.
+	const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(params.targetUserId);
+	if (deleteAuthError) {
+		return { ok: false, error: deleteAuthError.message };
 	}
 
 	await sendStatusEmail(profile.email, "deleted", params.reason).catch(() => null);

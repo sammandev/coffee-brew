@@ -334,6 +334,13 @@ export const profilePreferencesSchema = z
 	})
 	.strict();
 
+export const profileAccountDeleteSchema = z
+	.object({
+		confirmEmail: z.string().trim().email(),
+		reason: z.string().trim().max(500).optional(),
+	})
+	.strict();
+
 export const dmConversationStartSchema = z
 	.object({
 		recipientId: z.string().uuid(),

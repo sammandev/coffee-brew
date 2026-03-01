@@ -56,10 +56,15 @@ export function ThreadTypingIndicator({ currentUserId, locale, threadId }: Threa
 	if (typingCount <= 0) return null;
 
 	return (
-		<p className="text-xs text-(--muted)">
+		<div className="inline-flex items-center gap-2 rounded-full bg-(--accent)/10 px-3 py-1 text-xs font-medium text-(--accent)">
+			<span className="flex gap-0.5">
+				<span className="h-1 w-1 animate-bounce rounded-full bg-(--accent)" style={{ animationDelay: "0ms" }} />
+				<span className="h-1 w-1 animate-bounce rounded-full bg-(--accent)" style={{ animationDelay: "150ms" }} />
+				<span className="h-1 w-1 animate-bounce rounded-full bg-(--accent)" style={{ animationDelay: "300ms" }} />
+			</span>
 			{locale === "id"
-				? `${typingCount} pengguna sedang mengetik...`
-				: `${typingCount} user${typingCount > 1 ? "s are" : " is"} typing...`}
-		</p>
+				? `${typingCount} pengguna sedang mengetik`
+				: `${typingCount} user${typingCount > 1 ? "s" : ""} typing`}
+		</div>
 	);
 }

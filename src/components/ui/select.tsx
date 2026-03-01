@@ -158,7 +158,7 @@ export function Select({
 							const isSelected = option.value === selectedValue;
 
 							return (
-								<li key={option.value} role="none">
+								<div key={option.value} role="none">
 									<button
 										type="button"
 										role="option"
@@ -173,7 +173,7 @@ export function Select({
 										<span>{option.label}</span>
 										{isSelected ? <Check size={14} className="shrink-0 text-(--accent)" /> : null}
 									</button>
-								</li>
+								</div>
 							);
 						})}
 					</div>

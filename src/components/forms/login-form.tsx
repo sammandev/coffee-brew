@@ -1,13 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GoogleIcon } from "@/components/icons/google-icon";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
+import { getPreparedAuthCallbackUrl } from "@/lib/auth-callback-client";
+import { MAGIC_LINK_COOLDOWN_KEY } from "@/lib/auth-diagnostics";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 type LoginMode = "password" | "magic";
@@ -18,18 +20,68 @@ interface LoginFormProps {
 	redirectPath?: string;
 }
 
+const MAGIC_LINK_COOLDOWN_MS = 60_000;
+
 function buildResolvePath(redirectPath?: string) {
 	if (!redirectPath) return "/session/resolve";
 	return `/session/resolve?next=${encodeURIComponent(redirectPath)}`;
 }
 
 export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = true, redirectPath }: LoginFormProps) {
-	const { t } = useAppPreferences();
+	const { locale, t } = useAppPreferences();
 	const router = useRouter();
 	const [mode, setMode] = useState<LoginMode>("password");
 	const [isLoading, setIsLoading] = useState(false);
 	const [success, setSuccess] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [magicCooldownUntil, setMagicCooldownUntil] = useState<number | null>(null);
+	const [magicCooldownSeconds, setMagicCooldownSeconds] = useState(0);
+
+	useEffect(() => {
+		const raw = window.sessionStorage.getItem(MAGIC_LINK_COOLDOWN_KEY);
+		if (!raw) return;
+		const parsed = Number.parseInt(raw, 10);
+		if (Number.isFinite(parsed) && parsed > Date.now()) {
+			setMagicCooldownUntil(parsed);
+		}
+	}, []);
+
+	useEffect(() => {
+		if (!magicCooldownUntil) {
+			setMagicCooldownSeconds(0);
+			return;
+		}
+
+		const tick = () => {
+			const remainingMs = magicCooldownUntil - Date.now();
+			if (remainingMs <= 0) {
+				setMagicCooldownUntil(null);
+				setMagicCooldownSeconds(0);
+				window.sessionStorage.removeItem(MAGIC_LINK_COOLDOWN_KEY);
+				return;
+			}
+			setMagicCooldownSeconds(Math.ceil(remainingMs / 1000));
+		};
+
+		tick();
+		const interval = window.setInterval(tick, 1000);
+		return () => window.clearInterval(interval);
+	}, [magicCooldownUntil]);
+
+	function startMagicCooldown(ms: number) {
+		const until = Date.now() + ms;
+		setMagicCooldownUntil(until);
+		window.sessionStorage.setItem(MAGIC_LINK_COOLDOWN_KEY, String(until));
+	}
+
+	function isMagicLinkRateLimited(message: string) {
+		const normalized = message.toLowerCase();
+		return (
+			normalized.includes("rate limit") ||
+			normalized.includes("too many requests") ||
+			normalized.includes("try again later")
+		);
+	}
 
 	function switchMode(nextMode: LoginMode) {
 		setMode(nextMode);
@@ -68,15 +120,43 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 			return;
 		}
 
+		if (magicCooldownSeconds > 0) {
+			setError(
+				locale === "id"
+					? `Terlalu banyak permintaan magic link. Coba lagi dalam ${magicCooldownSeconds} detik.`
+					: `Too many magic link requests. Try again in ${magicCooldownSeconds} seconds.`,
+			);
+			setIsLoading(false);
+			return;
+		}
+
+		let callbackUrl: string;
+		try {
+			callbackUrl = await getPreparedAuthCallbackUrl(buildResolvePath(redirectPath));
+		} catch (caughtError) {
+			setError(caughtError instanceof Error ? caughtError.message : "Could not prepare secure authentication callback.");
+			setIsLoading(false);
+			return;
+		}
+
 		const { error: authError } = await supabase.auth.signInWithOtp({
 			email,
 			options: {
-				emailRedirectTo: `${window.location.origin}${buildResolvePath(redirectPath)}`,
+				emailRedirectTo: callbackUrl,
 			},
 		});
 
 		if (authError) {
-			setError(authError.message);
+			if (isMagicLinkRateLimited(authError.message)) {
+				startMagicCooldown(MAGIC_LINK_COOLDOWN_MS);
+				setError(
+					locale === "id"
+						? "Batas pengiriman magic link tercapai. Coba lagi dalam 60 detik."
+						: "Magic link rate limit reached. Please retry in 60 seconds.",
+				);
+			} else {
+				setError(authError.message);
+			}
 			setIsLoading(false);
 			return;
 		}
@@ -89,16 +169,21 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 		setError(null);
 		setSuccess(null);
 
-		const supabase = createSupabaseBrowserClient();
-		const { error: authError } = await supabase.auth.signInWithOAuth({
-			provider: "google",
-			options: {
-				redirectTo: `${window.location.origin}${buildResolvePath(redirectPath)}`,
-			},
-		});
+		try {
+			const supabase = createSupabaseBrowserClient();
+			const callbackUrl = await getPreparedAuthCallbackUrl(buildResolvePath(redirectPath));
+			const { error: authError } = await supabase.auth.signInWithOAuth({
+				provider: "google",
+				options: {
+					redirectTo: callbackUrl,
+				},
+			});
 
-		if (authError) {
-			setError(authError.message);
+			if (authError) {
+				setError(authError.message);
+			}
+		} catch (caughtError) {
+			setError(caughtError instanceof Error ? caughtError.message : "Could not prepare secure authentication callback.");
 		}
 	}
 
@@ -125,9 +210,24 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 						/>
 					</div>
 				)}
-				<Button type="submit" disabled={isLoading}>
-					{mode === "password" ? (isLoading ? t("auth.signingIn") : t("auth.signInWithEmail")) : t("auth.sendMagicLink")}
+				<Button type="submit" disabled={isLoading || (mode === "magic" && magicCooldownSeconds > 0)}>
+					{mode === "password"
+						? isLoading
+							? t("auth.signingIn")
+							: t("auth.signInWithEmail")
+						: magicCooldownSeconds > 0
+							? locale === "id"
+								? `Coba lagi ${magicCooldownSeconds}d`
+								: `Retry in ${magicCooldownSeconds}s`
+							: t("auth.sendMagicLink")}
 				</Button>
+				{mode === "magic" && magicCooldownSeconds > 0 ? (
+					<p className="text-xs text-(--muted)">
+						{locale === "id"
+							? `Pengiriman magic link dibatasi sementara. Silakan tunggu ${magicCooldownSeconds} detik.`
+							: `Magic link requests are temporarily throttled. Please wait ${magicCooldownSeconds} seconds.`}
+					</p>
+				) : null}
 
 				<div className="relative py-1">
 					<div className="absolute inset-0 flex items-center">

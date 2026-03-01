@@ -32,6 +32,7 @@ export function CommentComposer({
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [draftId, setDraftId] = useState<string | null>(null);
 	const [draftLoaded, setDraftLoaded] = useState(false);
+	const [typingChannelReady, setTypingChannelReady] = useState(false);
 	const typingChannelRef = useRef<RealtimeChannel | null>(null);
 	const lastTypingAtRef = useRef<number>(0);
 
@@ -72,9 +73,15 @@ export function CommentComposer({
 		const supabase = createSupabaseBrowserClient();
 		const channel = supabase.channel(`thread-typing-${threadId}`);
 		typingChannelRef.current = channel;
-		channel.subscribe();
+		setTypingChannelReady(false);
+		channel.subscribe((status) => {
+			if (status === "SUBSCRIBED") {
+				setTypingChannelReady(true);
+			}
+		});
 		return () => {
 			typingChannelRef.current = null;
+			setTypingChannelReady(false);
 			void supabase.removeChannel(channel);
 		};
 	}, [threadId]);
@@ -110,6 +117,7 @@ export function CommentComposer({
 
 	function broadcastTyping(nextContent: string) {
 		if (!typingChannelRef.current || !currentUserId) return;
+		if (!typingChannelReady) return;
 		if (nextContent.trim().length === 0) return;
 		const now = Date.now();
 		if (now - lastTypingAtRef.current < 1200) return;

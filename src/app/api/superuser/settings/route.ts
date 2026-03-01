@@ -1,5 +1,7 @@
 import { apiError, apiOk } from "@/lib/api";
 import { requireSessionContext } from "@/lib/auth";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { getSiteSettings } from "@/lib/site-settings";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -79,6 +81,8 @@ export async function PUT(request: Request) {
 			await createSupabaseAdminClient().storage.from(TAB_ICON_BUCKET).remove([previousPath]);
 		}
 	}
+
+	revalidatePublicCache([CACHE_TAGS.SITE_SETTINGS, CACHE_TAGS.LANDING]);
 
 	return apiOk({ settings: data });
 }

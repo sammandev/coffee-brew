@@ -1,5 +1,7 @@
 import { apiError, apiOk } from "@/lib/api";
 import { getSessionContext } from "@/lib/auth";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { buildForumThreadSlug, normalizeTagList } from "@/lib/forum";
 import { notifyMentions } from "@/lib/forum-mentions";
 import { requirePermission } from "@/lib/guards";
@@ -89,6 +91,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 			metadata: { thread_id: id, updated: true },
 		});
 	}
+
+	revalidatePublicCache([CACHE_TAGS.FORUM, CACHE_TAGS.LANDING]);
 
 	return apiOk({ thread: data });
 }

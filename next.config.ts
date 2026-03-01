@@ -14,6 +14,9 @@ function resolveSupabaseHostname() {
 const supabaseHostname = resolveSupabaseHostname();
 
 const nextConfig: NextConfig = {
+	experimental: {
+		authInterrupts: true,
+	},
 	images: {
 		remotePatterns: [
 			{

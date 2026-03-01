@@ -1,4 +1,6 @@
 import { apiError, apiOk } from "@/lib/api";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { ForumReactionType } from "@/lib/constants";
 import { applyForumReputation } from "@/lib/forum-reputation";
 import { requirePermission } from "@/lib/guards";
@@ -23,12 +25,6 @@ export async function POST(request: Request) {
 	}
 
 	const supabase = await createSupabaseServerClient();
-	const { data: actorProfile } = await supabase
-		.from("profiles")
-		.select("display_name, email")
-		.eq("id", permission.context.userId)
-		.maybeSingle<{ display_name: string | null; email: string | null }>();
-	const actorName = actorProfile?.display_name?.trim() || actorProfile?.email || "Someone";
 	let targetOwnerId = "";
 	let threadId = "";
 	let commentId: string | null = null;
@@ -133,6 +129,12 @@ export async function POST(request: Request) {
 		});
 
 		if (nextReaction) {
+			const { data: actorProfile } = await supabase
+				.from("profiles")
+				.select("display_name, email")
+				.eq("id", permission.context.userId)
+				.maybeSingle<{ display_name: string | null; email: string | null }>();
+			const actorName = actorProfile?.display_name?.trim() || actorProfile?.email || "Someone";
 			await createNotifications([
 				{
 					recipientId: targetOwnerId,
@@ -153,6 +155,8 @@ export async function POST(request: Request) {
 			]);
 		}
 	}
+
+	revalidatePublicCache([CACHE_TAGS.FORUM]);
 
 	return apiOk({
 		success: true,

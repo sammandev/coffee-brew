@@ -2,6 +2,8 @@ import { z } from "zod";
 import { apiError, apiOk } from "@/lib/api";
 import { logAuditEvent } from "@/lib/audit";
 import { requireSessionContext } from "@/lib/auth";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { applyForumReputation } from "@/lib/forum-reputation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -98,6 +100,12 @@ export async function POST(request: Request) {
 			reason: parsed.data.reason,
 		},
 	});
+
+	if (parsed.data.targetType === "brew") {
+		revalidatePublicCache([CACHE_TAGS.BREWS, CACHE_TAGS.BREW_DETAIL, CACHE_TAGS.LANDING]);
+	} else {
+		revalidatePublicCache([CACHE_TAGS.FORUM, CACHE_TAGS.LANDING]);
+	}
 
 	return apiOk({ success: true });
 }

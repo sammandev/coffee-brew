@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { RichTextContent } from "@/components/ui/rich-text-content";
 import { UserIdentitySummary } from "@/components/user/user-identity-summary";
 import { getSessionContext } from "@/lib/auth";
+import { canAccessBrew, canReadUnpublishedBrew } from "@/lib/brew-access";
 import { resolveBrewImageUrl } from "@/lib/brew-images";
 import { getMessage } from "@/lib/i18n/messages";
 import { getServerI18n } from "@/lib/i18n/server";
@@ -20,15 +21,13 @@ import { buildHighestBadgeMap, resolveUserDisplayName } from "@/lib/user-identit
 import { formatDate } from "@/lib/utils";
 
 export default async function BrewDetailPage({ params }: { params: Promise<{ id: string }> }) {
-	const [{ id }, { locale }, session, supabase] = await Promise.all([
-		params,
-		getServerI18n(),
-		getSessionContext(),
-		createSupabaseServerClient(),
-	]);
-	const { brew, reviews, aggregate } = await getBrewDetail(id);
+	const [{ id }, { locale }] = await Promise.all([params, getServerI18n()]);
+	const [session, supabase] = await Promise.all([getSessionContext(), createSupabaseServerClient()]);
+	const canReadUnpublished = canReadUnpublishedBrew(session?.role);
+	const detail = await getBrewDetail(id, { includeUnpublished: canReadUnpublished });
+	const { brew, reviews, aggregate } = detail;
 
-	if (!brew || (brew.status !== "published" && !session)) {
+	if (!brew || !canAccessBrew(brew.status, session?.role)) {
 		notFound();
 	}
 	const myReview = session ? (reviews.find((review) => review.reviewer_id === session.userId) ?? null) : null;

@@ -31,6 +31,17 @@ export function BlogReactionPanel({
 		setLoadingReaction(nextReaction);
 		setError(null);
 		const previousReaction = myReaction;
+		const optimisticReaction = previousReaction === nextReaction ? null : nextReaction;
+		const optimisticCounts = { ...counts };
+		if (previousReaction) {
+			optimisticCounts[previousReaction] = Math.max(0, (optimisticCounts[previousReaction] ?? 0) - 1);
+		}
+		if (optimisticReaction) {
+			optimisticCounts[optimisticReaction] = (optimisticCounts[optimisticReaction] ?? 0) + 1;
+		}
+		setCounts(optimisticCounts);
+		setMyReaction(optimisticReaction);
+
 		const response = await fetch("/api/blog/reactions", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -43,6 +54,8 @@ export function BlogReactionPanel({
 		if (!response?.ok) {
 			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
 			setError(body?.error ?? (locale === "id" ? "Gagal mengirim reaksi." : "Could not update reaction."));
+			setCounts(counts);
+			setMyReaction(previousReaction);
 			setLoadingReaction(null);
 			return;
 		}

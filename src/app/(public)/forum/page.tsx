@@ -1,19 +1,19 @@
 import { MessageSquare } from "lucide-react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { ForumBreadcrumbs } from "@/components/forum/forum-breadcrumbs";
 import { ForumLiveAutoRefresh } from "@/components/forum/forum-live-auto-refresh";
 import { ForumSearchControls } from "@/components/forum/forum-search-controls";
 import { ThreadComposerModal } from "@/components/forum/thread-composer-modal";
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { UserIdentitySummary } from "@/components/user/user-identity-summary";
+import { Badge } from "@/components/ui/badge";
 import { getSessionContext } from "@/lib/auth";
 import { FORUM_REACTION_TYPES, type ForumReactionType, REACTION_EMOJI } from "@/lib/constants";
 import { buildReactionCountMap } from "@/lib/forum";
 import { getServerI18n } from "@/lib/i18n/server";
 import { clampPlainText } from "@/lib/rich-text";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { buildHighestBadgeMap, resolveUserDisplayName } from "@/lib/user-identity";
+import { resolveUserDisplayName } from "@/lib/user-identity";
 import { formatDate } from "@/lib/utils";
 
 interface ForumPageProps {
@@ -48,6 +48,7 @@ interface ThreadRow {
 	subforum_id: string;
 	created_at: string;
 	updated_at: string;
+	is_pinned: boolean;
 }
 
 export default async function ForumPage({ searchParams }: ForumPageProps) {
@@ -76,7 +77,7 @@ export default async function ForumPage({ searchParams }: ForumPageProps) {
 			.order("order_index", { ascending: true }),
 		supabase
 			.from("forum_threads")
-			.select("id, title, content, tags, author_id, subforum_id, created_at, updated_at")
+			.select("id, title, content, tags, author_id, subforum_id, created_at, updated_at, is_pinned")
 			.eq("status", "visible")
 			.is("deleted_at", null)
 			.order("is_pinned", { ascending: false })
@@ -114,70 +115,42 @@ export default async function ForumPage({ searchParams }: ForumPageProps) {
 	const subforumRows = subforums ?? [];
 	const threadRows = (threads ?? []) as ThreadRow[];
 	const threadIds = threadRows.map((thread) => thread.id);
+	const subforumIds = subforumRows.map((subforum) => subforum.id);
 	const authorIds = Array.from(new Set(threadRows.map((thread) => thread.author_id)));
 
-	const [{ data: reactions }, { data: comments }, { data: authors }, { data: userBadges }, { data: authorReviewRows }] =
-		await Promise.all([
-			threadIds.length > 0
-				? supabase
-						.from("forum_reactions")
-						.select("target_id, reaction")
-						.eq("target_type", "thread")
-						.in("target_id", threadIds)
-				: Promise.resolve({ data: [] as Array<{ target_id: string; reaction: ForumReactionType }> }),
-			threadIds.length > 0
-				? supabase.from("forum_comments").select("thread_id, id").eq("status", "visible").in("thread_id", threadIds)
-				: Promise.resolve({ data: [] as Array<{ thread_id: string; id: string }> }),
-			authorIds.length > 0
-				? supabase
-						.from("profiles")
-						.select("id, display_name, email, avatar_url, created_at, is_verified, karma_points, mention_handle")
-						.in("id", authorIds)
-				: Promise.resolve({
-						data: [] as Array<{
-							id: string;
-							display_name: string | null;
-							email: string | null;
-							avatar_url: string | null;
-							created_at: string;
-							is_verified: boolean;
-							karma_points: number;
-							mention_handle: string | null;
-						}>,
-					}),
-			authorIds.length > 0
-				? supabase
-						.from("user_badges")
-						.select("user_id, badge_definitions(label_en, label_id, min_points)")
-						.in("user_id", authorIds)
-				: Promise.resolve({
-						data: [] as Array<{
-							user_id: string;
-							badge_definitions: { label_en: string; label_id: string; min_points: number } | null;
-						}>,
-					}),
-			authorIds.length > 0
-				? supabase.from("brew_reviews").select("reviewer_id").in("reviewer_id", authorIds).limit(5000)
-				: Promise.resolve({ data: [] as Array<{ reviewer_id: string }> }),
-		]);
+	const [{ data: reactions }, { data: commentTotals }, { data: subforumTotals }, { data: authors }] = await Promise.all([
+		threadIds.length > 0
+			? supabase
+					.from("forum_reactions")
+					.select("target_id, reaction")
+					.eq("target_type", "thread")
+					.in("target_id", threadIds)
+			: Promise.resolve({ data: [] as Array<{ target_id: string; reaction: ForumReactionType }> }),
+		threadIds.length > 0
+			? supabase.rpc("get_forum_thread_comment_totals", { thread_ids: threadIds })
+			: Promise.resolve({ data: [] as Array<{ thread_id: string; comment_total: number }> }),
+		subforumIds.length > 0
+			? supabase.rpc("get_forum_subforum_thread_totals", { subforum_ids: subforumIds })
+			: Promise.resolve({ data: [] as Array<{ subforum_id: string; thread_total: number }> }),
+		authorIds.length > 0
+			? supabase.from("profiles").select("id, display_name, email, avatar_url, mention_handle").in("id", authorIds)
+			: Promise.resolve({
+					data: [] as Array<{
+						id: string;
+						display_name: string | null;
+						email: string | null;
+						avatar_url: string | null;
+						mention_handle: string | null;
+					}>,
+				}),
+	]);
 
-	const authorReviewCountMap = new Map<string, number>();
-	for (const row of authorReviewRows ?? []) {
-		authorReviewCountMap.set(row.reviewer_id, (authorReviewCountMap.get(row.reviewer_id) ?? 0) + 1);
-	}
-	const topBadgeByUserId = buildHighestBadgeMap(userBadges ?? [], locale);
 	const authorById = new Map(
 		(authors ?? []).map((author) => [
 			author.id,
 			{
 				avatarUrl: author.avatar_url,
-				joinedAt: author.created_at,
-				mentionHandle: author.mention_handle,
 				name: resolveUserDisplayName(author),
-				totalReviews: authorReviewCountMap.get(author.id) ?? 0,
-				verified: Boolean(author.is_verified),
-				karma: Number(author.karma_points ?? 0),
-				topBadge: topBadgeByUserId.get(author.id) ?? null,
 			},
 		]),
 	);
@@ -188,12 +161,12 @@ export default async function ForumPage({ searchParams }: ForumPageProps) {
 		reactionRowsByThreadId.set(reaction.target_id, current);
 	}
 	const commentCountByThreadId = new Map<string, number>();
-	for (const comment of comments ?? []) {
-		commentCountByThreadId.set(comment.thread_id, (commentCountByThreadId.get(comment.thread_id) ?? 0) + 1);
+	for (const row of (commentTotals ?? []) as Array<{ thread_id: string; comment_total: number }>) {
+		commentCountByThreadId.set(row.thread_id, Number(row.comment_total ?? 0));
 	}
 	const threadCountBySubforum = new Map<string, number>();
-	for (const thread of threadRows) {
-		threadCountBySubforum.set(thread.subforum_id, (threadCountBySubforum.get(thread.subforum_id) ?? 0) + 1);
+	for (const row of (subforumTotals ?? []) as Array<{ subforum_id: string; thread_total: number }>) {
+		threadCountBySubforum.set(row.subforum_id, Number(row.thread_total ?? 0));
 	}
 
 	const tagCounts = new Map<string, number>();
@@ -264,25 +237,42 @@ export default async function ForumPage({ searchParams }: ForumPageProps) {
 				}
 			: null;
 
+	const totalReactions = (id: string) => (reactionRowsByThreadId.get(id) ?? []).length;
+
 	return (
-		<div className="space-y-6">
+		<div className="space-y-8">
 			<ForumLiveAutoRefresh
 				tableFilters={[{ table: "forum_threads" }, { table: "forum_comments" }, { table: "forum_reactions" }]}
 			/>
 
-			<header className="space-y-3">
+			{/* Header */}
+			<header className="space-y-4">
 				<ForumBreadcrumbs items={[{ href: "/", label: t("nav.home") }, { label: t("nav.forum") }]} />
-				<div className="flex flex-wrap items-center justify-between gap-3">
-					<h1 className="font-heading text-4xl text-(--espresso)">{t("nav.forum")}</h1>
+				<div className="flex flex-wrap items-start justify-between gap-4">
+					<div className="space-y-2">
+						<Badge>{t("nav.forum")}</Badge>
+						<h1 className="font-heading text-4xl text-(--espresso)">{t("forum.title")}</h1>
+						<p className="max-w-2xl text-(--muted)">{t("forum.heroDescription")}</p>
+						<div className="flex flex-wrap gap-4 pt-1 text-sm text-(--muted)">
+							<span className="inline-flex items-center gap-1.5">
+								<MessageSquare size={14} />
+								<span className="font-semibold text-(--espresso)">{sortedThreads.length}</span> {t("forum.discussions")}
+							</span>
+							<span className="inline-flex items-center gap-1.5">
+								☕ <span className="font-semibold text-(--espresso)">{categoryRows.length}</span>{" "}
+								{locale === "id" ? "kategori" : "categories"}
+							</span>
+							<span className="inline-flex items-center gap-1.5">
+								💬 <span className="font-semibold text-(--espresso)">{subforumRows.length}</span>{" "}
+								{locale === "id" ? "sub-forum" : "sub-forums"}
+							</span>
+						</div>
+					</div>
 					{session ? (
 						<ThreadComposerModal
 							title={t("forum.startDiscussion")}
-							description={
-								locale === "id"
-									? "Mulai thread baru di sub-forum yang paling relevan."
-									: "Start a new thread in the most relevant sub-forum."
-							}
-							triggerLabel={locale === "id" ? "Mulai Diskusi" : "Start Discussion"}
+							description={t("forum.startDiscussionDesc")}
+							triggerLabel={t("forum.startDiscussion")}
 							subforums={subforumRows}
 							initialSubforumId={subforumRows[0]?.id}
 							openOnMount={Boolean(discussPrefill)}
@@ -293,133 +283,195 @@ export default async function ForumPage({ searchParams }: ForumPageProps) {
 					) : (
 						<Link
 							href="/login"
-							className="rounded-full border px-4 py-2 text-sm font-semibold text-(--accent) hover:bg-(--sand)/15"
+							className="inline-flex items-center gap-2 rounded-full bg-(--espresso) px-5 py-2.5 text-sm font-semibold text-(--oat) shadow-sm transition hover:opacity-90"
 						>
 							{t("forum.loginToPost")}
 						</Link>
 					)}
 				</div>
-				<p className="text-(--muted)">{t("forum.subtitle")}</p>
-				<ForumSearchControls
-					initialQuery={q}
-					initialTag={tag}
-					initialAuthor={author}
-					initialMinReactions={minReactionsRaw}
-					initialSort={sort}
-					initialFrom={from}
-					initialTo={to}
-					locale={locale}
-					popularTags={popularTags}
-				/>
 			</header>
 
-			<section className="space-y-3">
-				<h2 className="font-heading text-2xl text-(--espresso)">
-					{locale === "id" ? "Kategori & Sub-Forum" : "Categories & Sub-forums"}
-				</h2>
-				<div className="grid gap-4 md:grid-cols-2">
-					{categoryRows.map((category) => (
-						<Card key={category.id} className="space-y-3">
-							<div>
-								<CardTitle>{locale === "id" ? category.name_id : category.name_en}</CardTitle>
-								<CardDescription>
-									{locale === "id"
-										? (category.description_id ?? category.description_en ?? "")
-										: (category.description_en ?? category.description_id ?? "")}
-								</CardDescription>
-							</div>
-							<div className="space-y-2">
-								{subforumRows
-									.filter((subforum) => subforum.category_id === category.id)
-									.map((subforum) => (
+			{/* Search Controls */}
+			<ForumSearchControls
+				initialQuery={q}
+				initialTag={tag}
+				initialAuthor={author}
+				initialMinReactions={minReactionsRaw}
+				initialSort={sort}
+				initialFrom={from}
+				initialTo={to}
+				locale={locale}
+				popularTags={popularTags}
+			/>
+
+			{/* Categories & Subforums */}
+			<section className="space-y-4">
+				<div className="flex items-center justify-between">
+					<div>
+						<h2 className="font-heading text-xl text-(--espresso) sm:text-2xl">{t("forum.categoriesTitle")}</h2>
+						<p className="text-sm text-(--muted)">{t("forum.categoriesSubtitle")}</p>
+					</div>
+				</div>
+				<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+					{categoryRows.map((category) => {
+						const catSubforums = subforumRows.filter((sf) => sf.category_id === category.id);
+						const catThreadCount = catSubforums.reduce((sum, sf) => sum + (threadCountBySubforum.get(sf.id) ?? 0), 0);
+						return (
+							<div
+								key={category.id}
+								className="group rounded-2xl border bg-(--surface-elevated) p-5 transition hover:shadow-md"
+							>
+								<div className="mb-3 flex items-start justify-between">
+									<div>
+										<h3 className="font-heading text-base font-semibold text-(--espresso)">
+											{locale === "id" ? category.name_id : category.name_en}
+										</h3>
+										<p className="mt-0.5 text-xs text-(--muted) line-clamp-2">
+											{locale === "id"
+												? (category.description_id ?? category.description_en ?? "")
+												: (category.description_en ?? category.description_id ?? "")}
+										</p>
+									</div>
+									<span className="shrink-0 rounded-full bg-(--accent)/10 px-2.5 py-0.5 text-xs font-semibold text-(--accent)">
+										{catThreadCount} {t("forum.threadCount")}
+									</span>
+								</div>
+								<div className="space-y-1.5">
+									{catSubforums.map((subforum) => (
 										<Link
 											key={subforum.id}
 											href={`/forum/f/${subforum.slug}`}
-											className="flex items-center justify-between rounded-xl border bg-(--surface) px-3 py-2 transition hover:bg-(--sand)/15"
+											className="flex items-center justify-between rounded-xl bg-(--surface) px-3 py-2.5 transition hover:bg-(--sand)/15"
 										>
-											<span className="text-sm font-semibold text-(--espresso)">
-												{locale === "id" ? subforum.name_id : subforum.name_en}
+											<div className="flex items-center gap-2">
+												<span className="flex h-7 w-7 items-center justify-center rounded-lg bg-(--accent)/10 text-xs">💬</span>
+												<span className="text-sm font-medium text-(--espresso)">
+													{locale === "id" ? subforum.name_id : subforum.name_en}
+												</span>
+											</div>
+											<span className="rounded-full bg-(--sand)/20 px-2 py-0.5 text-xs text-(--muted)">
+												{threadCountBySubforum.get(subforum.id) ?? 0}
 											</span>
-											<span className="text-xs text-(--muted)">{threadCountBySubforum.get(subforum.id) ?? 0}</span>
 										</Link>
 									))}
+								</div>
 							</div>
-						</Card>
-					))}
+						);
+					})}
 				</div>
 			</section>
 
-			<section className="space-y-3">
-				<h2 className="font-heading text-2xl text-(--espresso)">
-					{locale === "id" ? "Aktivitas Terbaru" : "Recent Activity"}
-				</h2>
+			{/* Recent Discussions */}
+			<section className="space-y-4">
+				<div className="flex items-center justify-between">
+					<div>
+						<h2 className="font-heading text-xl text-(--espresso) sm:text-2xl">{t("forum.recentActivity")}</h2>
+						<p className="text-sm text-(--muted)">{t("forum.recentSubtitle")}</p>
+					</div>
+					{sortedThreads.length > 0 ? (
+						<span className="rounded-full bg-(--accent)/10 px-3 py-1 text-xs font-semibold text-(--accent)">
+							{sortedThreads.length} {t("forum.resultsCount")}
+						</span>
+					) : null}
+				</div>
+
 				<div className="space-y-3">
 					{sortedThreads.map((thread) => {
 						const reactionCounts = buildReactionCountMap(reactionRowsByThreadId.get(thread.id) ?? []);
-						const author = authorById.get(thread.author_id) ?? {
+						const threadAuthor = authorById.get(thread.author_id) ?? {
 							avatarUrl: null,
-							joinedAt: thread.created_at,
-							mentionHandle: null,
 							name: "Unknown User",
-							totalReviews: 0,
-							verified: false,
-							karma: 0,
-							topBadge: null,
 						};
+						const commentCount = commentCountByThreadId.get(thread.id) ?? 0;
+						const reactionTotal = totalReactions(thread.id);
 						return (
-							<Card key={thread.id} className="transition hover:-translate-y-1">
-								<Link href={`/forum/${thread.id}`} className="block">
-									<CardTitle>{thread.title}</CardTitle>
-									{Array.isArray(thread.tags) && thread.tags.length > 0 ? (
-										<div className="mt-2 flex flex-wrap gap-2">
-											{thread.tags.slice(0, 5).map((tag) => (
-												<span key={`${thread.id}-${tag}`} className="rounded-full border px-2 py-0.5 text-xs text-(--muted)">
-													#{tag}
-												</span>
-											))}
+							<Link key={thread.id} href={`/forum/${thread.id}`} className="group block">
+								<div className="rounded-2xl border bg-(--surface-elevated) p-4 transition group-hover:shadow-md group-hover:border-(--accent)/30 sm:p-5">
+									<div className="flex gap-4">
+										{/* Left: Author Avatar */}
+										<div className="hidden shrink-0 sm:block">
+											{threadAuthor.avatarUrl ? (
+												<Image
+													src={threadAuthor.avatarUrl}
+													alt=""
+													width={40}
+													height={40}
+													unoptimized
+													className="h-10 w-10 rounded-full object-cover"
+												/>
+											) : (
+												<div className="flex h-10 w-10 items-center justify-center rounded-full bg-(--accent)/10 text-sm font-bold text-(--accent)">
+													{threadAuthor.name.charAt(0).toUpperCase()}
+												</div>
+											)}
 										</div>
-									) : null}
-									<CardDescription className="mt-2 line-clamp-2">{clampPlainText(thread.content, 180)}</CardDescription>
-								</Link>
-								<div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-(--muted)">
-									<UserIdentitySummary
-										userId={thread.author_id}
-										displayName={author.name}
-										avatarUrl={author.avatarUrl}
-										joinedAt={author.joinedAt}
-										karma={author.karma}
-										totalReviews={author.totalReviews}
-										locale={locale}
-										variant="compact"
-										hideJoined
-										isVerified={author.verified}
-										mentionHandle={author.mentionHandle}
-										badges={author.topBadge ? [author.topBadge] : []}
-									/>
-									<span className="inline-flex items-center gap-1">
-										<MessageSquare size={13} />
-										{commentCountByThreadId.get(thread.id) ?? 0}
-									</span>
+
+										{/* Right: Content */}
+										<div className="min-w-0 flex-1">
+											<div className="flex flex-wrap items-center gap-2">
+												<h3 className="font-semibold text-(--espresso) group-hover:text-(--accent) transition line-clamp-1">
+													{thread.title}
+												</h3>
+												{thread.is_pinned ? (
+													<span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+														📌 {t("forum.pinned")}
+													</span>
+												) : null}
+											</div>
+
+											{/* Tags */}
+											{Array.isArray(thread.tags) && thread.tags.length > 0 ? (
+												<div className="mt-1.5 flex flex-wrap gap-1.5">
+													{thread.tags.slice(0, 4).map((threadTag) => (
+														<span
+															key={`${thread.id}-${threadTag}`}
+															className="rounded-full bg-(--sand)/25 px-2 py-0.5 text-[11px] font-medium text-(--muted)"
+														>
+															#{threadTag}
+														</span>
+													))}
+													{thread.tags.length > 4 ? (
+														<span className="text-[11px] text-(--muted)">+{thread.tags.length - 4}</span>
+													) : null}
+												</div>
+											) : null}
+
+											{/* Preview */}
+											<p className="mt-1.5 text-sm text-(--muted) line-clamp-2">{clampPlainText(thread.content, 160)}</p>
+
+											{/* Footer: Meta Info */}
+											<div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-(--muted)">
+												<span className="font-medium text-(--espresso)">{threadAuthor.name}</span>
+												<span className="inline-flex items-center gap-1">
+													<MessageSquare size={12} />
+													{commentCount} {t("forum.repliesCount")}
+												</span>
+												{reactionTotal > 0 ? (
+													<span className="inline-flex items-center gap-1">
+														{FORUM_REACTION_TYPES.filter((rt) => (reactionCounts[rt] ?? 0) > 0)
+															.slice(0, 3)
+															.map((rt) => (
+																<span key={`${thread.id}-e-${rt}`}>{REACTION_EMOJI[rt]}</span>
+															))}
+														{reactionTotal}
+													</span>
+												) : null}
+												<span>
+													{t("forum.updated")} {formatDate(thread.updated_at, locale)}
+												</span>
+											</div>
+										</div>
+									</div>
 								</div>
-								<div className="mt-2 flex flex-wrap gap-2 text-xs">
-									{FORUM_REACTION_TYPES.map((reactionType) => (
-										<span key={`${thread.id}-${reactionType}`} className="rounded-full border px-2 py-0.5 text-(--muted)">
-											{REACTION_EMOJI[reactionType]} {reactionCounts[reactionType] ?? 0}
-										</span>
-									))}
-								</div>
-								<p className="mt-2 text-xs text-(--muted)">
-									{locale === "id" ? "Diperbarui" : "Updated"} {formatDate(thread.updated_at, locale)}
-								</p>
-							</Card>
+							</Link>
 						);
 					})}
+
 					{filteredThreads.length === 0 ? (
-						<Card>
-							<p className="text-sm text-(--muted)">
-								{locale === "id" ? "Belum ada thread untuk filter ini." : "No threads matched your filters."}
-							</p>
-						</Card>
+						<div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed bg-(--surface-elevated) py-12 text-center">
+							<div className="flex h-14 w-14 items-center justify-center rounded-full bg-(--sand)/20 text-2xl">💬</div>
+							<p className="text-sm font-medium text-(--muted)">{t("forum.noThreads")}</p>
+						</div>
 					) : null}
 				</div>
 			</section>

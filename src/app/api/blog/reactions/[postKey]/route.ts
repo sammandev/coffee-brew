@@ -1,5 +1,7 @@
 import { apiError, apiOk } from "@/lib/api";
 import { getSessionContext, requireSessionContext, type SessionContext } from "@/lib/auth";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { FORUM_REACTION_TYPES, type ForumReactionType } from "@/lib/constants";
 import { AccountDisabledError, UnauthorizedError } from "@/lib/errors";
 import { applyForumReputation } from "@/lib/forum-reputation";
@@ -143,6 +145,8 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ postKey
 			},
 		});
 	}
+
+	revalidatePublicCache([CACHE_TAGS.BLOG]);
 
 	return apiOk({ success: true, removed: true });
 }

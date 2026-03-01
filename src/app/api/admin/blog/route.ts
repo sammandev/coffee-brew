@@ -1,4 +1,6 @@
 import { apiError, apiOk } from "@/lib/api";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { requirePermission } from "@/lib/guards";
 import { sanitizeForStorage, validatePlainTextLength } from "@/lib/rich-text";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -99,6 +101,8 @@ export async function POST(request: Request) {
 	if (error) {
 		return apiError("Could not create blog post", 400, error.message);
 	}
+
+	revalidatePublicCache([CACHE_TAGS.BLOG]);
 
 	return apiOk({ post: data }, 201);
 }

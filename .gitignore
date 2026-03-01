@@ -47,6 +47,7 @@ package-lock.json
 /local-config.json
 /developer-config.json
 /development-docs
+/docs
 
 # Playwright
 node_modules/

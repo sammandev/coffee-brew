@@ -60,7 +60,10 @@ export function ForumThreadModerationControls({
 	}
 
 	return (
-		<div className="space-y-2 rounded-2xl border bg-(--surface-elevated) p-3">
+		<div className="space-y-2 rounded-2xl border border-amber-100 bg-amber-700 p-4 dark:border-amber-100/30 dark:bg-amber-900/10">
+			<p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-(--espresso)">
+				{locale === "id" ? "Kontrol Moderasi" : "Moderation Controls"}
+			</p>
 			<div className="flex flex-wrap items-center gap-2">
 				<Button
 					type="button"
@@ -68,16 +71,13 @@ export function ForumThreadModerationControls({
 					variant="outline"
 					onClick={() => void toggleLock()}
 					disabled={loadingAction !== null}
+					className="rounded-xl"
 				>
 					{loadingAction === "lock"
 						? "..."
 						: locked
-							? locale === "id"
-								? "Buka Kunci"
-								: "Unlock"
-							: locale === "id"
-								? "Kunci Thread"
-								: "Lock Thread"}
+							? `🔓 ${locale === "id" ? "Buka Kunci" : "Unlock"}`
+							: `🔒 ${locale === "id" ? "Kunci Thread" : "Lock Thread"}`}
 				</Button>
 				<Button
 					type="button"
@@ -85,16 +85,13 @@ export function ForumThreadModerationControls({
 					variant="outline"
 					onClick={() => void togglePin()}
 					disabled={loadingAction !== null}
+					className="rounded-xl"
 				>
 					{loadingAction === "pin"
 						? "..."
 						: pinned
-							? locale === "id"
-								? "Lepas Pin"
-								: "Unpin"
-							: locale === "id"
-								? "Pin Thread"
-								: "Pin Thread"}
+							? `📌 ${locale === "id" ? "Lepas Pin" : "Unpin"}`
+							: `📌 ${locale === "id" ? "Pin Thread" : "Pin Thread"}`}
 				</Button>
 			</div>
 			{error ? <p className="text-xs text-(--danger)">{error}</p> : null}

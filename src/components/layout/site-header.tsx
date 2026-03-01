@@ -7,7 +7,6 @@ import { NavbarNotifications } from "@/components/layout/navbar-notifications";
 import { PreferenceControls } from "@/components/layout/preference-controls";
 import { UserProfileMenu } from "@/components/layout/user-profile-menu";
 import { getServerI18n } from "@/lib/i18n/server";
-import { touchUserPresence } from "@/lib/presence";
 import { getSiteSettings } from "@/lib/site-settings";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -36,10 +35,6 @@ export async function SiteHeader() {
 
 	const role = roleLookup.data ?? "user";
 	const displayName = profile?.display_name?.trim() || user?.email?.split("@")[0] || "User";
-
-	if (user) {
-		await touchUserPresence(user.id).catch(() => null);
-	}
 
 	return (
 		<header className="sticky top-0 z-40 border-b border-(--border) bg-(--surface)/95 shadow-[0_6px_30px_-24px_var(--overlay)] backdrop-blur">

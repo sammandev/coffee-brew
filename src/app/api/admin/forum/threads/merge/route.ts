@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { apiError, apiOk } from "@/lib/api";
 import { getSessionContext } from "@/lib/auth";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const mergeSchema = z.object({
@@ -68,6 +70,8 @@ export async function POST(request: Request) {
 	if (deleteError) {
 		return apiError("Could not finalize thread merge", 400, deleteError.message);
 	}
+
+	revalidatePublicCache([CACHE_TAGS.FORUM, CACHE_TAGS.LANDING]);
 
 	return apiOk({
 		success: true,

@@ -1,5 +1,7 @@
 import { apiError, apiOk } from "@/lib/api";
 import { getSessionContext } from "@/lib/auth";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { notifyMentions } from "@/lib/forum-mentions";
 import { applyForumReputation } from "@/lib/forum-reputation";
 import { isSuspiciousForumContent, verifyTurnstileToken } from "@/lib/forum-spam";
@@ -219,6 +221,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 	} catch (sideEffectError) {
 		console.error("[forum:comments] post-creation side effect failed:", sideEffectError);
 	}
+
+	revalidatePublicCache([CACHE_TAGS.FORUM]);
 
 	return apiOk({ comment: data }, 201);
 }

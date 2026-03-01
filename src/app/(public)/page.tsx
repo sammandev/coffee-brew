@@ -10,21 +10,30 @@ import { getSiteSettings } from "@/lib/site-settings";
 
 /* ─── Star rating helper ─── */
 function StarRating({ value, max = 5 }: { value: number; max?: number }) {
+	const stars = Array.from({ length: max }, (_, number) => number + 1);
+
 	return (
-		<span className="inline-flex gap-px" aria-label={`${value.toFixed(1)} out of ${max}`}>
-			{Array.from({ length: max }, (_, i) => {
-				const fill = Math.min(1, Math.max(0, value - i));
+		<span className="inline-flex gap-px" role="img" aria-label={`${value.toFixed(1)} out of ${max}`}>
+			{stars.map((star) => {
+				const fill = Math.min(1, Math.max(0, value - (star - 1)));
 				return (
-					<svg key={i} xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+					<svg
+						key={`home-star-${star}`}
+						xmlns="http://www.w3.org/2000/svg"
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						aria-hidden="true"
+					>
 						<defs>
-							<linearGradient id={`star-fill-home-${i}-${value.toFixed(1)}`}>
+							<linearGradient id={`star-fill-home-${star}-${value.toFixed(1)}`}>
 								<stop offset={`${fill * 100}%`} stopColor="var(--crema)" />
 								<stop offset={`${fill * 100}%`} stopColor="var(--sand)" stopOpacity="0.35" />
 							</linearGradient>
 						</defs>
 						<path
 							d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-							fill={`url(#star-fill-home-${i}-${value.toFixed(1)})`}
+							fill={`url(#star-fill-home-${star}-${value.toFixed(1)})`}
 						/>
 					</svg>
 				);

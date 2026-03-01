@@ -1,20 +1,25 @@
+import { ProfileAccountDeleteForm } from "@/components/forms/profile-account-delete-form";
 import { ProfileAvatarForm } from "@/components/forms/profile-avatar-form";
 import { ProfileDisplayNameForm } from "@/components/forms/profile-display-name-form";
 import { ProfileDmPreferencesForm } from "@/components/forms/profile-dm-preferences-form";
+import { ProfileLinkedAccountsForm } from "@/components/forms/profile-linked-accounts-form";
 import { ProfileNewsletterForm } from "@/components/forms/profile-newsletter-form";
 import { ProfilePasswordForm } from "@/components/forms/profile-password-form";
 import { ProfileVisibilityForm } from "@/components/forms/profile-visibility-form";
 import { Card } from "@/components/ui/card";
+import type { Role } from "@/lib/types";
 
 interface ProfileSettingsPanelProps {
 	avatarUrl: string | null;
 	displayName: string;
 	email: string;
+	accountRole: Role;
 	labels: {
 		displayName: string;
 		email: string;
 		status: string;
 	};
+	enableGoogleLogin: boolean;
 	newsletterSubscribed: boolean;
 	publicProfileHref: string;
 	showOnlineStatus: boolean;
@@ -27,7 +32,9 @@ export function ProfileSettingsPanel({
 	avatarUrl,
 	displayName,
 	email,
+	accountRole,
 	labels,
+	enableGoogleLogin,
 	newsletterSubscribed,
 	publicProfileHref,
 	showOnlineStatus,
@@ -59,10 +66,12 @@ export function ProfileSettingsPanel({
 				initialShowOnlineStatus={showOnlineStatus}
 				publicProfileHref={publicProfileHref}
 			/>
+			<ProfileLinkedAccountsForm enableGoogleLogin={enableGoogleLogin} />
 			<ProfileDmPreferencesForm initialDmPrivacy={dmPrivacy} />
 
 			<ProfilePasswordForm />
 			<ProfileNewsletterForm email={email} subscribed={newsletterSubscribed} />
+			<ProfileAccountDeleteForm accountRole={accountRole} email={email} />
 		</div>
 	);
 }

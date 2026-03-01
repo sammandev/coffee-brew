@@ -31,9 +31,19 @@ export function ForumRealtimeNotice() {
 	if (!live) return null;
 
 	return (
-		<div className="mb-4 rounded-2xl border border-(--accent) bg-(--accent)/10 p-3 text-sm text-(--accent)">
-			{t("forum.liveNotice")}{" "}
-			<button type="button" className="underline" onClick={() => router.refresh()}>
+		<div className="flex items-center justify-between gap-3 rounded-2xl border border-(--accent)/30 bg-(--accent)/5 px-4 py-3">
+			<div className="flex items-center gap-2">
+				<span className="relative flex h-2 w-2">
+					<span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-(--accent) opacity-75" />
+					<span className="relative inline-flex h-2 w-2 rounded-full bg-(--accent)" />
+				</span>
+				<p className="text-sm font-medium text-(--accent)">{t("forum.liveNotice")}</p>
+			</div>
+			<button
+				type="button"
+				className="rounded-full bg-(--accent)/10 px-3 py-1 text-xs font-semibold text-(--accent) transition hover:bg-(--accent)/20"
+				onClick={() => router.refresh()}
+			>
 				{t("common.refresh")}
 			</button>
 		</div>

@@ -1,8 +1,5 @@
-"use client";
-
 import { Coffee, FileText, MessageSquare, Star } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { UserIdentitySummary } from "@/components/user/user-identity-summary";
@@ -58,7 +55,10 @@ interface ReviewListItem {
 }
 
 interface PublicProfileTabsProps {
+	activeReviewsTab: ReviewsTabId;
+	activeTab: TabId;
 	blogs: BlogListItem[];
+	basePath: string;
 	brews: BrewListItem[];
 	locale: "en" | "id";
 	reviewsGiven: ReviewListItem[];
@@ -69,6 +69,15 @@ interface PublicProfileTabsProps {
 
 type ReviewsTabId = "received" | "given";
 type TabId = "brews" | "blogs" | "threads" | "reviews";
+
+function buildTabHref(basePath: string, tab: TabId, reviewsTab: ReviewsTabId) {
+	const params = new URLSearchParams();
+	params.set("tab", tab);
+	if (tab === "reviews") {
+		params.set("reviews", reviewsTab);
+	}
+	return `${basePath}?${params.toString()}`;
+}
 
 function ReviewList({ items, locale, title }: { items: ReviewListItem[]; locale: "en" | "id"; title: string }) {
 	return (
@@ -118,7 +127,10 @@ function ReviewList({ items, locale, title }: { items: ReviewListItem[]; locale:
 }
 
 export function PublicProfileTabs({
+	activeReviewsTab,
+	activeTab,
 	blogs,
+	basePath,
 	brews,
 	locale,
 	reviewsGiven,
@@ -126,44 +138,37 @@ export function PublicProfileTabs({
 	showStatuses,
 	threads,
 }: PublicProfileTabsProps) {
-	const [activeTab, setActiveTab] = useState<TabId>("brews");
-	const [reviewsTab, setReviewsTab] = useState<ReviewsTabId>("received");
-
 	return (
 		<section className="space-y-4">
 			<div className="inline-flex flex-wrap rounded-xl border bg-(--surface) p-1">
-				<button
-					type="button"
-					onClick={() => setActiveTab("brews")}
+				<Link
+					href={buildTabHref(basePath, "brews", activeReviewsTab)}
 					className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold ${activeTab === "brews" ? "bg-(--espresso) text-(--surface-elevated)" : "text-(--muted)"}`}
 				>
 					<Coffee size={15} />
 					{locale === "id" ? "Brew" : "Brews"}
-				</button>
-				<button
-					type="button"
-					onClick={() => setActiveTab("blogs")}
+				</Link>
+				<Link
+					href={buildTabHref(basePath, "blogs", activeReviewsTab)}
 					className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold ${activeTab === "blogs" ? "bg-(--espresso) text-(--surface-elevated)" : "text-(--muted)"}`}
 				>
 					<FileText size={15} />
 					Blog
-				</button>
-				<button
-					type="button"
-					onClick={() => setActiveTab("threads")}
+				</Link>
+				<Link
+					href={buildTabHref(basePath, "threads", activeReviewsTab)}
 					className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold ${activeTab === "threads" ? "bg-(--espresso) text-(--surface-elevated)" : "text-(--muted)"}`}
 				>
 					<MessageSquare size={15} />
 					{locale === "id" ? "Thread" : "Threads"}
-				</button>
-				<button
-					type="button"
-					onClick={() => setActiveTab("reviews")}
+				</Link>
+				<Link
+					href={buildTabHref(basePath, "reviews", activeReviewsTab)}
 					className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold ${activeTab === "reviews" ? "bg-(--espresso) text-(--surface-elevated)" : "text-(--muted)"}`}
 				>
 					<Star size={15} />
 					{locale === "id" ? "Review" : "Reviews"}
-				</button>
+				</Link>
 			</div>
 
 			{activeTab === "brews" ? (
@@ -254,22 +259,20 @@ export function PublicProfileTabs({
 			{activeTab === "reviews" ? (
 				<div className="space-y-3">
 					<div className="inline-flex rounded-xl border bg-(--surface) p-1">
-						<button
-							type="button"
-							onClick={() => setReviewsTab("received")}
-							className={`inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-semibold ${reviewsTab === "received" ? "bg-(--espresso) text-(--surface-elevated)" : "text-(--muted)"}`}
+						<Link
+							href={buildTabHref(basePath, "reviews", "received")}
+							className={`inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-semibold ${activeReviewsTab === "received" ? "bg-(--espresso) text-(--surface-elevated)" : "text-(--muted)"}`}
 						>
 							{locale === "id" ? "Diterima" : "Received"}
-						</button>
-						<button
-							type="button"
-							onClick={() => setReviewsTab("given")}
-							className={`inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-semibold ${reviewsTab === "given" ? "bg-(--espresso) text-(--surface-elevated)" : "text-(--muted)"}`}
+						</Link>
+						<Link
+							href={buildTabHref(basePath, "reviews", "given")}
+							className={`inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-semibold ${activeReviewsTab === "given" ? "bg-(--espresso) text-(--surface-elevated)" : "text-(--muted)"}`}
 						>
 							{locale === "id" ? "Diberikan" : "Given"}
-						</button>
+						</Link>
 					</div>
-					{reviewsTab === "received" ? (
+					{activeReviewsTab === "received" ? (
 						<ReviewList
 							items={reviewsReceived}
 							locale={locale}

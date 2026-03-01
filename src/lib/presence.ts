@@ -1,6 +1,7 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const ONLINE_WINDOW_MS = 5 * 60 * 1000;
+export const PRESENCE_TOUCH_INTERVAL_MS = 60 * 1000;
 
 export function isOnlineByLastActive(lastActiveAt: string | null | undefined) {
 	if (!lastActiveAt) return false;
@@ -11,5 +12,12 @@ export function isOnlineByLastActive(lastActiveAt: string | null | undefined) {
 
 export async function touchUserPresence(userId: string) {
 	const supabase = await createSupabaseServerClient();
-	await supabase.from("profiles").update({ last_active_at: new Date().toISOString() }).eq("id", userId);
+	const now = new Date();
+	const threshold = new Date(now.getTime() - PRESENCE_TOUCH_INTERVAL_MS).toISOString();
+
+	await supabase
+		.from("profiles")
+		.update({ last_active_at: now.toISOString() })
+		.eq("id", userId)
+		.lt("last_active_at", threshold);
 }

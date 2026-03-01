@@ -1,4 +1,6 @@
 import { apiError, apiOk } from "@/lib/api";
+import { revalidatePublicCache } from "@/lib/cache-invalidation";
+import { CACHE_TAGS } from "@/lib/cache-tags";
 import { requirePermission } from "@/lib/guards";
 import { createNotifications } from "@/lib/notifications";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -79,6 +81,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 			},
 		]);
 	}
+
+	revalidatePublicCache([CACHE_TAGS.FORUM]);
 
 	return apiOk({ vote: data }, 201);
 }
