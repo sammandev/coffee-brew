@@ -1,12 +1,21 @@
 import { apiError, apiOk } from "@/lib/api";
 import { getSessionContext } from "@/lib/auth";
+import { normalizeRecommendedMethods } from "@/lib/brew-catalog";
 import { requirePermission } from "@/lib/guards";
 import { sanitizeForStorage, validatePlainTextLength } from "@/lib/rich-text";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isMissingColumnError } from "@/lib/supabase-errors";
 import { brewSchema } from "@/lib/validators";
 
-const BREW_OPTIONAL_COLUMNS = ["image_url", "image_alt", "tags"] as const;
+const BREW_OPTIONAL_COLUMNS = [
+	"image_url",
+	"image_alt",
+	"tags",
+	"bean_process",
+	"recommended_methods",
+	"grind_reference_image_url",
+	"grind_reference_image_alt",
+] as const;
 
 function normalizeTags(raw: unknown) {
 	if (!Array.isArray(raw)) return [];
@@ -64,12 +73,22 @@ export async function POST(request: Request) {
 		const notes = typeof payload.notes === "string" ? payload.notes : "";
 		const imageUrl = typeof payload.imageUrl === "string" ? payload.imageUrl.trim() : "";
 		const imageAlt = typeof payload.imageAlt === "string" ? payload.imageAlt.trim() : "";
+		const beanProcess = typeof payload.beanProcess === "string" ? payload.beanProcess.trim() : "";
+		const grindReferenceImageUrl =
+			typeof payload.grindReferenceImageUrl === "string" ? payload.grindReferenceImageUrl.trim() : "";
+		const grindReferenceImageAlt =
+			typeof payload.grindReferenceImageAlt === "string" ? payload.grindReferenceImageAlt.trim() : "";
 		const tags = normalizeTags(payload.tags);
+		const recommendedMethods = normalizeRecommendedMethods(payload.recommendedMethods);
 		return {
 			...payload,
 			notes: sanitizeForStorage(notes),
 			imageUrl: imageUrl.length > 0 ? imageUrl : null,
 			imageAlt: imageAlt.length > 0 ? imageAlt : null,
+			beanProcess: beanProcess.length > 0 ? beanProcess : null,
+			grindReferenceImageUrl: grindReferenceImageUrl.length > 0 ? grindReferenceImageUrl : null,
+			grindReferenceImageAlt: grindReferenceImageAlt.length > 0 ? grindReferenceImageAlt : null,
+			recommendedMethods,
 			tags,
 		};
 	})();
@@ -86,12 +105,16 @@ export async function POST(request: Request) {
 	if (parsed.data.imageAlt && !parsed.data.imageUrl) {
 		return apiError("Invalid brew payload", 400, "Image alt text requires an image URL.");
 	}
+	if (parsed.data.grindReferenceImageAlt && !parsed.data.grindReferenceImageUrl) {
+		return apiError("Invalid brew payload", 400, "Grind reference alt text requires an image URL.");
+	}
 
 	const supabase = await createSupabaseServerClient();
 	const insertPayload = {
 		owner_id: permission.context.userId,
 		name: parsed.data.name,
 		brew_method: parsed.data.brewMethod,
+		bean_process: parsed.data.beanProcess ?? null,
 		coffee_beans: parsed.data.coffeeBeans,
 		brand_roastery: parsed.data.brandRoastery,
 		water_type: parsed.data.waterType,
@@ -104,6 +127,9 @@ export async function POST(request: Request) {
 		brewer_name: parsed.data.brewerName,
 		notes: parsed.data.notes ?? null,
 		status: parsed.data.status,
+		recommended_methods: parsed.data.recommendedMethods ?? [],
+		grind_reference_image_url: parsed.data.grindReferenceImageUrl ?? null,
+		grind_reference_image_alt: parsed.data.grindReferenceImageAlt ?? null,
 	};
 
 	let { data, error } = await supabase
@@ -120,9 +146,15 @@ export async function POST(request: Request) {
 	if (error && isMissingColumnError(error, [...BREW_OPTIONAL_COLUMNS])) {
 		const missingImageColumns = isMissingColumnError(error, ["image_url", "image_alt"]);
 		const missingTagsColumn = isMissingColumnError(error, ["tags"]);
+		const missingBeanProcessColumn = isMissingColumnError(error, ["bean_process"]);
+		const missingRecommendedMethodsColumn = isMissingColumnError(error, ["recommended_methods"]);
+		const missingGrindReferenceImageColumns = isMissingColumnError(error, [
+			"grind_reference_image_url",
+			"grind_reference_image_alt",
+		]);
 		console.warn("[brews:create] optional columns missing; retrying insert with compatibility payload");
 
-		const compatibilityPayload = {
+		const compatibilityPayload: Record<string, unknown> = {
 			...insertPayload,
 			...(missingImageColumns
 				? {}
@@ -132,6 +164,13 @@ export async function POST(request: Request) {
 					}),
 			...(missingTagsColumn ? {} : { tags: parsed.data.tags ?? [] }),
 		};
+
+		if (missingBeanProcessColumn) delete compatibilityPayload.bean_process;
+		if (missingRecommendedMethodsColumn) delete compatibilityPayload.recommended_methods;
+		if (missingGrindReferenceImageColumns) {
+			delete compatibilityPayload.grind_reference_image_url;
+			delete compatibilityPayload.grind_reference_image_alt;
+		}
 
 		({ data, error } = await supabase.from("brews").insert(compatibilityPayload).select("*").single());
 	}

@@ -1,13 +1,12 @@
-import Image from "next/image";
-import Link from "next/link";
+import { CatalogBrewGrid } from "@/components/catalog/catalog-brew-grid";
 import { CatalogSearchControls } from "@/components/catalog/catalog-search-controls";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
-import { resolveBrewImageUrl } from "@/lib/brew-images";
+import { getSessionContext } from "@/lib/auth";
+import { normalizeCatalogSort, sortCatalogRows } from "@/lib/brew-catalog";
 import { getServerI18n } from "@/lib/i18n/server";
 import { getPublishedBrews } from "@/lib/queries";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { formatDate } from "@/lib/utils";
 
 interface CatalogPageProps {
 	searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -19,7 +18,12 @@ function getFirstParam(value: string | string[] | undefined) {
 }
 
 export default async function CatalogPage({ searchParams }: CatalogPageProps) {
-	const [{ locale, t }, params, brews] = await Promise.all([getServerI18n(), searchParams, getPublishedBrews(160)]);
+	const [{ locale, t }, params, brews, session] = await Promise.all([
+		getServerI18n(),
+		searchParams,
+		getPublishedBrews(160),
+		getSessionContext(),
+	]);
 	const q = getFirstParam(params.q).trim().toLowerCase();
 	const tag = getFirstParam(params.tag).trim().toLowerCase();
 	const method = getFirstParam(params.method).trim().toLowerCase();
@@ -28,7 +32,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 	const minRatingParam = getFirstParam(params.minRating).trim();
 	const sortParam = getFirstParam(params.sort).trim();
 	const minRating = Number.isFinite(Number(minRatingParam)) ? Math.max(0, Math.min(5, Number(minRatingParam))) : 0;
-	const sort = sortParam || "latest";
+	const sort = normalizeCatalogSort(sortParam);
 
 	const popularTagCounts = new Map<string, number>();
 	for (const brew of brews) {
@@ -92,21 +96,8 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 			if (brewer.length === 0) return true;
 			return brew.brewer_name.toLowerCase().includes(brewer);
 		})
-		.filter((brew) => brew.rating_avg >= minRating)
-		.sort((left, right) => {
-			if (sort === "oldest") {
-				return new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
-			}
-			if (sort === "highest_rated") {
-				if (right.rating_avg !== left.rating_avg) return right.rating_avg - left.rating_avg;
-				return right.review_total - left.review_total;
-			}
-			if (sort === "most_reviewed") {
-				if (right.review_total !== left.review_total) return right.review_total - left.review_total;
-				return right.rating_avg - left.rating_avg;
-			}
-			return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
-		});
+		.filter((brew) => brew.rating_avg >= minRating);
+	const filteredAndSortedBrews = sortCatalogRows(filteredBrews, sort);
 
 	return (
 		<div className="space-y-6">
@@ -142,50 +133,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 					<CardDescription>{t("catalog.noResultsDescription")}</CardDescription>
 				</Card>
 			) : (
-				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-					{filteredBrews.map((brew) => (
-						<Link href={`/brew/${brew.id}`} key={brew.id}>
-							<Card className="h-full overflow-hidden p-0 transition hover:-translate-y-1 hover:shadow-[0_16px_50px_-25px_var(--overlay)]">
-								<div className="relative aspect-[16/10] w-full">
-									<Image
-										src={resolveBrewImageUrl(brew.image_url)}
-										alt={brew.image_alt || brew.name}
-										fill
-										sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-										className="object-cover"
-									/>
-								</div>
-								<div className="space-y-2 p-5">
-									<CardTitle>{brew.name}</CardTitle>
-									<CardDescription className="mt-1">{brew.brew_method}</CardDescription>
-									{Array.isArray(brew.tags) && brew.tags.length > 0 ? (
-										<div className="mt-2 flex flex-wrap gap-1.5">
-											{brew.tags.slice(0, 5).map((tag: string) => (
-												<span key={`${brew.id}-${tag}`} className="rounded-full border px-2 py-0.5 text-[11px] text-(--muted)">
-													#{tag}
-												</span>
-											))}
-										</div>
-									) : null}
-									<p className="mt-2 text-sm text-(--muted)">Beans: {brew.coffee_beans}</p>
-									<p className="text-sm text-(--muted)">Roastery: {brew.brand_roastery}</p>
-									<p className="text-sm text-(--muted)">
-										{locale === "id" ? "Rating" : "Rating"}:{" "}
-										{brew.review_total > 0
-											? `${brew.rating_avg.toFixed(2)} (${brew.review_total})`
-											: locale === "id"
-												? "Belum ada ulasan"
-												: "No reviews yet"}
-									</p>
-									<p className="mt-3 text-xs text-(--muted)">
-										{locale === "id" ? "Oleh" : "By"} {brew.brewer_name} {locale === "id" ? "pada" : "on"}{" "}
-										{formatDate(brew.created_at, locale)}
-									</p>
-								</div>
-							</Card>
-						</Link>
-					))}
-				</div>
+				<CatalogBrewGrid brews={filteredAndSortedBrews} locale={locale} isAuthenticated={Boolean(session)} />
 			)}
 		</div>
 	);

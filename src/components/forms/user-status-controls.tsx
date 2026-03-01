@@ -17,10 +17,10 @@ export function UserStatusControls({ userId, status, isVerified = false }: UserS
 	const { locale } = useAppPreferences();
 	const router = useRouter();
 	const [loading, setLoading] = useState<string | null>(null);
-	const [pendingAction, setPendingAction] = useState<"block" | "delete" | "disable" | null>(null);
+	const [pendingAction, setPendingAction] = useState<"delete" | "disable" | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
-	async function trigger(action: "block" | "disable" | "delete") {
+	async function trigger(action: "disable" | "delete") {
 		setLoading(action);
 		setError(null);
 
@@ -65,32 +65,18 @@ export function UserStatusControls({ userId, status, isVerified = false }: UserS
 		setError(body?.error ?? (locale === "id" ? "Aksi verifikasi gagal." : "Verification update failed."));
 	}
 
-	const isWarningAction = pendingAction === "block" || pendingAction === "disable";
-	const warningTitle =
-		pendingAction === "block"
-			? locale === "id"
-				? "Blokir Pengguna"
-				: "Block User"
-			: locale === "id"
-				? "Nonaktifkan Pengguna"
-				: "Disable User";
+	const isWarningAction = pendingAction === "disable";
+	const warningTitle = locale === "id" ? "Nonaktifkan Pengguna" : "Disable User";
 	const warningDescription =
-		pendingAction === "block"
-			? locale === "id"
-				? "Pengguna tidak dapat mengakses akun hingga status diubah kembali."
-				: "This user will not be able to access their account until status is changed."
-			: locale === "id"
-				? "Akun pengguna akan dinonaktifkan dan tidak dapat digunakan."
-				: "This user account will be disabled and cannot be used.";
+		locale === "id"
+			? "Akun pengguna akan dinonaktifkan dan tidak dapat digunakan."
+			: "This user account will be disabled and cannot be used.";
 
 	return (
 		<>
 			<div className="space-y-2">
 				<div className="flex flex-wrap items-center gap-2">
 					<span className="rounded-full bg-(--sand)/30 px-3 py-1 text-xs font-semibold text-(--espresso)">{status}</span>
-					<Button variant="outline" size="sm" onClick={() => setPendingAction("block")} disabled={loading !== null}>
-						{loading === "block" ? "..." : locale === "id" ? "Blokir" : "Block"}
-					</Button>
 					<Button variant="outline" size="sm" onClick={() => setPendingAction("disable")} disabled={loading !== null}>
 						{loading === "disable" ? "..." : locale === "id" ? "Nonaktifkan" : "Disable"}
 					</Button>
@@ -119,9 +105,7 @@ export function UserStatusControls({ userId, status, isVerified = false }: UserS
 				isSubmitting={loading !== null}
 				title={warningTitle}
 				description={warningDescription}
-				confirmLabel={
-					pendingAction === "block" ? (locale === "id" ? "Blokir" : "Block") : locale === "id" ? "Nonaktifkan" : "Disable"
-				}
+				confirmLabel={locale === "id" ? "Nonaktifkan" : "Disable"}
 			/>
 
 			<DeleteModal

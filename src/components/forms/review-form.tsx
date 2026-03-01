@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,13 +9,34 @@ import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Select } from "@/components/ui/select";
 
 const scoreOptions = [1, 2, 3, 4, 5];
+const REVIEW_FIELDS = [
+	{ key: "acidity", labelEn: "Acidity", labelId: "Keasaman" },
+	{ key: "sweetness", labelEn: "Sweetness", labelId: "Kemanisan" },
+	{ key: "body", labelEn: "Body", labelId: "Body" },
+	{ key: "aroma", labelEn: "Aroma", labelId: "Aroma" },
+	{ key: "balance", labelEn: "Balance", labelId: "Keseimbangan" },
+] as const;
 
-export function ReviewForm({ brewId }: { brewId: string }) {
+interface InitialReview {
+	acidity: number;
+	aroma: number;
+	balance: number;
+	body: number;
+	notes?: string | null;
+	sweetness: number;
+}
+
+export function ReviewForm({ brewId, initialReview }: { brewId: string; initialReview?: InitialReview | null }) {
 	const { locale } = useAppPreferences();
 	const router = useRouter();
 	const [error, setError] = useState<string | null>(null);
-	const [notes, setNotes] = useState("");
+	const [notes, setNotes] = useState(initialReview?.notes ?? "");
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const isEditMode = Boolean(initialReview);
+
+	useEffect(() => {
+		setNotes(initialReview?.notes ?? "");
+	}, [initialReview?.notes]);
 
 	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
@@ -47,7 +68,6 @@ export function ReviewForm({ brewId }: { brewId: string }) {
 			return;
 		}
 
-		setNotes("");
 		setIsSubmitting(false);
 		router.refresh();
 	}
@@ -55,20 +75,20 @@ export function ReviewForm({ brewId }: { brewId: string }) {
 	return (
 		<form onSubmit={onSubmit} className="grid gap-4 rounded-3xl border bg-(--surface-elevated) p-5">
 			<h3 className="font-heading text-xl text-(--espresso)">
-				{locale === "id" ? "Nilai Racikan Ini" : "Rate This Brew"}
+				{isEditMode
+					? locale === "id"
+						? "Perbarui Review Anda"
+						: "Update Your Review"
+					: locale === "id"
+						? "Nilai Racikan Ini"
+						: "Rate This Brew"}
 			</h3>
 
 			<div className="grid gap-4 md:grid-cols-5">
-				{[
-					["acidity", "Acidity", "Keasaman"],
-					["sweetness", "Sweetness", "Kemanisan"],
-					["body", "Body", "Body"],
-					["aroma", "Aroma", "Aroma"],
-					["balance", "Balance", "Keseimbangan"],
-				].map(([field, labelEn, labelId]) => (
-					<div key={field}>
-						<Label htmlFor={field}>{locale === "id" ? labelId : labelEn}</Label>
-						<Select name={field} id={field} defaultValue="4">
+				{REVIEW_FIELDS.map((field) => (
+					<div key={field.key}>
+						<Label htmlFor={field.key}>{locale === "id" ? field.labelId : field.labelEn}</Label>
+						<Select name={field.key} id={field.key} defaultValue={String(initialReview?.[field.key] ?? 4)}>
 							{scoreOptions.map((score) => (
 								<option value={score} key={score}>
 									{score}
@@ -96,9 +116,13 @@ export function ReviewForm({ brewId }: { brewId: string }) {
 						? locale === "id"
 							? "Mengirim..."
 							: "Submitting..."
-						: locale === "id"
-							? "Kirim Review"
-							: "Submit Review"}
+						: isEditMode
+							? locale === "id"
+								? "Perbarui Review"
+								: "Update Review"
+							: locale === "id"
+								? "Kirim Review"
+								: "Submit Review"}
 				</Button>
 			</div>
 		</form>

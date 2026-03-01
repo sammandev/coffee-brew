@@ -28,6 +28,15 @@ function firstParam(value: string | string[] | undefined) {
 	return value ?? "";
 }
 
+function escapeHtml(value: string) {
+	return value
+		.replaceAll("&", "&amp;")
+		.replaceAll("<", "&lt;")
+		.replaceAll(">", "&gt;")
+		.replaceAll('"', "&quot;")
+		.replaceAll("'", "&#39;");
+}
+
 interface ThreadRow {
 	id: string;
 	title: string;
@@ -48,10 +57,11 @@ export default async function ForumPage({ searchParams }: ForumPageProps) {
 	const to = firstParam(params.to).trim();
 	const minReactionsRaw = firstParam(params.minReactions).trim();
 	const sort = firstParam(params.sort).trim() || "latest";
+	const discussBrewId = firstParam(params.discussBrewId).trim();
 	const minReactions = Number.isFinite(Number(minReactionsRaw)) ? Math.max(0, Number(minReactionsRaw)) : 0;
 	const supabase = createSupabaseAdminClient();
 
-	const [{ data: categories }, { data: subforums }, { data: threads }] = await Promise.all([
+	const [{ data: categories }, { data: subforums }, { data: threads }, { data: discussBrew }] = await Promise.all([
 		supabase
 			.from("forum_categories")
 			.select("id, slug, name_en, name_id, description_en, description_id, order_index")
@@ -70,6 +80,32 @@ export default async function ForumPage({ searchParams }: ForumPageProps) {
 			.order("is_pinned", { ascending: false })
 			.order("updated_at", { ascending: false })
 			.limit(80),
+		discussBrewId
+			? supabase
+					.from("brews")
+					.select("id, name, brew_method, coffee_beans, brand_roastery, tags, status")
+					.eq("id", discussBrewId)
+					.eq("status", "published")
+					.maybeSingle<{
+						id: string;
+						name: string;
+						brew_method: string;
+						coffee_beans: string;
+						brand_roastery: string;
+						tags: string[] | null;
+						status: string;
+					}>()
+			: Promise.resolve({
+					data: null as {
+						id: string;
+						name: string;
+						brew_method: string;
+						coffee_beans: string;
+						brand_roastery: string;
+						tags: string[] | null;
+						status: string;
+					} | null,
+				}),
 	]);
 
 	const categoryRows = categories ?? [];
@@ -193,6 +229,22 @@ export default async function ForumPage({ searchParams }: ForumPageProps) {
 		}
 		return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
 	});
+	const discussPrefill =
+		session && discussBrew
+			? {
+					title: locale === "id" ? `Diskusi Brew: ${discussBrew.name}` : `Brew Discussion: ${discussBrew.name}`,
+					content: `<p>${
+						locale === "id" ? "Saya ingin membahas profil brew ini:" : "I want to discuss this brew profile:"
+					}</p><ul><li><strong>${escapeHtml(discussBrew.name)}</strong></li><li>${escapeHtml(
+						discussBrew.brew_method,
+					)}</li><li>${escapeHtml(discussBrew.coffee_beans)}</li><li>${escapeHtml(
+						discussBrew.brand_roastery,
+					)}</li></ul><p><a href="/brew/${discussBrew.id}">${
+						locale === "id" ? "Lihat detail brew" : "View brew detail"
+					}</a></p>`,
+					tags: Array.isArray(discussBrew.tags) ? discussBrew.tags.slice(0, 5) : [],
+				}
+			: null;
 
 	return (
 		<div className="space-y-6">
@@ -215,6 +267,10 @@ export default async function ForumPage({ searchParams }: ForumPageProps) {
 							triggerLabel={locale === "id" ? "Mulai Diskusi" : "Start Discussion"}
 							subforums={subforumRows}
 							initialSubforumId={subforumRows[0]?.id}
+							openOnMount={Boolean(discussPrefill)}
+							initialTitle={discussPrefill?.title}
+							initialContent={discussPrefill?.content}
+							initialTags={discussPrefill?.tags}
 						/>
 					) : (
 						<Link

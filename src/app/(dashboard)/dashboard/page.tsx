@@ -55,8 +55,19 @@ export default async function DashboardOverviewPage() {
 					<h3 className="font-heading text-2xl text-[var(--espresso)]">{locale === "id" ? "Brew" : "Brews"}</h3>
 					<CardDescription className="mt-2">
 						{locale === "id"
-							? "Kelola brew milik sendiri dan moderasi visibilitas brew pengguna lain."
-							: "Manage own brews and moderate visibility of other users' brews."}
+							? "Kelola dan moderasi brew. Admin tidak dapat memoderasi brew milik superuser."
+							: "Manage and moderate brews. Admin cannot moderate superuser-owned brews."}
+					</CardDescription>
+				</Link>
+				<Link
+					href="/dashboard/collections"
+					className="rounded-3xl border bg-[var(--surface-elevated)] p-6 hover:bg-[var(--surface)]"
+				>
+					<h3 className="font-heading text-2xl text-[var(--espresso)]">{locale === "id" ? "Koleksi" : "Collections"}</h3>
+					<CardDescription className="mt-2">
+						{locale === "id"
+							? "Kelola wishlist, riwayat seduh, dan URL share publik."
+							: "Manage wishlist, brewed history, and public share URL."}
 					</CardDescription>
 				</Link>
 				<Link
@@ -112,7 +123,9 @@ export default async function DashboardOverviewPage() {
 						>
 							<h3 className="font-heading text-2xl text-[var(--espresso)]">{locale === "id" ? "Pengguna" : "Users"}</h3>
 							<CardDescription className="mt-2">
-								{locale === "id" ? "Lifecycle user: block, disable, delete." : "User lifecycle: block, disable, delete."}
+								{locale === "id"
+									? "Kelola pengguna: tambah, ubah peran, disable, verifikasi, dan hapus."
+									: "Manage users: create, update role, disable, verify, and delete."}
 							</CardDescription>
 						</Link>
 					</>

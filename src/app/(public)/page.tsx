@@ -2,13 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { NewsletterInlineForm } from "@/components/forms/newsletter-inline-form";
 import { LandingSectionRenderer } from "@/components/layout/landing-section-renderer";
-import { RichTextContent } from "@/components/ui/rich-text-content";
 import { resolveBrewImageUrl } from "@/lib/brew-images";
 import { resolveLocalizedConfig } from "@/lib/i18n/localize";
 import { getServerI18n } from "@/lib/i18n/server";
 import { getHomeShowcase, getLandingStats, getVisibleFaqItems, getVisibleLandingSections } from "@/lib/queries";
 import { getSiteSettings } from "@/lib/site-settings";
-import { formatDate } from "@/lib/utils";
 
 export default async function LandingPage() {
 	const [{ locale, t }, sections, faqItems, stats, showcase, settings] = await Promise.all([
@@ -193,16 +191,16 @@ export default async function LandingPage() {
 				))}
 			</div>
 
-			<section className="rounded-3xl border bg-(--surface-elevated) p-6 sm:p-8">
+			<section className="overflow-hidden rounded-3xl border bg-(--surface-elevated) p-5 sm:p-8">
 				<div className="flex flex-wrap items-center justify-between gap-3">
 					<div>
 						<h2 className="font-heading text-3xl text-(--espresso)">
-							{locale === "id" ? "Pilihan Katalog dan Review Terbaru" : "Featured Catalog Brews and Recent Reviews"}
+							{locale === "id" ? "Pilihan Katalog Brew" : "Featured Brew Catalog"}
 						</h2>
 						<p className="mt-2 text-(--muted)">
 							{locale === "id"
-								? "Data ini diambil langsung dari racikan publik dan ulasan terbaru."
-								: "This data is pulled directly from published brews and recent review entries."}
+								? "Data ini diambil langsung dari katalog racikan publik."
+								: "This data is pulled directly from published brew catalog entries."}
 						</p>
 					</div>
 					<Link href="/catalog" className="rounded-full border px-4 py-2 text-sm font-semibold hover:bg-(--sand)/20">
@@ -210,14 +208,18 @@ export default async function LandingPage() {
 					</Link>
 				</div>
 
-				<div className="mt-6 grid gap-6 lg:grid-cols-2">
-					<div className="space-y-3">
+				<div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+					<div className="w-full min-w-0 space-y-3">
 						<h3 className="font-heading text-xl text-(--espresso)">
 							{locale === "id" ? "Racikan Unggulan" : "Featured Brews"}
 						</h3>
 						<div className="space-y-3">
 							{showcase.featuredBrews.slice(0, 5).map((brew) => (
-								<Link key={brew.id} href={`/brew/${brew.id}`} className="block rounded-2xl border bg-(--surface) p-4">
+								<Link
+									key={brew.id}
+									href={`/brew/${brew.id}`}
+									className="block w-full overflow-hidden rounded-2xl border bg-(--surface) p-4"
+								>
 									<div className="flex items-start gap-3">
 										<div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border">
 											<Image
@@ -230,14 +232,14 @@ export default async function LandingPage() {
 										</div>
 										<div className="min-w-0">
 											<p className="truncate font-semibold text-(--espresso)">{brew.name}</p>
-											<p className="mt-1 text-sm text-(--muted)">
+											<p className="mt-1 line-clamp-2 break-words text-sm text-(--muted)">
 												{brew.brew_method} · {brew.brand_roastery}
 											</p>
 										</div>
 									</div>
-									<p className="mt-3 text-xs text-(--muted)">
+									<p className="mt-3 text-xs font-semibold text-(--muted)">
 										{brew.review_total > 0
-											? `${brew.rating_avg.toFixed(2)} / 5 (${brew.review_total})`
+											? `★ ${brew.rating_avg.toFixed(2)} · ${brew.review_total} ${locale === "id" ? "review" : "reviews"}`
 											: locale === "id"
 												? "Belum ada review"
 												: "No reviews yet"}
@@ -247,23 +249,40 @@ export default async function LandingPage() {
 						</div>
 					</div>
 
-					<div className="space-y-3">
-						<h3 className="font-heading text-xl text-(--espresso)">{locale === "id" ? "Catatan Review" : "Review Notes"}</h3>
+					<div className="w-full min-w-0 space-y-3">
+						<h3 className="font-heading text-xl text-(--espresso)">
+							{locale === "id" ? "Brew Rating Tertinggi" : "Top Rated Brews"}
+						</h3>
 						<div className="space-y-3">
-							{showcase.recentReviews.slice(0, 5).map((review) => (
-								<div key={review.id} className="rounded-2xl border bg-(--surface) p-4">
-									<p className="text-sm font-semibold text-(--espresso)">{review.brew_name}</p>
-									<p className="mt-1 text-xs text-(--muted)">{review.overall.toFixed(2)} / 5</p>
-									{review.notes ? (
-										<RichTextContent html={review.notes} className="mt-2 line-clamp-3 text-sm" />
-									) : (
-										<p className="mt-2 line-clamp-3 text-sm text-(--foreground)/90">
-											{locale === "id" ? "Tanpa catatan tambahan." : "No additional notes."}
-										</p>
-									)}
-									<p className="mt-2 text-xs text-(--muted)">{formatDate(review.updated_at, locale)}</p>
-								</div>
+							{showcase.topRatedBrews.slice(0, 5).map((brew, index) => (
+								<Link
+									key={brew.id}
+									href={`/brew/${brew.id}`}
+									className="block w-full overflow-hidden rounded-2xl border bg-(--surface) p-4"
+								>
+									<div className="flex items-start justify-between gap-3">
+										<div className="min-w-0">
+											<p className="line-clamp-2 break-words text-sm font-semibold text-(--espresso)">{brew.name}</p>
+											<p className="mt-1 line-clamp-2 break-words text-xs text-(--muted)">
+												{brew.brew_method} · {brew.brand_roastery}
+											</p>
+										</div>
+										<span className="rounded-full border px-2 py-0.5 text-[11px] font-semibold text-(--muted)">#{index + 1}</span>
+									</div>
+									<p className="mt-3 text-xs font-semibold text-(--muted)">
+										{brew.review_total > 0
+											? `★ ${brew.rating_avg.toFixed(2)} · ${brew.review_total} ${locale === "id" ? "review" : "reviews"}`
+											: locale === "id"
+												? "Belum ada review"
+												: "No reviews yet"}
+									</p>
+								</Link>
 							))}
+							{showcase.topRatedBrews.length === 0 ? (
+								<div className="rounded-2xl border bg-(--surface) p-4 text-sm text-(--muted)">
+									{locale === "id" ? "Belum ada data rating brew." : "No rated brews available yet."}
+								</div>
+							) : null}
 						</div>
 					</div>
 				</div>

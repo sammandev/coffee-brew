@@ -52,6 +52,8 @@ export async function POST(request: Request) {
 	if (!(file instanceof File)) {
 		return apiError("Image file is required", 400);
 	}
+	const kindRaw = formData.get("kind");
+	const kind = typeof kindRaw === "string" && kindRaw === "grind_reference" ? "grind_reference" : "primary";
 
 	if (!ALLOWED_MIME_TYPES.includes(file.type)) {
 		return apiError("Image format must be jpeg, png, or webp", 400);
@@ -72,7 +74,7 @@ export async function POST(request: Request) {
 	}
 
 	const supabase = createSupabaseAdminClient();
-	const storagePath = `${permission.context.userId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+	const storagePath = `${permission.context.userId}/${kind}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
 
 	const uploadResult = await supabase.storage.from(BREW_IMAGE_BUCKET).upload(storagePath, file, {
 		contentType: file.type,
@@ -87,5 +89,5 @@ export async function POST(request: Request) {
 		data: { publicUrl },
 	} = supabase.storage.from(BREW_IMAGE_BUCKET).getPublicUrl(storagePath);
 
-	return apiOk({ image_url: publicUrl, storage_path: storagePath });
+	return apiOk({ image_url: publicUrl, storage_path: storagePath, kind });
 }

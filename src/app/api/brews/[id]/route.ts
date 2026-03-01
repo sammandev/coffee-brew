@@ -1,5 +1,6 @@
 import { apiError, apiOk } from "@/lib/api";
 import { getSessionContext } from "@/lib/auth";
+import { normalizeRecommendedMethods } from "@/lib/brew-catalog";
 import { BREW_IMAGE_BUCKET, toManagedBrewImagePath } from "@/lib/brew-images";
 import { sanitizeForStorage, validatePlainTextLength } from "@/lib/rich-text";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -8,7 +9,15 @@ import { isMissingColumnError } from "@/lib/supabase-errors";
 import type { Role } from "@/lib/types";
 import { brewSchema } from "@/lib/validators";
 
-const BREW_OPTIONAL_COLUMNS = ["image_url", "image_alt", "tags"] as const;
+const BREW_OPTIONAL_COLUMNS = [
+	"image_url",
+	"image_alt",
+	"tags",
+	"bean_process",
+	"recommended_methods",
+	"grind_reference_image_url",
+	"grind_reference_image_alt",
+] as const;
 
 type BrewRecord = Record<string, unknown>;
 
@@ -131,27 +140,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 			if (ownerRole === "superuser") {
 				return apiError("Forbidden", 403, "Admin cannot moderate superuser brews.");
 			}
-
-			const providedKeys = Object.keys(payload).filter((key) => payload[key] !== undefined);
-			const invalidKeys = providedKeys.filter((key) => key !== "status");
-			if (invalidKeys.length > 0) {
-				return apiError("Forbidden", 403, "Admin can only show or hide other users' brews.");
-			}
-
-			const nextStatus = typeof payload.status === "string" ? payload.status : "";
-			if (nextStatus !== "published" && nextStatus !== "hidden") {
-				return apiError("Invalid brew payload", 400, "Status must be published or hidden.");
-			}
-
-			const { brew, error } = await updateAndLoadBrew(supabase, id, { status: nextStatus }, current as BrewRecord);
-			if (error) {
-				return apiError("Could not update brew", 400, error.message);
-			}
-
-			return apiOk({ brew });
-		}
-
-		if (session.role !== "superuser") {
+		} else if (session.role !== "superuser") {
 			return apiError("Forbidden", 403);
 		}
 	}
@@ -160,12 +149,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 		const notes = typeof payload.notes === "string" ? payload.notes : "";
 		const imageUrl = typeof payload.imageUrl === "string" ? payload.imageUrl.trim() : "";
 		const imageAlt = typeof payload.imageAlt === "string" ? payload.imageAlt.trim() : "";
+		const beanProcess = typeof payload.beanProcess === "string" ? payload.beanProcess.trim() : "";
+		const grindReferenceImageUrl =
+			typeof payload.grindReferenceImageUrl === "string" ? payload.grindReferenceImageUrl.trim() : "";
+		const grindReferenceImageAlt =
+			typeof payload.grindReferenceImageAlt === "string" ? payload.grindReferenceImageAlt.trim() : "";
 		const tags = normalizeTags(payload.tags);
+		const recommendedMethods = normalizeRecommendedMethods(payload.recommendedMethods);
 		return {
 			...payload,
 			notes: sanitizeForStorage(notes),
 			imageUrl: imageUrl.length > 0 ? imageUrl : null,
 			imageAlt: imageAlt.length > 0 ? imageAlt : null,
+			beanProcess: beanProcess.length > 0 ? beanProcess : null,
+			grindReferenceImageUrl: grindReferenceImageUrl.length > 0 ? grindReferenceImageUrl : null,
+			grindReferenceImageAlt: grindReferenceImageAlt.length > 0 ? grindReferenceImageAlt : null,
+			recommendedMethods,
 			tags,
 		};
 	})();
@@ -182,13 +181,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 	if (parsed.data.imageAlt && !parsed.data.imageUrl) {
 		return apiError("Invalid brew payload", 400, "Image alt text requires an image URL.");
 	}
+	if (parsed.data.grindReferenceImageAlt && !parsed.data.grindReferenceImageUrl) {
+		return apiError("Invalid brew payload", 400, "Grind reference alt text requires an image URL.");
+	}
 
 	const previousImageUrl = typeof current.image_url === "string" ? current.image_url : null;
+	const previousGrindReferenceImageUrl =
+		typeof current.grind_reference_image_url === "string" ? current.grind_reference_image_url : null;
 	const nextImageUrl = parsed.data.imageUrl ?? null;
+	const nextGrindReferenceImageUrl = parsed.data.grindReferenceImageUrl ?? null;
 
 	const updatePayload = {
 		name: parsed.data.name,
 		brew_method: parsed.data.brewMethod,
+		bean_process: parsed.data.beanProcess ?? null,
 		coffee_beans: parsed.data.coffeeBeans,
 		brand_roastery: parsed.data.brandRoastery,
 		water_type: parsed.data.waterType,
@@ -201,6 +207,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 		brewer_name: parsed.data.brewerName,
 		notes: parsed.data.notes ?? null,
 		status: parsed.data.status,
+		recommended_methods: parsed.data.recommendedMethods ?? [],
+		grind_reference_image_url: parsed.data.grindReferenceImageUrl ?? null,
+		grind_reference_image_alt: parsed.data.grindReferenceImageAlt ?? null,
 	};
 
 	let imageColumnsApplied = true;
@@ -219,10 +228,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 	if (error && isMissingColumnError(error, [...BREW_OPTIONAL_COLUMNS])) {
 		const missingImageColumns = isMissingColumnError(error, ["image_url", "image_alt"]);
 		const missingTagsColumn = isMissingColumnError(error, ["tags"]);
+		const missingBeanProcessColumn = isMissingColumnError(error, ["bean_process"]);
+		const missingRecommendedMethodsColumn = isMissingColumnError(error, ["recommended_methods"]);
+		const missingGrindReferenceImageColumns = isMissingColumnError(error, [
+			"grind_reference_image_url",
+			"grind_reference_image_alt",
+		]);
 		imageColumnsApplied = !missingImageColumns;
 
 		console.warn("[brews:update] optional columns missing; retrying update with compatibility payload");
-		const compatibilityPayload = {
+		const compatibilityPayload: Record<string, unknown> = {
 			...updatePayload,
 			...(missingImageColumns
 				? {}
@@ -232,6 +247,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 					}),
 			...(missingTagsColumn ? {} : { tags: parsed.data.tags ?? [] }),
 		};
+		if (missingBeanProcessColumn) delete compatibilityPayload.bean_process;
+		if (missingRecommendedMethodsColumn) delete compatibilityPayload.recommended_methods;
+		if (missingGrindReferenceImageColumns) {
+			delete compatibilityPayload.grind_reference_image_url;
+			delete compatibilityPayload.grind_reference_image_alt;
+		}
 
 		({ brew: data, error } = await updateAndLoadBrew(supabase, id, compatibilityPayload, current as BrewRecord));
 	}
@@ -240,10 +261,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 		return apiError("Could not update brew", 400, error.message);
 	}
 
-	if (imageColumnsApplied && previousImageUrl && previousImageUrl !== nextImageUrl) {
-		const previousPath = toManagedBrewImagePath(previousImageUrl);
-		if (previousPath) {
-			await createSupabaseAdminClient().storage.from(BREW_IMAGE_BUCKET).remove([previousPath]);
+	if (imageColumnsApplied) {
+		const removedPaths: string[] = [];
+		if (previousImageUrl && previousImageUrl !== nextImageUrl) {
+			const previousPath = toManagedBrewImagePath(previousImageUrl);
+			if (previousPath) removedPaths.push(previousPath);
+		}
+		if (previousGrindReferenceImageUrl && previousGrindReferenceImageUrl !== nextGrindReferenceImageUrl) {
+			const previousPath = toManagedBrewImagePath(previousGrindReferenceImageUrl);
+			if (previousPath) removedPaths.push(previousPath);
+		}
+
+		if (removedPaths.length > 0) {
+			await createSupabaseAdminClient().storage.from(BREW_IMAGE_BUCKET).remove(removedPaths);
 		}
 	}
 
@@ -266,8 +296,20 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 	}
 
 	const isOwner = current.owner_id === session.userId;
-	if (!isOwner && session.role !== "superuser") {
-		return apiError("Forbidden", 403);
+	if (!isOwner) {
+		if (session.role === "superuser") {
+			// allow
+		} else if (session.role === "admin") {
+			const ownerRole = await getUserRoleById(supabase, current.owner_id);
+			if (!ownerRole) {
+				return apiError("Forbidden", 403, "Unable to verify brew owner role.");
+			}
+			if (ownerRole === "superuser") {
+				return apiError("Forbidden", 403, "Admin cannot moderate superuser brews.");
+			}
+		} else {
+			return apiError("Forbidden", 403);
+		}
 	}
 
 	const { error } = await supabase.from("brews").delete().eq("id", id);
@@ -276,9 +318,14 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 		return apiError("Could not delete brew", 400, error.message);
 	}
 
-	const previousPath = toManagedBrewImagePath(typeof current.image_url === "string" ? current.image_url : null);
-	if (previousPath) {
-		await createSupabaseAdminClient().storage.from(BREW_IMAGE_BUCKET).remove([previousPath]);
+	const removedPaths = [
+		toManagedBrewImagePath(typeof current.image_url === "string" ? current.image_url : null),
+		toManagedBrewImagePath(
+			typeof current.grind_reference_image_url === "string" ? current.grind_reference_image_url : null,
+		),
+	].filter((value): value is string => Boolean(value));
+	if (removedPaths.length > 0) {
+		await createSupabaseAdminClient().storage.from(BREW_IMAGE_BUCKET).remove(removedPaths);
 	}
 
 	return apiOk({ success: true });

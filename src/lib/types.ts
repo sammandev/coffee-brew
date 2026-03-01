@@ -16,6 +16,7 @@ export type ResourceKey = "landing" | "brews" | "catalog" | "forum" | "reviews" 
 export type UserStatus = "active" | "blocked" | "disabled";
 
 export type BrewStatus = "draft" | "published" | "hidden";
+export type BrewRecommendedMethod = "espresso" | "cold_brew" | "pour_over";
 export type ContentLifecycleStatus = "draft" | "published" | "hidden";
 
 export type ForumContentStatus = "visible" | "hidden";
@@ -27,6 +28,7 @@ export type { Locale, ThemePreference };
 export interface BrewInput {
 	name: string;
 	brewMethod: string;
+	beanProcess?: string | null;
 	coffeeBeans: string;
 	brandRoastery: string;
 	waterType: string;
@@ -40,6 +42,9 @@ export interface BrewInput {
 	notes?: string;
 	imageUrl?: string | null;
 	imageAlt?: string | null;
+	grindReferenceImageUrl?: string | null;
+	grindReferenceImageAlt?: string | null;
+	recommendedMethods?: BrewRecommendedMethod[];
 	tags?: string[];
 	status: BrewStatus;
 }
@@ -109,6 +114,21 @@ export interface FaqItem {
 export interface Brew extends BrewInput {
 	id: string;
 	owner_id: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface BrewWishlistRecord {
+	user_id: string;
+	brew_id: string;
+	created_at: string;
+}
+
+export interface BrewCollectionShareRecord {
+	id: string;
+	owner_id: string;
+	token: string;
+	is_active: boolean;
 	created_at: string;
 	updated_at: string;
 }

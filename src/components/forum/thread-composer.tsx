@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,6 +20,9 @@ interface ForumSubforumOption {
 
 interface ThreadComposerProps {
 	hideTitle?: boolean;
+	initialContent?: string;
+	initialTags?: string[];
+	initialTitle?: string;
 	initialSubforumId?: string;
 	onSubmitted?: () => void;
 	subforums?: ForumSubforumOption[];
@@ -28,6 +31,9 @@ interface ThreadComposerProps {
 
 export function ThreadComposer({
 	hideTitle = false,
+	initialContent = "",
+	initialTags = [],
+	initialTitle = "",
 	initialSubforumId,
 	onSubmitted,
 	subforums = [],
@@ -38,22 +44,37 @@ export function ThreadComposer({
 	const [error, setError] = useState<string | null>(null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [subforumId, setSubforumId] = useState(initialSubforumId ?? subforums[0]?.id ?? "");
-	const [title, setTitle] = useState("");
-	const [content, setContent] = useState("");
-	const [tagsInput, setTagsInput] = useState("");
+	const [title, setTitle] = useState(initialTitle);
+	const [content, setContent] = useState(initialContent);
+	const [tagsInput, setTagsInput] = useState(initialTags.join(", "));
 	const [draftId, setDraftId] = useState<string | null>(null);
 	const [draftLoaded, setDraftLoaded] = useState(false);
 	const [enablePoll, setEnablePoll] = useState(false);
 	const [pollQuestion, setPollQuestion] = useState("");
 	const [pollOptionsInput, setPollOptionsInput] = useState("");
 	const [pollClosesAt, setPollClosesAt] = useState("");
+	const hasPrefill = useMemo(
+		() => initialTitle.trim().length > 0 || initialContent.trim().length > 0 || initialTags.length > 0,
+		[initialContent, initialTags, initialTitle],
+	);
 
 	useEffect(() => {
 		setSubforumId(initialSubforumId ?? subforums[0]?.id ?? "");
 	}, [initialSubforumId, subforums]);
 
 	useEffect(() => {
+		if (!hasPrefill) return;
+		setTitle(initialTitle);
+		setContent(initialContent);
+		setTagsInput(initialTags.join(", "));
+	}, [hasPrefill, initialContent, initialTags, initialTitle]);
+
+	useEffect(() => {
 		if (!subforumId) return;
+		if (hasPrefill) {
+			setDraftLoaded(true);
+			return;
+		}
 		let active = true;
 		void (async () => {
 			const response = await fetch(`/api/forum/drafts?type=thread&subforumId=${encodeURIComponent(subforumId)}`, {
@@ -95,7 +116,7 @@ export function ThreadComposer({
 		return () => {
 			active = false;
 		};
-	}, [subforumId]);
+	}, [hasPrefill, subforumId]);
 
 	useEffect(() => {
 		if (!draftLoaded) return;

@@ -4,6 +4,7 @@ import { FORUM_REACTION_TYPES, FORUM_THREAD_SORT_VALUES } from "@/lib/constants"
 export const brewSchema = z.object({
 	name: z.string().trim().min(2).max(120),
 	brewMethod: z.string().trim().min(2).max(80),
+	beanProcess: z.string().trim().max(120).nullable().optional(),
 	coffeeBeans: z.string().trim().min(2).max(120),
 	brandRoastery: z.string().trim().min(2).max(120),
 	waterType: z.string().trim().min(2).max(80),
@@ -17,6 +18,12 @@ export const brewSchema = z.object({
 	notes: z.string().trim().max(30000).optional(),
 	imageUrl: z.string().trim().url().max(2000).nullable().optional(),
 	imageAlt: z.string().trim().max(200).nullable().optional(),
+	grindReferenceImageUrl: z.string().trim().url().max(2000).nullable().optional(),
+	grindReferenceImageAlt: z.string().trim().max(200).nullable().optional(),
+	recommendedMethods: z
+		.array(z.enum(["espresso", "cold_brew", "pour_over"]))
+		.max(3)
+		.default([]),
 	tags: z.array(z.string().trim().min(1).max(32)).max(10).default([]),
 	status: z.enum(["draft", "published", "hidden"]).default("draft"),
 });
@@ -222,6 +229,22 @@ export const rbacUpdateSchema = z.object({
 export const userActionSchema = z.object({
 	reason: z.string().trim().max(300).optional(),
 });
+
+export const superuserCreateUserSchema = z
+	.object({
+		email: z.string().trim().email(),
+		password: z.string().min(8).max(128),
+		displayName: z.string().trim().min(2).max(120).optional(),
+		role: z.enum(["user", "admin"]),
+		emailConfirmed: z.boolean().optional().default(true),
+	})
+	.strict();
+
+export const superuserUpdateUserRoleSchema = z
+	.object({
+		role: z.enum(["user", "admin"]),
+	})
+	.strict();
 
 export const blogPostSchema = z.object({
 	slug: z

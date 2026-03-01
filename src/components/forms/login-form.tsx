@@ -15,9 +15,15 @@ type LoginMode = "password" | "magic";
 interface LoginFormProps {
 	enableGoogleLogin?: boolean;
 	enableMagicLinkLogin?: boolean;
+	redirectPath?: string;
 }
 
-export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = true }: LoginFormProps) {
+function buildResolvePath(redirectPath?: string) {
+	if (!redirectPath) return "/session/resolve";
+	return `/session/resolve?next=${encodeURIComponent(redirectPath)}`;
+}
+
+export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = true, redirectPath }: LoginFormProps) {
 	const { t } = useAppPreferences();
 	const router = useRouter();
 	const [mode, setMode] = useState<LoginMode>("password");
@@ -51,7 +57,7 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 				return;
 			}
 
-			router.push("/session/resolve");
+			router.push(buildResolvePath(redirectPath));
 			router.refresh();
 			return;
 		}
@@ -65,7 +71,7 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 		const { error: authError } = await supabase.auth.signInWithOtp({
 			email,
 			options: {
-				emailRedirectTo: `${window.location.origin}/session/resolve`,
+				emailRedirectTo: `${window.location.origin}${buildResolvePath(redirectPath)}`,
 			},
 		});
 
@@ -87,7 +93,7 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 		const { error: authError } = await supabase.auth.signInWithOAuth({
 			provider: "google",
 			options: {
-				redirectTo: `${window.location.origin}/session/resolve`,
+				redirectTo: `${window.location.origin}${buildResolvePath(redirectPath)}`,
 			},
 		});
 

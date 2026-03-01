@@ -1,8 +1,17 @@
+import { sortCatalogRows } from "@/lib/brew-catalog";
 import { aggregateRatings } from "@/lib/rating";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isMissingColumnError } from "@/lib/supabase-errors";
 
-const BREW_OPTIONAL_COLUMNS = ["image_url", "image_alt", "tags"] as const;
+const BREW_OPTIONAL_COLUMNS = [
+	"image_url",
+	"image_alt",
+	"tags",
+	"bean_process",
+	"recommended_methods",
+	"grind_reference_image_url",
+	"grind_reference_image_alt",
+] as const;
 
 export async function getVisibleLandingSections() {
 	const supabase = await createSupabaseServerClient();
@@ -48,7 +57,9 @@ export async function getPublishedBrews(limit = 24) {
 	const supabase = await createSupabaseServerClient();
 	let { data, error } = await supabase
 		.from("brews")
-		.select("id, name, brew_method, brand_roastery, coffee_beans, brewer_name, image_url, image_alt, tags, created_at")
+		.select(
+			"id, name, brew_method, bean_process, brand_roastery, coffee_beans, brewer_name, image_url, image_alt, grind_reference_image_url, grind_reference_image_alt, recommended_methods, tags, created_at",
+		)
 		.eq("status", "published")
 		.order("created_at", { ascending: false })
 		.limit(limit);
@@ -61,7 +72,16 @@ export async function getPublishedBrews(limit = 24) {
 			.eq("status", "published")
 			.order("created_at", { ascending: false })
 			.limit(limit);
-		data = (fallback.data ?? []).map((brew) => ({ ...brew, image_url: null, image_alt: null, tags: [] }));
+		data = (fallback.data ?? []).map((brew) => ({
+			...brew,
+			image_url: null,
+			image_alt: null,
+			grind_reference_image_url: null,
+			grind_reference_image_alt: null,
+			bean_process: null,
+			recommended_methods: [],
+			tags: [],
+		}));
 		error = fallback.error ?? null;
 	}
 
@@ -97,22 +117,17 @@ export async function getLandingStats() {
 	};
 }
 
-export async function getHomeShowcase(limitBrews = 6, limitReviews = 6) {
+export async function getHomeShowcase(limitFeaturedBrews = 6, limitTopRatedBrews = 5) {
 	const supabase = await createSupabaseServerClient();
 
-	const [{ data: brewRows, error: brewError }, { data: recentReviews }] = await Promise.all([
-		supabase
-			.from("brews")
-			.select("id, name, brew_method, brand_roastery, coffee_beans, brewer_name, image_url, image_alt, tags, created_at")
-			.eq("status", "published")
-			.order("created_at", { ascending: false })
-			.limit(limitBrews),
-		supabase
-			.from("brew_reviews")
-			.select("id, brew_id, overall, notes, updated_at, brews(name)")
-			.order("updated_at", { ascending: false })
-			.limit(limitReviews),
-	]);
+	const { data: brewRows, error: brewError } = await supabase
+		.from("brews")
+		.select(
+			"id, name, brew_method, bean_process, brand_roastery, coffee_beans, brewer_name, image_url, image_alt, grind_reference_image_url, grind_reference_image_alt, recommended_methods, tags, created_at",
+		)
+		.eq("status", "published")
+		.order("created_at", { ascending: false })
+		.limit(220);
 	let brews = brewRows ?? [];
 
 	if (brewError && isMissingColumnError(brewError, [...BREW_OPTIONAL_COLUMNS])) {
@@ -122,8 +137,17 @@ export async function getHomeShowcase(limitBrews = 6, limitReviews = 6) {
 			.select("id, name, brew_method, brand_roastery, coffee_beans, brewer_name, created_at")
 			.eq("status", "published")
 			.order("created_at", { ascending: false })
-			.limit(limitBrews);
-		brews = (fallback.data ?? []).map((brew) => ({ ...brew, image_url: null, image_alt: null, tags: [] }));
+			.limit(220);
+		brews = (fallback.data ?? []).map((brew) => ({
+			...brew,
+			image_url: null,
+			image_alt: null,
+			grind_reference_image_url: null,
+			grind_reference_image_alt: null,
+			bean_process: null,
+			recommended_methods: [],
+			tags: [],
+		}));
 	}
 
 	const brewIds = brews.map((brew) => brew.id);
@@ -140,7 +164,7 @@ export async function getHomeShowcase(limitBrews = 6, limitReviews = 6) {
 		aggregateMap.set(row.brew_id, existing);
 	}
 
-	const featuredBrews = brews.map((brew) => {
+	const preparedBrews = brews.map((brew) => {
 		const aggregate = aggregateMap.get(brew.id);
 		return {
 			...brew,
@@ -149,20 +173,12 @@ export async function getHomeShowcase(limitBrews = 6, limitReviews = 6) {
 		};
 	});
 
-	const mappedReviews = (recentReviews ?? []).map((review) => ({
-		id: review.id,
-		brew_id: review.brew_id,
-		overall: Number(review.overall),
-		notes: review.notes,
-		updated_at: review.updated_at,
-		brew_name: Array.isArray(review.brews)
-			? (review.brews[0]?.name ?? "Unknown Brew")
-			: ((review.brews as { name?: string } | null)?.name ?? "Unknown Brew"),
-	}));
+	const featuredBrews = sortCatalogRows(preparedBrews, "newest").slice(0, limitFeaturedBrews);
+	const topRatedBrews = sortCatalogRows(preparedBrews, "highest_stars").slice(0, limitTopRatedBrews);
 
 	return {
 		featuredBrews,
-		recentReviews: mappedReviews,
+		topRatedBrews,
 	};
 }
 

@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DeleteModal } from "@/components/ui/delete-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Select } from "@/components/ui/select";
 import { DEFAULT_BREW_IMAGE_URL, isManagedBrewImageUrl, resolveBrewImageUrl } from "@/lib/brew-images";
-import type { BrewStatus } from "@/lib/types";
+import type { BrewRecommendedMethod, BrewStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface BrewFormProps {
@@ -34,12 +35,17 @@ interface BrewFormProps {
 		notes?: string;
 		image_url?: string | null;
 		image_alt?: string | null;
+		grind_reference_image_url?: string | null;
+		grind_reference_image_alt?: string | null;
+		bean_process?: string | null;
+		recommended_methods?: string[] | null;
 		tags?: string[] | null;
 		status?: BrewStatus;
 	};
 }
 
 type ImageMode = "upload" | "url";
+const RECOMMENDED_METHOD_VALUES: BrewRecommendedMethod[] = ["espresso", "cold_brew", "pour_over"];
 
 function toTagInput(tags: string[] | null | undefined) {
 	if (!Array.isArray(tags)) return "";
@@ -60,6 +66,18 @@ function isValidImageUrl(value: string) {
 	}
 }
 
+function normalizeRecommendedMethods(raw: string[] | null | undefined): BrewRecommendedMethod[] {
+	if (!Array.isArray(raw)) return [];
+	const normalized: BrewRecommendedMethod[] = [];
+	for (const entry of raw) {
+		const value = String(entry).trim().toLowerCase() as BrewRecommendedMethod;
+		if (!RECOMMENDED_METHOD_VALUES.includes(value)) continue;
+		if (normalized.includes(value)) continue;
+		normalized.push(value);
+	}
+	return normalized;
+}
+
 export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: BrewFormProps) {
 	const { locale } = useAppPreferences();
 	const router = useRouter();
@@ -67,8 +85,10 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 	const [isDeleting, setIsDeleting] = useState(false);
 	const [deleteOpen, setDeleteOpen] = useState(false);
 	const [isUploadingImage, setIsUploadingImage] = useState(false);
+	const [isUploadingGrindReferenceImage, setIsUploadingGrindReferenceImage] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [imageError, setImageError] = useState<string | null>(null);
+	const [grindReferenceImageError, setGrindReferenceImageError] = useState<string | null>(null);
 
 	const defaults = useMemo(
 		() => ({
@@ -87,6 +107,10 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 			notes: initialValues?.notes ?? "",
 			imageUrl: initialValues?.image_url?.trim() ?? "",
 			imageAlt: initialValues?.image_alt?.trim() ?? "",
+			grindReferenceImageUrl: initialValues?.grind_reference_image_url?.trim() ?? "",
+			grindReferenceImageAlt: initialValues?.grind_reference_image_alt?.trim() ?? "",
+			beanProcess: initialValues?.bean_process?.trim() ?? "",
+			recommendedMethods: normalizeRecommendedMethods(initialValues?.recommended_methods),
 			tags: toTagInput(initialValues?.tags),
 			status: initialValues?.status ?? "draft",
 		}),
@@ -95,6 +119,9 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 
 	const [notes, setNotes] = useState(defaults.notes);
 	const [imageAlt, setImageAlt] = useState(defaults.imageAlt);
+	const [grindReferenceImageAlt, setGrindReferenceImageAlt] = useState(defaults.grindReferenceImageAlt);
+	const [beanProcess, setBeanProcess] = useState(defaults.beanProcess);
+	const [recommendedMethods, setRecommendedMethods] = useState<BrewRecommendedMethod[]>(defaults.recommendedMethods);
 	const [imageMode, setImageMode] = useState<ImageMode>(resolveDefaultImageMode(defaults.imageUrl));
 	const [imageUrlInput, setImageUrlInput] = useState(
 		resolveDefaultImageMode(defaults.imageUrl) === "url" ? defaults.imageUrl : "",
@@ -102,40 +129,72 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 	const [uploadedImageUrl, setUploadedImageUrl] = useState(
 		resolveDefaultImageMode(defaults.imageUrl) === "upload" ? defaults.imageUrl : "",
 	);
+	const [grindReferenceImageMode, setGrindReferenceImageMode] = useState<ImageMode>(
+		resolveDefaultImageMode(defaults.grindReferenceImageUrl),
+	);
+	const [grindReferenceImageUrlInput, setGrindReferenceImageUrlInput] = useState(
+		resolveDefaultImageMode(defaults.grindReferenceImageUrl) === "url" ? defaults.grindReferenceImageUrl : "",
+	);
+	const [uploadedGrindReferenceImageUrl, setUploadedGrindReferenceImageUrl] = useState(
+		resolveDefaultImageMode(defaults.grindReferenceImageUrl) === "upload" ? defaults.grindReferenceImageUrl : "",
+	);
 	const [tagsInput, setTagsInput] = useState(defaults.tags);
 
 	useEffect(() => {
 		const nextMode = resolveDefaultImageMode(defaults.imageUrl);
+		const nextGrindReferenceMode = resolveDefaultImageMode(defaults.grindReferenceImageUrl);
 		setNotes(defaults.notes);
 		setImageAlt(defaults.imageAlt);
+		setGrindReferenceImageAlt(defaults.grindReferenceImageAlt);
+		setBeanProcess(defaults.beanProcess);
+		setRecommendedMethods(defaults.recommendedMethods);
 		setImageMode(nextMode);
 		setImageUrlInput(nextMode === "url" ? defaults.imageUrl : "");
 		setUploadedImageUrl(nextMode === "upload" ? defaults.imageUrl : "");
+		setGrindReferenceImageMode(nextGrindReferenceMode);
+		setGrindReferenceImageUrlInput(nextGrindReferenceMode === "url" ? defaults.grindReferenceImageUrl : "");
+		setUploadedGrindReferenceImageUrl(nextGrindReferenceMode === "upload" ? defaults.grindReferenceImageUrl : "");
 		setTagsInput(defaults.tags);
-	}, [defaults.imageAlt, defaults.imageUrl, defaults.notes, defaults.tags]);
+	}, [
+		defaults.beanProcess,
+		defaults.grindReferenceImageAlt,
+		defaults.grindReferenceImageUrl,
+		defaults.imageAlt,
+		defaults.imageUrl,
+		defaults.notes,
+		defaults.recommendedMethods,
+		defaults.tags,
+	]);
 
 	const selectedImageUrl = imageMode === "upload" ? uploadedImageUrl.trim() : imageUrlInput.trim();
 	const imagePreviewUrl = resolveBrewImageUrl(selectedImageUrl || null);
 	const hasCustomImage = selectedImageUrl.length > 0;
+	const selectedGrindReferenceImageUrl =
+		grindReferenceImageMode === "upload" ? uploadedGrindReferenceImageUrl.trim() : grindReferenceImageUrlInput.trim();
+	const grindReferenceImagePreviewUrl = resolveBrewImageUrl(selectedGrindReferenceImageUrl || null);
+	const hasCustomGrindReferenceImage = selectedGrindReferenceImageUrl.length > 0;
+
+	async function uploadImageFile(file: File, kind: "primary" | "grind_reference") {
+		const formData = new FormData();
+		formData.append("file", file);
+		formData.append("kind", kind);
+
+		return fetch("/api/brews/image", {
+			method: "POST",
+			body: formData,
+		}).catch(() => null);
+	}
 
 	async function onUploadImage(event: React.ChangeEvent<HTMLInputElement>) {
 		const file = event.currentTarget.files?.[0];
 		event.currentTarget.value = "";
-
 		if (!file) return;
 
 		setIsUploadingImage(true);
 		setImageError(null);
 		setError(null);
 
-		const formData = new FormData();
-		formData.append("file", file);
-
-		const response = await fetch("/api/brews/image", {
-			method: "POST",
-			body: formData,
-		}).catch(() => null);
-
+		const response = await uploadImageFile(file, "primary");
 		if (!response?.ok) {
 			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
 			setImageError(
@@ -158,15 +217,50 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 		setIsUploadingImage(false);
 	}
 
+	async function onUploadGrindReferenceImage(event: React.ChangeEvent<HTMLInputElement>) {
+		const file = event.currentTarget.files?.[0];
+		event.currentTarget.value = "";
+		if (!file) return;
+
+		setIsUploadingGrindReferenceImage(true);
+		setGrindReferenceImageError(null);
+		setError(null);
+
+		const response = await uploadImageFile(file, "grind_reference");
+		if (!response?.ok) {
+			const body = response ? ((await response.json().catch(() => ({}))) as { error?: string }) : null;
+			setGrindReferenceImageError(
+				body?.error ??
+					(locale === "id" ? "Gagal mengunggah gambar referensi grind." : "Could not upload grind reference image."),
+			);
+			setIsUploadingGrindReferenceImage(false);
+			return;
+		}
+
+		const body = (await response.json().catch(() => ({}))) as { image_url?: string };
+		if (!body.image_url) {
+			setGrindReferenceImageError(locale === "id" ? "Respons upload tidak valid." : "Invalid upload response.");
+			setIsUploadingGrindReferenceImage(false);
+			return;
+		}
+
+		setUploadedGrindReferenceImageUrl(body.image_url);
+		setGrindReferenceImageMode("upload");
+		setIsUploadingGrindReferenceImage(false);
+	}
+
 	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setIsSubmitting(true);
 		setError(null);
 		setImageError(null);
+		setGrindReferenceImageError(null);
 
 		const formData = new FormData(event.currentTarget);
 		const normalizedImageUrl = selectedImageUrl.trim();
 		const normalizedImageAlt = imageAlt.trim();
+		const normalizedGrindReferenceImageUrl = selectedGrindReferenceImageUrl.trim();
+		const normalizedGrindReferenceImageAlt = grindReferenceImageAlt.trim();
 		const tags = tagsInput
 			.split(",")
 			.map((tag) => tag.trim().toLowerCase())
@@ -188,10 +282,29 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 			setIsSubmitting(false);
 			return;
 		}
+		if (grindReferenceImageMode === "upload" && !normalizedGrindReferenceImageUrl) {
+			setError(
+				locale === "id"
+					? "Unggah gambar referensi grind terlebih dahulu atau pilih mode URL."
+					: "Upload a grind reference image first or switch to URL mode.",
+			);
+			setIsSubmitting(false);
+			return;
+		}
+		if (
+			grindReferenceImageMode === "url" &&
+			normalizedGrindReferenceImageUrl.length > 0 &&
+			!isValidImageUrl(normalizedGrindReferenceImageUrl)
+		) {
+			setError(locale === "id" ? "URL referensi grind tidak valid." : "Grind reference URL is invalid.");
+			setIsSubmitting(false);
+			return;
+		}
 
 		const payload = {
 			name: String(formData.get("name") ?? ""),
 			brewMethod: String(formData.get("brewMethod") ?? ""),
+			beanProcess: beanProcess.trim().length > 0 ? beanProcess.trim() : null,
 			coffeeBeans: String(formData.get("coffeeBeans") ?? ""),
 			brandRoastery: String(formData.get("brandRoastery") ?? ""),
 			waterType: String(formData.get("waterType") ?? ""),
@@ -205,6 +318,12 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 			notes: String(formData.get("notes") ?? ""),
 			imageUrl: normalizedImageUrl.length > 0 ? normalizedImageUrl : null,
 			imageAlt: normalizedImageUrl.length > 0 && normalizedImageAlt.length > 0 ? normalizedImageAlt : null,
+			grindReferenceImageUrl: normalizedGrindReferenceImageUrl.length > 0 ? normalizedGrindReferenceImageUrl : null,
+			grindReferenceImageAlt:
+				normalizedGrindReferenceImageUrl.length > 0 && normalizedGrindReferenceImageAlt.length > 0
+					? normalizedGrindReferenceImageAlt
+					: null,
+			recommendedMethods,
 			tags,
 			status: String(formData.get("status") ?? "draft"),
 		};
@@ -263,6 +382,76 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 					<div>
 						<Label htmlFor="brewerName">{locale === "id" ? "Nama Brewer" : "Brewer Name"}</Label>
 						<Input id="brewerName" name="brewerName" defaultValue={defaults.brewerName} required />
+					</div>
+				</div>
+
+				<div className="grid gap-4 md:grid-cols-2">
+					<div>
+						<Label htmlFor="beanProcess">{locale === "id" ? "Proses Bean (Opsional)" : "Bean Process (Optional)"}</Label>
+						<Input
+							id="beanProcess"
+							name="beanProcess"
+							value={beanProcess}
+							onChange={(event) => setBeanProcess(event.currentTarget.value)}
+							placeholder={locale === "id" ? "washed, natural, honey, anaerobic..." : "washed, natural, honey, anaerobic..."}
+							maxLength={120}
+						/>
+					</div>
+					<div className="space-y-2">
+						<Label>{locale === "id" ? "Rekomendasi Metode" : "Method Recommendations"}</Label>
+						<div className="grid gap-2">
+							<div className="inline-flex items-center gap-2 text-sm">
+								<Checkbox
+									id="recommended-espresso"
+									checked={recommendedMethods.includes("espresso")}
+									onChange={(event) => {
+										setRecommendedMethods((current) => {
+											if (event.currentTarget.checked) {
+												return Array.from(new Set([...current, "espresso"]));
+											}
+											return current.filter((value) => value !== "espresso");
+										});
+									}}
+								/>
+								<Label htmlFor="recommended-espresso" className="font-medium">
+									{locale === "id" ? "Cocok untuk Espresso" : "Best for Espresso"}
+								</Label>
+							</div>
+							<div className="inline-flex items-center gap-2 text-sm">
+								<Checkbox
+									id="recommended-cold-brew"
+									checked={recommendedMethods.includes("cold_brew")}
+									onChange={(event) => {
+										setRecommendedMethods((current) => {
+											if (event.currentTarget.checked) {
+												return Array.from(new Set([...current, "cold_brew"]));
+											}
+											return current.filter((value) => value !== "cold_brew");
+										});
+									}}
+								/>
+								<Label htmlFor="recommended-cold-brew" className="font-medium">
+									{locale === "id" ? "Bagus untuk Cold Brew" : "Great for Cold Brew"}
+								</Label>
+							</div>
+							<div className="inline-flex items-center gap-2 text-sm">
+								<Checkbox
+									id="recommended-pour-over"
+									checked={recommendedMethods.includes("pour_over")}
+									onChange={(event) => {
+										setRecommendedMethods((current) => {
+											if (event.currentTarget.checked) {
+												return Array.from(new Set([...current, "pour_over"]));
+											}
+											return current.filter((value) => value !== "pour_over");
+										});
+									}}
+								/>
+								<Label htmlFor="recommended-pour-over" className="font-medium">
+									{locale === "id" ? "Optimal untuk Pour-Over" : "Optimized for Pour-Over"}
+								</Label>
+							</div>
+						</div>
 					</div>
 				</div>
 
@@ -451,6 +640,131 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 					</div>
 
 					{imageError ? <p className="text-sm text-(--danger)">{imageError}</p> : null}
+				</section>
+
+				<section className="space-y-3 rounded-2xl border bg-(--surface) p-4">
+					<div className="flex flex-wrap items-center justify-between gap-3">
+						<div>
+							<h3 className="font-heading text-xl text-(--espresso)">
+								{locale === "id" ? "Referensi Ukuran Giling" : "Grind Reference"}
+							</h3>
+							<p className="text-xs text-(--muted)">
+								{locale === "id"
+									? "Foto referensi ukuran giling ideal untuk mencapai profil rasa terbaik."
+									: "Macro-photo reference of ideal grind size for best flavor profile."}
+							</p>
+						</div>
+						<div className="inline-flex rounded-lg border bg-(--surface-elevated) p-1">
+							<button
+								type="button"
+								onClick={() => setGrindReferenceImageMode("upload")}
+								className={cn(
+									"rounded-md px-3 py-1.5 text-sm font-semibold",
+									grindReferenceImageMode === "upload" ? "bg-(--espresso) text-(--surface-elevated)" : "text-(--muted)",
+								)}
+							>
+								{locale === "id" ? "Upload" : "Upload"}
+							</button>
+							<button
+								type="button"
+								onClick={() => setGrindReferenceImageMode("url")}
+								className={cn(
+									"rounded-md px-3 py-1.5 text-sm font-semibold",
+									grindReferenceImageMode === "url" ? "bg-(--espresso) text-(--surface-elevated)" : "text-(--muted)",
+								)}
+							>
+								URL
+							</button>
+						</div>
+					</div>
+
+					{grindReferenceImageMode === "upload" ? (
+						<div className="space-y-2">
+							<label className="inline-flex cursor-pointer items-center rounded-full border px-4 py-2 text-sm font-semibold hover:bg-(--sand)/15">
+								<input
+									type="file"
+									accept="image/jpeg,image/png,image/webp"
+									onChange={onUploadGrindReferenceImage}
+									disabled={isUploadingGrindReferenceImage || isSubmitting || isDeleting}
+									className="hidden"
+								/>
+								{isUploadingGrindReferenceImage
+									? locale === "id"
+										? "Mengunggah..."
+										: "Uploading..."
+									: locale === "id"
+										? "Unggah Referensi Giling"
+										: "Upload Grind Reference"}
+							</label>
+							<p className="text-xs text-(--muted)">
+								{locale === "id" ? "Format JPG/PNG/WEBP, maks 5MB." : "JPG/PNG/WEBP up to 5MB."}
+							</p>
+						</div>
+					) : (
+						<div className="space-y-2">
+							<Label htmlFor="grindReferenceImageUrl">
+								{locale === "id" ? "URL Referensi Giling" : "Grind Reference URL"}
+							</Label>
+							<Input
+								id="grindReferenceImageUrl"
+								value={grindReferenceImageUrlInput}
+								onChange={(event) => setGrindReferenceImageUrlInput(event.currentTarget.value)}
+								placeholder={DEFAULT_BREW_IMAGE_URL}
+							/>
+						</div>
+					)}
+
+					<div className="space-y-2">
+						<Label htmlFor="grindReferenceImageAlt">
+							{locale === "id" ? "Alt Referensi Giling (Opsional)" : "Grind Reference Alt (Optional)"}
+						</Label>
+						<Input
+							id="grindReferenceImageAlt"
+							value={grindReferenceImageAlt}
+							onChange={(event) => setGrindReferenceImageAlt(event.currentTarget.value)}
+							disabled={!hasCustomGrindReferenceImage}
+							placeholder={locale === "id" ? "Contoh: ukuran medium-fine untuk V60." : "Example: medium-fine target for V60."}
+						/>
+					</div>
+
+					<div className="space-y-2">
+						<div className="relative aspect-[16/9] overflow-hidden rounded-2xl border bg-(--surface-elevated)">
+							<Image
+								src={grindReferenceImagePreviewUrl}
+								alt={grindReferenceImageAlt || defaults.name || "Grind reference image"}
+								fill
+								sizes="(max-width: 768px) 100vw, 800px"
+								className="object-cover"
+							/>
+						</div>
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							<p className="text-xs text-(--muted)">
+								{hasCustomGrindReferenceImage
+									? locale === "id"
+										? "Pratinjau gambar referensi giling."
+										: "Grind reference preview."
+									: locale === "id"
+										? "Belum ada referensi khusus, memakai fallback Unsplash."
+										: "No custom grind reference yet, using Unsplash fallback."}
+							</p>
+							{hasCustomGrindReferenceImage ? (
+								<Button
+									type="button"
+									size="sm"
+									variant="ghost"
+									onClick={() =>
+										grindReferenceImageMode === "upload"
+											? setUploadedGrindReferenceImageUrl("")
+											: setGrindReferenceImageUrlInput("")
+									}
+								>
+									{locale === "id" ? "Hapus Referensi" : "Clear Reference"}
+								</Button>
+							) : null}
+						</div>
+					</div>
+
+					{grindReferenceImageError ? <p className="text-sm text-(--danger)">{grindReferenceImageError}</p> : null}
 				</section>
 
 				<div className="grid gap-2">

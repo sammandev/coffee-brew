@@ -27,13 +27,16 @@ export default async function MePage() {
 					<Badge>{t("nav.dashboard")}</Badge>
 					<h1 className="mt-2 font-heading text-4xl text-[var(--espresso)]">{t("dashboard.title")}</h1>
 				</div>
-				<div className="flex gap-3">
-					<Link href="/me/profile" className="rounded-full border px-4 py-2 text-sm font-semibold">
+				<div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap sm:gap-3">
+					<Link href="/me/collections" className="rounded-full border px-4 py-2 text-center text-sm font-semibold">
+						{locale === "id" ? "Koleksi" : "Collections"}
+					</Link>
+					<Link href="/me/profile" className="rounded-full border px-4 py-2 text-center text-sm font-semibold">
 						{t("dashboard.profile")}
 					</Link>
 					<Link
 						href="/me/brews/new"
-						className="rounded-full bg-[var(--espresso)] px-4 py-2 text-sm font-semibold text-[var(--surface-elevated)]"
+						className="rounded-full bg-[var(--espresso)] px-4 py-2 text-center text-sm font-semibold text-[var(--surface-elevated)]"
 					>
 						{t("dashboard.newBrew")}
 					</Link>

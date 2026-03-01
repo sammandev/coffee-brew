@@ -30,6 +30,7 @@ function buildSections(locale: "en" | "id", role: Role): SidebarSection[] {
 		links: [
 			{ href: "/dashboard", label: locale === "id" ? "Ringkasan" : "Overview" },
 			{ href: "/dashboard/brews", label: locale === "id" ? "Brew" : "Brews" },
+			{ href: "/dashboard/collections", label: locale === "id" ? "Koleksi" : "Collections" },
 			{ href: "/dashboard/landing", label: "Landing" },
 			{ href: "/dashboard/faq", label: "FAQ" },
 			{ href: "/dashboard/blog", label: "Blog" },

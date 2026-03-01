@@ -1,9 +1,11 @@
 import { requireRole } from "@/components/auth-guard";
+import { SuperuserUserCreateModal } from "@/components/forms/superuser-user-create-modal";
+import { UserRoleControls } from "@/components/forms/user-role-controls";
 import { UserStatusControls } from "@/components/forms/user-status-controls";
 import { Card } from "@/components/ui/card";
 import { getServerI18n } from "@/lib/i18n/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import type { UserStatus } from "@/lib/types";
+import type { Role, UserStatus } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
 function resolveUserStatus(status: unknown): UserStatus {
@@ -14,7 +16,7 @@ function resolveUserStatus(status: unknown): UserStatus {
 }
 
 export default async function DashboardUsersPage() {
-	await requireRole({ minRole: "superuser", onUnauthorized: "forbidden" });
+	const session = await requireRole({ minRole: "superuser", onUnauthorized: "forbidden" });
 	const { locale } = await getServerI18n();
 	const supabase = createSupabaseAdminClient();
 
@@ -89,27 +91,42 @@ export default async function DashboardUsersPage() {
 
 	return (
 		<div className="space-y-6">
-			<h1 className="font-heading text-4xl text-[var(--espresso)]">
-				{locale === "id" ? "Manajemen Pengguna" : "User Management"}
-			</h1>
+			<div className="flex flex-wrap items-center justify-between gap-3">
+				<h1 className="font-heading text-4xl text-[var(--espresso)]">
+					{locale === "id" ? "Manajemen Pengguna" : "User Management"}
+				</h1>
+				<SuperuserUserCreateModal />
+			</div>
 			<div className="space-y-3">
-				{accountRows.map((user) => (
-					<Card key={user.id} className="flex flex-wrap items-center justify-between gap-4">
-						<div>
-							<div className="flex items-center gap-2">
-								<span className="rounded-full border bg-(--surface) px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-(--muted)">
-									{roleByUserId.get(user.id) ?? "user"}
-								</span>
-								<p className="font-semibold text-[var(--espresso)]">{user.display_name ?? user.email}</p>
+				{accountRows.map((user) => {
+					const currentRole = (roleByUserId.get(user.id) as Role | undefined) ?? "user";
+
+					return (
+						<Card key={user.id} className="flex flex-wrap items-center justify-between gap-4">
+							<div>
+								<div className="flex items-center gap-2">
+									<span className="rounded-full border bg-(--surface) px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-(--muted)">
+										{currentRole}
+									</span>
+									<p className="font-semibold text-[var(--espresso)]">{user.display_name ?? user.email}</p>
+								</div>
+								<p className="text-xs text-[var(--muted)]">{user.email}</p>
+								<p className="text-xs text-[var(--muted)]">
+									{locale === "id" ? "Bergabung" : "Joined"} {formatDate(user.created_at, locale)}
+								</p>
 							</div>
-							<p className="text-xs text-[var(--muted)]">{user.email}</p>
-							<p className="text-xs text-[var(--muted)]">
-								{locale === "id" ? "Bergabung" : "Joined"} {formatDate(user.created_at, locale)}
-							</p>
-						</div>
-						<UserStatusControls userId={user.id} status={user.status} isVerified={user.is_verified} />
-					</Card>
-				))}
+							<div className="space-y-2">
+								<UserRoleControls currentRole={currentRole} userId={user.id} />
+								<UserStatusControls userId={user.id} status={user.status} isVerified={user.is_verified} />
+								{user.id === session.userId ? (
+									<p className="text-[11px] text-(--muted)">
+										{locale === "id" ? "Akun Anda saat ini." : "This is your current account."}
+									</p>
+								) : null}
+							</div>
+						</Card>
+					);
+				})}
 			</div>
 		</div>
 	);

@@ -8,6 +8,7 @@ import { FormModal } from "@/components/ui/form-modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { normalizeCatalogSort } from "@/lib/brew-catalog";
 import { getMessage } from "@/lib/i18n/messages";
 
 interface CatalogSearchControlsProps {
@@ -52,7 +53,7 @@ export function CatalogSearchControls({
 	const [roastery, setRoastery] = useState(initialRoastery);
 	const [brewer, setBrewer] = useState(initialBrewer);
 	const [minRating, setMinRating] = useState(initialMinRating);
-	const [sort, setSort] = useState(initialSort);
+	const [sort, setSort] = useState(normalizeCatalogSort(initialSort));
 
 	const labels = useMemo(
 		() => ({
@@ -69,6 +70,7 @@ export function CatalogSearchControls({
 			minRating: getMessage(locale, "catalog.filter.minRating"),
 			sort: getMessage(locale, "catalog.filter.sort"),
 			sortLatest: getMessage(locale, "catalog.filter.sort.latest"),
+			sortSmart: getMessage(locale, "catalog.filter.sort.smart"),
 			sortHighestRated: getMessage(locale, "catalog.filter.sort.highestRated"),
 			sortMostReviewed: getMessage(locale, "catalog.filter.sort.mostReviewed"),
 			sortOldest: getMessage(locale, "catalog.filter.sort.oldest"),
@@ -116,7 +118,7 @@ export function CatalogSearchControls({
 		setRoastery("");
 		setBrewer("");
 		setMinRating("");
-		setSort("latest");
+		setSort("newest");
 		router.push("/catalog");
 		setAdvancedOpen(false);
 	}
@@ -246,10 +248,15 @@ export function CatalogSearchControls({
 					</div>
 					<div>
 						<Label htmlFor="catalog-advanced-sort">{labels.sort}</Label>
-						<Select id="catalog-advanced-sort" value={sort} onChange={(event) => setSort(event.currentTarget.value)}>
-							<option value="latest">{labels.sortLatest}</option>
-							<option value="highest_rated">{labels.sortHighestRated}</option>
-							<option value="most_reviewed">{labels.sortMostReviewed}</option>
+						<Select
+							id="catalog-advanced-sort"
+							value={sort}
+							onChange={(event) => setSort(normalizeCatalogSort(event.currentTarget.value))}
+						>
+							<option value="newest">{labels.sortLatest}</option>
+							<option value="smart">{labels.sortSmart}</option>
+							<option value="highest_stars">{labels.sortHighestRated}</option>
+							<option value="most_reviews">{labels.sortMostReviewed}</option>
 							<option value="oldest">{labels.sortOldest}</option>
 						</Select>
 					</div>
