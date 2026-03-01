@@ -1,8 +1,8 @@
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BrewReviewsLiveRefresh } from "@/components/brew/brew-reviews-live-refresh";
-import { FlavorRadarChart } from "@/components/brew/flavor-radar-chart";
 import { MethodRecommendationChips } from "@/components/brew/method-recommendation-chips";
 import { WishlistToggleButton } from "@/components/brew/wishlist-toggle-button";
 import { ReviewForm } from "@/components/forms/review-form";
@@ -20,6 +20,10 @@ import { clampPlainText } from "@/lib/rich-text";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { buildHighestBadgeMap, resolveUserDisplayName } from "@/lib/user-identity";
 import { formatDate } from "@/lib/utils";
+
+const FlavorRadarChart = dynamic(() =>
+	import("@/components/brew/flavor-radar-chart").then((mod) => mod.FlavorRadarChart),
+);
 
 export default async function BrewDetailPage({ params }: { params: Promise<{ id: string }> }) {
 	const [{ id }, { locale }] = await Promise.all([params, getServerI18n()]);

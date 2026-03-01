@@ -1,7 +1,10 @@
+import { createClient } from "@supabase/supabase-js";
 import { apiError, apiOk } from "@/lib/api";
 import { normalizeCatalogSort, sortCatalogRows } from "@/lib/brew-catalog";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { clientEnv } from "@/lib/config/client";
 import { isMissingColumnError } from "@/lib/supabase-errors";
+
+export const runtime = "edge";
 
 const BREW_OPTIONAL_COLUMNS = [
 	"image_url",
@@ -28,7 +31,13 @@ export async function GET(request: Request) {
 	const minRating = Number.isFinite(Number(minRatingRaw)) ? Math.max(0, Math.min(5, Number(minRatingRaw))) : 0;
 	const sort = normalizeCatalogSort(url.searchParams.get("sort"));
 
-	const supabase = await createSupabaseServerClient();
+	const supabase = createClient(clientEnv.NEXT_PUBLIC_SUPABASE_URL, clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+		auth: {
+			autoRefreshToken: false,
+			detectSessionInUrl: false,
+			persistSession: false,
+		},
+	});
 	const primary = await supabase
 		.from("brews")
 		.select(

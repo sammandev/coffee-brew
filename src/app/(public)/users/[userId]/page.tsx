@@ -1,4 +1,5 @@
 import { CalendarDays, Lock } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PrivateProfileLockCard } from "@/components/profile/private-profile-lock-card";
@@ -537,8 +538,13 @@ export default async function PublicProfilePage({ params, searchParams }: Public
 						<div className="relative inline-flex h-14 w-14 shrink-0 items-center justify-center overflow-visible">
 							<div className="inline-flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border bg-(--sand)/20 text-lg font-semibold text-(--espresso)">
 								{targetProfile.avatar_url ? (
-									// biome-ignore lint/performance/noImgElement: avatar source can be external Supabase or URL
-									<img src={targetProfile.avatar_url} alt={displayName} className="h-full w-full object-cover" />
+									<Image
+										src={targetProfile.avatar_url}
+										alt={displayName}
+										width={56}
+										height={56}
+										className="h-full w-full object-cover"
+									/>
 								) : (
 									initial
 								)}

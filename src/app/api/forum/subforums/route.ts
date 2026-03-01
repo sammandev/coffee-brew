@@ -1,8 +1,17 @@
+import { createClient } from "@supabase/supabase-js";
 import { apiError, apiOk } from "@/lib/api";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { clientEnv } from "@/lib/config/client";
+
+export const runtime = "edge";
 
 export async function GET(request: Request) {
-	const supabase = await createSupabaseServerClient();
+	const supabase = createClient(clientEnv.NEXT_PUBLIC_SUPABASE_URL, clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+		auth: {
+			autoRefreshToken: false,
+			detectSessionInUrl: false,
+			persistSession: false,
+		},
+	});
 	const url = new URL(request.url);
 	const category = url.searchParams.get("category")?.trim();
 

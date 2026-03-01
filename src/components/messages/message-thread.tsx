@@ -2,6 +2,7 @@
 
 import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { EllipsisVertical, Flag, Loader2, Pencil, Send, Trash2 } from "lucide-react";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FormModal } from "@/components/ui/form-modal";
@@ -166,8 +167,13 @@ export function ThreadHeader({
 				) : null}
 				<span className="inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-(--sand)/20 text-sm font-semibold text-(--espresso)">
 					{counterpartAvatarUrl ? (
-						// biome-ignore lint/performance/noImgElement: avatar URL may be remote Supabase storage path
-						<img src={counterpartAvatarUrl} alt={counterpartName} className="h-full w-full object-cover" />
+						<Image
+							src={counterpartAvatarUrl}
+							alt={counterpartName}
+							width={40}
+							height={40}
+							className="h-full w-full object-cover"
+						/>
 					) : (
 						toInitial(counterpartName)
 					)}
@@ -287,10 +293,15 @@ export function ThreadTimeline({
 														href={attachment.public_url}
 														target="_blank"
 														rel="noopener noreferrer"
-														className="overflow-hidden rounded-lg border"
+														className="relative block h-28 w-full overflow-hidden rounded-lg border"
 													>
-														{/* biome-ignore lint/performance/noImgElement: attachment URLs are remote/public */}
-														<img src={attachment.public_url} alt="message attachment" className="h-28 w-full object-cover" />
+														<Image
+															src={attachment.public_url}
+															alt="message attachment"
+															fill
+															sizes="(max-width: 640px) 100vw, 50vw"
+															className="object-cover"
+														/>
 													</a>
 												))}
 											</div>

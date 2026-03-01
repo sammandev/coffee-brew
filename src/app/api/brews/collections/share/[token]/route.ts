@@ -1,6 +1,8 @@
 import { apiError, apiOk } from "@/lib/api";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
+export const runtime = "edge";
+
 interface SharedBrewRow {
 	id: string;
 	name: string;

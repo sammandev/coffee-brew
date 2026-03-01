@@ -13,6 +13,8 @@ It combines:
 - [Core Features](#core-features)
 - [Tech Stack](#tech-stack)
 - [Architecture Overview](#architecture-overview)
+- [Project Structure](#project-structure)
+- [Architecture Flow](#architecture-flow)
 - [Role Model](#role-model)
 - [Prerequisites](#prerequisites)
 - [Environment Variables](#environment-variables)
@@ -90,6 +92,67 @@ Important route groups:
 - `src/app/(me)/*` user dashboard
 - `src/app/(dashboard)/*` admin/superuser dashboard
 - `src/app/(messages)/*` dedicated full-height messages shell (header only, no public footer)
+
+## Project Structure
+
+High-level repository map:
+
+```text
+.
+|- .github/
+|  |- workflows/
+|  |  |- ci.yml
+|  |  |- cd-vercel.yml
+|  |  |- preview-vercel.yml
+|  |  |- playwright.yml
+|- e2e/
+|- scripts/
+|- src/
+|  |- app/
+|  |  |- (public)/
+|  |  |- (auth)/
+|  |  |- (me)/
+|  |  |- (dashboard)/
+|  |  |- (messages)/
+|  |  |- api/
+|  |- components/
+|  |- lib/
+|- supabase/
+|  |- migrations/
+|  |- seed/
+|- tests/
+|  |- unit/
+|  |- integration/
+```
+
+Detailed responsibilities:
+
+- `src/app/*`: App Router routes, nested layouts, error boundaries, route handlers.
+- `src/app/api/*`: server-side HTTP interfaces for UI actions and admin operations.
+- `src/components/*`: reusable UI and feature components (blog, forum, messages, profile, dashboard).
+- `src/lib/*`: domain/business logic, validation, permissions, Supabase clients, queries, helpers.
+- `supabase/migrations/*`: schema, RLS policies, SQL functions, triggers, publication setup.
+- `scripts/*`: migration/status helpers and user bootstrap tools.
+- `tests/*`: unit and integration test suites.
+- `e2e/*`: Playwright browser scenarios.
+
+## Architecture Flow
+
+Request and data flow in production:
+
+1. Browser hits Next.js route in `src/app/*`.
+2. `src/proxy.ts` enforces edge rules (rate limits, maintenance mode, auth cookie short-circuit).
+3. Route or server action uses domain logic from `src/lib/*`.
+4. Supabase handles Auth, Postgres data access (with RLS), Realtime, and Storage.
+5. API routes under `src/app/api/*` return shaped responses for interactive UI features.
+6. Client components subscribe to realtime events (forum/messages/notifications) and patch UI state.
+
+Architecture layers:
+
+- Presentation layer: `src/app`, `src/components`
+- Application/domain layer: `src/lib` services and guards
+- Data layer: Supabase Postgres + Storage + Realtime
+- Platform layer: Vercel runtime + GitHub Actions CI/CD
 
 ## Role Model
 
@@ -309,6 +372,13 @@ For manual browser validation, include:
 Deployment guide:
 
 - [Vercel + Supabase Runbook](development-docs/deploy-vercel-supabase.md)
+
+CI/CD workflows:
+
+- `.github/workflows/ci.yml` required quality gates on PR and `main`
+- `.github/workflows/preview-vercel.yml` PR preview deploy + PR comment URL
+- `.github/workflows/cd-vercel.yml` production deployment from `main`
+- `.github/workflows/playwright.yml` scheduled/manual smoke E2E checks
 
 ## Troubleshooting
 

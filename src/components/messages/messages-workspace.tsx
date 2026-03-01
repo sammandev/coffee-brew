@@ -2,6 +2,7 @@
 
 import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { Archive, ArchiveRestore, Loader2, MessageCircle, Search } from "lucide-react";
+import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageThread } from "@/components/messages/message-thread";
@@ -537,10 +538,11 @@ export function MessagesWorkspace({
 										>
 											<span className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-(--sand)/20 text-sm font-semibold text-(--espresso)">
 												{conversation.counterpart?.avatar_url ? (
-													// biome-ignore lint/performance/noImgElement: avatar can come from Supabase public URL
-													<img
+													<Image
 														src={conversation.counterpart.avatar_url}
 														alt={counterpartName}
+														width={40}
+														height={40}
 														className="h-full w-full object-cover"
 													/>
 												) : (

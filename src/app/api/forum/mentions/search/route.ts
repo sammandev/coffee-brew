@@ -1,6 +1,9 @@
+import { createClient } from "@supabase/supabase-js";
 import { apiError, apiOk } from "@/lib/api";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { clientEnv } from "@/lib/config/client";
 import { forumMentionSearchSchema } from "@/lib/validators";
+
+export const runtime = "edge";
 
 function escapeLikePattern(value: string) {
 	return value.replace(/[%_\\]/g, "\\$&");
@@ -17,7 +20,13 @@ export async function GET(request: Request) {
 	}
 
 	const q = escapeLikePattern(parsed.data.q.trim().toLowerCase());
-	const supabase = await createSupabaseServerClient();
+	const supabase = createClient(clientEnv.NEXT_PUBLIC_SUPABASE_URL, clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+		auth: {
+			autoRefreshToken: false,
+			detectSessionInUrl: false,
+			persistSession: false,
+		},
+	});
 	const { data, error } = await supabase
 		.from("profiles")
 		.select("id, mention_handle, display_name, email, is_profile_private")

@@ -3,6 +3,8 @@ import { getNewsletterProvider } from "@/lib/newsletter";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { newsletterUnsubscribeSchema } from "@/lib/validators";
 
+export const runtime = "edge";
+
 export async function POST(request: Request) {
 	const body = await request.json().catch(() => null);
 	const parsed = newsletterUnsubscribeSchema.safeParse(body);

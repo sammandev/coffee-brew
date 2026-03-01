@@ -2,6 +2,8 @@ import { apiError, apiOk } from "@/lib/api";
 import { getSessionContext } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+export const runtime = "edge";
+
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
 	const { id } = await params;
 	const session = await getSessionContext();

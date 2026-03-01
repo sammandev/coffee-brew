@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { AUTH_CALLBACK_NONCE_COOKIE, isAllowedOtpType, normalizeAuthCallbackNextPath } from "@/lib/auth-callback";
 import { clientEnv } from "@/lib/config/client";
 
+export const runtime = "edge";
+
 export async function GET(request: Request) {
 	const { searchParams, origin } = new URL(request.url);
 	const code = searchParams.get("code");

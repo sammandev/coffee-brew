@@ -1,0 +1,106 @@
+name: CD (Vercel)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-vercel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Vercel Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ github.ref == 'refs/heads/main' && secrets.VERCEL_TOKEN != '' && secrets.VERCEL_ORG_ID != '' && secrets.VERCEL_PROJECT_ID != '' }}
+
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Pull Vercel environment
+        run: pnpm dlx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build project artifacts
+        run: pnpm dlx vercel build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy prebuilt artifacts
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm dlx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN" 2>&1 | tee /tmp/vercel-deploy.log
+          PRODUCTION_URL=$(grep -Eo 'https://[a-zA-Z0-9.-]+\.vercel\.app' /tmp/vercel-deploy.log | tail -n 1)
+          if [ -z "$PRODUCTION_URL" ]; then
+            echo "Failed to parse Vercel production URL from deploy output"
+            exit 1
+          fi
+          echo "production_url=$PRODUCTION_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Post-deploy health check
+        id: health
+        shell: bash
+        run: |
+          set -euo pipefail
+          HEALTH_URL="${{ steps.deploy.outputs.production_url }}/api/health"
+
+          # Vercel can briefly return 404/5xx before all edges are warm.
+          for ATTEMPT in 1 2 3 4 5; do
+            if curl --connect-timeout 10 --max-time 20 -fsSL "$HEALTH_URL" >/tmp/health.json; then
+              break
+            fi
+
+            if [ "$ATTEMPT" -eq 5 ]; then
+              echo "Health check failed after ${ATTEMPT} attempts"
+              exit 1
+            fi
+
+            SLEEP_SECONDS=$((ATTEMPT * 4))
+            echo "Health check attempt ${ATTEMPT} failed, retrying in ${SLEEP_SECONDS}s..."
+            sleep "$SLEEP_SECONDS"
+          done
+
+          cat /tmp/health.json
+          HEALTH_OK=$(node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync('/tmp/health.json','utf8'));process.stdout.write(String(Boolean(d.ok)));")
+          echo "health_ok=$HEALTH_OK" >> "$GITHUB_OUTPUT"
+          {
+            echo "health_json<<EOF"
+            cat /tmp/health.json
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Deployment summary
+        shell: bash
+        run: |
+          {
+            echo "## Vercel Production Deployment"
+            echo ""
+            echo "- URL: ${{ steps.deploy.outputs.production_url }}"
+            echo "- Health OK: ${{ steps.health.outputs.health_ok }}"
+            echo "- Health payload: \`${{ steps.health.outputs.health_json }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
