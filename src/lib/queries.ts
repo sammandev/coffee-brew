@@ -96,25 +96,19 @@ export async function getPublishedBrews(limit = 24) {
 export async function getLandingStats() {
 	const supabase = await createSupabaseServerClient();
 
-	const [{ count: publishedBrews }, { count: forumThreads }, { count: reviewEntries }, { data: roasteryRows }] =
+	const [{ count: publishedBrews }, { count: forumThreads }, { count: reviewEntries }, { data: roasteryCount }] =
 		await Promise.all([
 			supabase.from("brews").select("*", { count: "exact", head: true }).eq("status", "published"),
 			supabase.from("forum_threads").select("*", { count: "exact", head: true }).eq("status", "visible"),
 			supabase.from("brew_reviews").select("*", { count: "exact", head: true }),
-			supabase.from("brews").select("brand_roastery").eq("status", "published").limit(2000),
+			supabase.rpc("count_distinct_roasteries"),
 		]);
-
-	const roasteries = new Set(
-		(roasteryRows ?? [])
-			.map((row) => row.brand_roastery)
-			.filter((value): value is string => typeof value === "string" && value.trim().length > 0),
-	);
 
 	return {
 		publishedBrews: publishedBrews ?? 0,
 		forumThreads: forumThreads ?? 0,
 		reviewEntries: reviewEntries ?? 0,
-		roasteries: roasteries.size,
+		roasteries: Number(roasteryCount) || 0,
 	};
 }
 

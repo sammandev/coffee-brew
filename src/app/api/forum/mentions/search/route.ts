@@ -2,6 +2,10 @@ import { apiError, apiOk } from "@/lib/api";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { forumMentionSearchSchema } from "@/lib/validators";
 
+function escapeLikePattern(value: string) {
+	return value.replace(/[%_\\]/g, "\\$&");
+}
+
 export async function GET(request: Request) {
 	const url = new URL(request.url);
 	const parsed = forumMentionSearchSchema.safeParse({
@@ -12,7 +16,7 @@ export async function GET(request: Request) {
 		return apiError("Invalid mention query", 400, parsed.error.message);
 	}
 
-	const q = parsed.data.q.trim().toLowerCase();
+	const q = escapeLikePattern(parsed.data.q.trim().toLowerCase());
 	const supabase = await createSupabaseServerClient();
 	const { data, error } = await supabase
 		.from("profiles")

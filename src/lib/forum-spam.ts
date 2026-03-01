@@ -17,6 +17,9 @@ export function isSuspiciousForumContent(content: string) {
 
 export async function verifyTurnstileToken(token: string | null | undefined, remoteIp?: string | null) {
 	if (!serverEnv.TURNSTILE_SECRET_KEY) {
+		if (process.env.NODE_ENV === "production") {
+			return { ok: false, skipped: false as const, error: "Turnstile is not configured." };
+		}
 		return { ok: true, skipped: true as const };
 	}
 

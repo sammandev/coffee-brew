@@ -14,6 +14,10 @@ function parseFirstParam(value: string | string[] | null) {
 	return value ?? "";
 }
 
+function escapeLikePattern(value: string) {
+	return value.replace(/[%_\\]/g, "\\$&");
+}
+
 export async function GET(request: Request) {
 	const supabase = await createSupabaseServerClient();
 	const url = new URL(request.url);
@@ -49,7 +53,7 @@ export async function GET(request: Request) {
 
 	let authorIds: string[] | null = null;
 	if (queryParams.author?.trim()) {
-		const search = queryParams.author.trim();
+		const search = escapeLikePattern(queryParams.author.trim());
 		const { data: profiles } = await supabase
 			.from("profiles")
 			.select("id")
@@ -79,7 +83,7 @@ export async function GET(request: Request) {
 	}
 
 	if (queryParams.q?.trim()) {
-		const q = queryParams.q.trim();
+		const q = escapeLikePattern(queryParams.q.trim());
 		query = query.or(`title.ilike.%${q}%,content.ilike.%${q}%`);
 	}
 

@@ -1,3 +1,4 @@
+import { AccountDisabledError, UnauthorizedError } from "@/lib/errors";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Role, UserStatus } from "@/lib/types";
 
@@ -46,10 +47,10 @@ export async function getSessionContext(): Promise<SessionContext | null> {
 export async function requireSessionContext() {
 	const context = await getSessionContext();
 	if (!context) {
-		throw new Error("UNAUTHORIZED");
+		throw new UnauthorizedError();
 	}
 	if (context.status !== "active") {
-		throw new Error("ACCOUNT_DISABLED");
+		throw new AccountDisabledError();
 	}
 	return context;
 }

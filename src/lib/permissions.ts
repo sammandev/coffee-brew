@@ -1,4 +1,5 @@
 import { DEFAULT_ROLE_PERMISSIONS } from "@/lib/constants";
+import { ForbiddenError } from "@/lib/errors";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { PermissionAction, ResourceKey, Role } from "@/lib/types";
 
@@ -54,7 +55,7 @@ export async function assertPermission(role: Role, resource: ResourceKey, action
 	const permissions = await getRolePermissions(role);
 	const allowed = hasPermission(role, resource, action, permissions);
 	if (!allowed) {
-		throw new Error("FORBIDDEN");
+		throw new ForbiddenError();
 	}
 	return true;
 }

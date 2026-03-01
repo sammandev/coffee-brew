@@ -6,6 +6,19 @@ const AVATAR_BUCKET = "avatars";
 const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+const MAGIC_BYTES: Record<string, number[][]> = {
+	"image/jpeg": [[0xff, 0xd8, 0xff]],
+	"image/png": [[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]],
+	"image/webp": [[0x52, 0x49, 0x46, 0x46]], // RIFF header; full check includes "WEBP" at offset 8
+};
+
+function matchesMagicBytes(buffer: ArrayBuffer, mimeType: string): boolean {
+	const signatures = MAGIC_BYTES[mimeType];
+	if (!signatures) return false;
+	const bytes = new Uint8Array(buffer);
+	return signatures.some((sig) => sig.every((byte, i) => bytes[i] === byte));
+}
+
 function extensionFromMimeType(mimeType: string) {
 	switch (mimeType) {
 		case "image/jpeg":
@@ -84,6 +97,11 @@ export async function POST(request: Request) {
 
 	if (file.size > MAX_AVATAR_SIZE_BYTES) {
 		return apiError("Avatar must be smaller than 2MB", 400);
+	}
+
+	const headerBytes = await file.slice(0, 16).arrayBuffer();
+	if (!matchesMagicBytes(headerBytes, file.type)) {
+		return apiError("File content does not match declared format", 400);
 	}
 
 	const extension = extensionFromMimeType(file.type);

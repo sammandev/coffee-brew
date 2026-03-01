@@ -1,6 +1,7 @@
 import { apiError, apiOk } from "@/lib/api";
 import { getSessionContext, requireSessionContext, type SessionContext } from "@/lib/auth";
 import { FORUM_REACTION_TYPES, type ForumReactionType } from "@/lib/constants";
+import { AccountDisabledError, UnauthorizedError } from "@/lib/errors";
 import { applyForumReputation } from "@/lib/forum-reputation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -91,10 +92,10 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ postKey
 	try {
 		session = await requireSessionContext();
 	} catch (error) {
-		if (error instanceof Error && error.message === "UNAUTHORIZED") {
+		if (error instanceof UnauthorizedError) {
 			return apiError("Unauthorized", 401);
 		}
-		if (error instanceof Error && error.message === "ACCOUNT_DISABLED") {
+		if (error instanceof AccountDisabledError) {
 			return apiError("Account blocked or disabled", 403);
 		}
 		return apiError("Unexpected auth error", 500);

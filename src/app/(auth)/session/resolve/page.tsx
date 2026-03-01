@@ -6,7 +6,9 @@ function resolveSafeNextPath(raw: string | string[] | undefined) {
 	const normalized = value.trim();
 	if (!normalized.startsWith("/")) return null;
 	if (normalized.startsWith("//")) return null;
+	if (normalized.startsWith("/\\")) return null;
 	if (normalized.startsWith("/session/resolve")) return null;
+	if (/^\/[^a-zA-Z0-9]/.test(normalized)) return null;
 	return normalized;
 }
 

@@ -1,6 +1,7 @@
 import { apiError, apiOk } from "@/lib/api";
 import { requireSessionContext, type SessionContext } from "@/lib/auth";
 import type { ForumReactionType } from "@/lib/constants";
+import { AccountDisabledError, UnauthorizedError } from "@/lib/errors";
 import { applyForumReputation } from "@/lib/forum-reputation";
 import { createNotifications } from "@/lib/notifications";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -16,10 +17,10 @@ export async function POST(request: Request) {
 	try {
 		session = await requireSessionContext();
 	} catch (error) {
-		if (error instanceof Error && error.message === "UNAUTHORIZED") {
+		if (error instanceof UnauthorizedError) {
 			return apiError("Unauthorized", 401);
 		}
-		if (error instanceof Error && error.message === "ACCOUNT_DISABLED") {
+		if (error instanceof AccountDisabledError) {
 			return apiError("Account blocked or disabled", 403);
 		}
 		return apiError("Unexpected auth error", 500);

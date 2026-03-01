@@ -156,64 +156,68 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 	const actorName = actorProfile?.display_name?.trim() || actorProfile?.email || "Someone";
 	const recipientIds = buildRecipientIds([thread.author_id ?? null, parentCommentAuthorId], permission.context.userId);
 
-	if (recipientIds.length > 0) {
-		const eventType = parentCommentId ? "reply" : "comment";
-		const title = parentCommentId ? `${actorName} replied to a discussion` : `${actorName} commented on your thread`;
-		const body = parentCommentId
-			? `A new reply was posted in "${thread.title}".`
-			: `A new comment was posted in "${thread.title}".`;
+	try {
+		if (recipientIds.length > 0) {
+			const eventType = parentCommentId ? "reply" : "comment";
+			const title = parentCommentId ? `${actorName} replied to a discussion` : `${actorName} commented on your thread`;
+			const body = parentCommentId
+				? `A new reply was posted in "${thread.title}".`
+				: `A new comment was posted in "${thread.title}".`;
 
-		await createNotifications(
-			recipientIds.map((recipientId) => ({
-				recipientId,
-				actorId: permission.context.userId,
-				eventType,
-				title,
-				body,
-				linkPath: `/forum/${id}#comment-${data.id}`,
-				metadata: {
-					thread_id: id,
-					comment_id: data.id,
-					parent_comment_id: parentCommentId,
-				},
-			})),
-		);
-	}
+			await createNotifications(
+				recipientIds.map((recipientId) => ({
+					recipientId,
+					actorId: permission.context.userId,
+					eventType,
+					title,
+					body,
+					linkPath: `/forum/${id}#comment-${data.id}`,
+					metadata: {
+						thread_id: id,
+						comment_id: data.id,
+						parent_comment_id: parentCommentId,
+					},
+				})),
+			);
+		}
 
-	await applyForumReputation({
-		userId: permission.context.userId,
-		actorId: permission.context.userId,
-		eventType: "comment_create",
-		sourceType: "comment",
-		sourceId: data.id as string,
-	});
+		await applyForumReputation({
+			userId: permission.context.userId,
+			actorId: permission.context.userId,
+			eventType: "comment_create",
+			sourceType: "comment",
+			sourceId: data.id as string,
+		});
 
-	await notifyMentions({
-		actorId: permission.context.userId,
-		actorName,
-		content: parsed.data.content,
-		title: `${actorName} mentioned you in a reply`,
-		linkPath: `/forum/${id}#comment-${data.id}`,
-		metadata: {
-			thread_id: id,
-			comment_id: data.id,
-			parent_comment_id: parentCommentId,
-		},
-	});
-
-	if (isSuspiciousForumContent(parsed.data.content)) {
-		await supabase.from("forum_reports").insert({
-			reporter_id: permission.context.userId,
-			target_type: parentCommentId ? "reply" : "comment",
-			target_id: data.id,
-			reason: "Automatic spam review",
-			detail: "System detected suspicious link pattern in comment content.",
-			status: "open",
+		await notifyMentions({
+			actorId: permission.context.userId,
+			actorName,
+			content: parsed.data.content,
+			title: `${actorName} mentioned you in a reply`,
+			linkPath: `/forum/${id}#comment-${data.id}`,
 			metadata: {
-				auto_flagged: true,
 				thread_id: id,
+				comment_id: data.id,
+				parent_comment_id: parentCommentId,
 			},
 		});
+
+		if (isSuspiciousForumContent(parsed.data.content)) {
+			await supabase.from("forum_reports").insert({
+				reporter_id: permission.context.userId,
+				target_type: parentCommentId ? "reply" : "comment",
+				target_id: data.id,
+				reason: "Automatic spam review",
+				detail: "System detected suspicious link pattern in comment content.",
+				status: "open",
+				metadata: {
+					auto_flagged: true,
+					thread_id: id,
+				},
+			});
+		}
+	} catch (sideEffectError) {
+		console.error("[forum:comments] post-creation side effect failed:", sideEffectError);
 	}
 
 	return apiOk({ comment: data }, 201);
