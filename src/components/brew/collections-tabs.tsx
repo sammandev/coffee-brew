@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MethodRecommendationChips } from "@/components/brew/method-recommendation-chips";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -44,9 +44,35 @@ interface CollectionsTabsProps {
 }
 
 type CollectionTab = "wishlist" | "history";
+const INITIAL_VISIBLE_CARDS = 12;
+const LOAD_MORE_STEP = 9;
 
 export function CollectionsTabs({ history, locale, onRemoveWishlist, wishlist }: CollectionsTabsProps) {
 	const [tab, setTab] = useState<CollectionTab>("wishlist");
+	const [visibleWishlist, setVisibleWishlist] = useState(() => Math.min(INITIAL_VISIBLE_CARDS, wishlist.length));
+	const [visibleHistory, setVisibleHistory] = useState(() => Math.min(INITIAL_VISIBLE_CARDS, history.length));
+
+	const visibleWishlistItems = useMemo(() => wishlist.slice(0, visibleWishlist), [wishlist, visibleWishlist]);
+	const visibleHistoryItems = useMemo(() => history.slice(0, visibleHistory), [history, visibleHistory]);
+	const canLoadMoreWishlist = visibleWishlist < wishlist.length;
+	const canLoadMoreHistory = visibleHistory < history.length;
+
+	const handleLoadMoreWishlist = () => {
+		setVisibleWishlist((current) => Math.min(current + LOAD_MORE_STEP, wishlist.length));
+	};
+
+	const handleLoadMoreHistory = () => {
+		setVisibleHistory((current) => Math.min(current + LOAD_MORE_STEP, history.length));
+	};
+
+	useEffect(() => {
+		setVisibleWishlist(Math.min(INITIAL_VISIBLE_CARDS, wishlist.length));
+	}, [wishlist.length]);
+
+	useEffect(() => {
+		setVisibleHistory(Math.min(INITIAL_VISIBLE_CARDS, history.length));
+	}, [history.length]);
+
 	const activeTitle = useMemo(
 		() =>
 			tab === "wishlist"
@@ -101,10 +127,74 @@ export function CollectionsTabs({ history, locale, onRemoveWishlist, wishlist }:
 						<CardDescription>{activeEmpty}</CardDescription>
 					</Card>
 				) : (
+					<div className="space-y-4">
+						<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+							{visibleWishlistItems.map((item) => (
+								<Card
+									key={`wishlist-${item.brew.id}`}
+									className="group flex flex-col overflow-hidden p-0 transition-shadow hover:shadow-md"
+								>
+									<div className="relative aspect-16/10 overflow-hidden">
+										<Image
+											src={resolveBrewImageUrl(item.brew.image_url)}
+											alt={item.brew.image_alt || item.brew.name}
+											fill
+											sizes="(max-width: 1280px) 100vw, 33vw"
+											className="object-cover transition-transform duration-300 group-hover:scale-105"
+										/>
+										<span className="absolute top-3 left-3 z-10 rounded-full bg-(--surface-elevated)/90 px-2.5 py-1 text-xs font-semibold text-(--espresso) shadow-sm backdrop-blur-sm">
+											{item.brew.brew_method}
+										</span>
+									</div>
+									<div className="flex flex-1 flex-col gap-2 p-4">
+										<Link href={`/brew/${item.brew.id}`} className="hover:underline">
+											<CardTitle className="line-clamp-2 text-base">{item.brew.name}</CardTitle>
+										</Link>
+										<MethodRecommendationChips locale={locale} methods={item.brew.recommended_methods ?? []} />
+										<p className="mt-auto text-xs text-(--muted)">
+											{locale === "id" ? "Disimpan" : "Saved"}: {formatDate(item.saved_at, locale)}
+										</p>
+										{onRemoveWishlist ? (
+											<Button
+												type="button"
+												size="sm"
+												variant="ghost"
+												className="w-full justify-center"
+												onClick={() => {
+													void onRemoveWishlist(item.brew.id);
+												}}
+											>
+												{locale === "id" ? "Hapus dari Wishlist" : "Remove from Wishlist"}
+											</Button>
+										) : null}
+									</div>
+								</Card>
+							))}
+						</div>
+						<div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-(--surface-elevated) p-4">
+							<p className="text-sm text-(--muted)">
+								{locale === "id"
+									? `Menampilkan ${visibleWishlistItems.length} dari ${wishlist.length} brew.`
+									: `Showing ${visibleWishlistItems.length} of ${wishlist.length} brews.`}
+							</p>
+							{canLoadMoreWishlist ? (
+								<Button type="button" variant="outline" onClick={handleLoadMoreWishlist}>
+									{locale === "id" ? "Muat lebih banyak" : "Load More"}
+								</Button>
+							) : null}
+						</div>
+					</div>
+				)
+			) : history.length === 0 ? (
+				<Card>
+					<CardDescription>{activeEmpty}</CardDescription>
+				</Card>
+			) : (
+				<div className="space-y-4">
 					<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-						{wishlist.map((item) => (
+						{visibleHistoryItems.map((item) => (
 							<Card
-								key={`wishlist-${item.brew.id}`}
+								key={`history-${item.brew.id}-${item.last_brewed_at}`}
 								className="group flex flex-col overflow-hidden p-0 transition-shadow hover:shadow-md"
 							>
 								<div className="relative aspect-16/10 overflow-hidden">
@@ -118,6 +208,9 @@ export function CollectionsTabs({ history, locale, onRemoveWishlist, wishlist }:
 									<span className="absolute top-3 left-3 z-10 rounded-full bg-(--surface-elevated)/90 px-2.5 py-1 text-xs font-semibold text-(--espresso) shadow-sm backdrop-blur-sm">
 										{item.brew.brew_method}
 									</span>
+									<span className="absolute top-3 right-3 z-10 inline-flex items-center gap-1 rounded-full bg-(--surface-elevated)/90 px-2 py-1 text-xs font-semibold text-(--accent) shadow-sm backdrop-blur-sm">
+										★ {item.my_overall.toFixed(1)}
+									</span>
 								</div>
 								<div className="flex flex-1 flex-col gap-2 p-4">
 									<Link href={`/brew/${item.brew.id}`} className="hover:underline">
@@ -125,63 +218,24 @@ export function CollectionsTabs({ history, locale, onRemoveWishlist, wishlist }:
 									</Link>
 									<MethodRecommendationChips locale={locale} methods={item.brew.recommended_methods ?? []} />
 									<p className="mt-auto text-xs text-(--muted)">
-										{locale === "id" ? "Disimpan" : "Saved"}: {formatDate(item.saved_at, locale)}
+										{locale === "id" ? "Terakhir diseduh" : "Last brewed"}: {formatDate(item.last_brewed_at, locale)}
 									</p>
-									{onRemoveWishlist ? (
-										<Button
-											type="button"
-											size="sm"
-											variant="ghost"
-											className="w-full justify-center"
-											onClick={() => {
-												void onRemoveWishlist(item.brew.id);
-											}}
-										>
-											{locale === "id" ? "Hapus dari Wishlist" : "Remove from Wishlist"}
-										</Button>
-									) : null}
 								</div>
 							</Card>
 						))}
 					</div>
-				)
-			) : history.length === 0 ? (
-				<Card>
-					<CardDescription>{activeEmpty}</CardDescription>
-				</Card>
-			) : (
-				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-					{history.map((item) => (
-						<Card
-							key={`history-${item.brew.id}-${item.last_brewed_at}`}
-							className="group flex flex-col overflow-hidden p-0 transition-shadow hover:shadow-md"
-						>
-							<div className="relative aspect-16/10 overflow-hidden">
-								<Image
-									src={resolveBrewImageUrl(item.brew.image_url)}
-									alt={item.brew.image_alt || item.brew.name}
-									fill
-									sizes="(max-width: 1280px) 100vw, 33vw"
-									className="object-cover transition-transform duration-300 group-hover:scale-105"
-								/>
-								<span className="absolute top-3 left-3 z-10 rounded-full bg-(--surface-elevated)/90 px-2.5 py-1 text-xs font-semibold text-(--espresso) shadow-sm backdrop-blur-sm">
-									{item.brew.brew_method}
-								</span>
-								<span className="absolute top-3 right-3 z-10 inline-flex items-center gap-1 rounded-full bg-(--surface-elevated)/90 px-2 py-1 text-xs font-semibold text-(--accent) shadow-sm backdrop-blur-sm">
-									★ {item.my_overall.toFixed(1)}
-								</span>
-							</div>
-							<div className="flex flex-1 flex-col gap-2 p-4">
-								<Link href={`/brew/${item.brew.id}`} className="hover:underline">
-									<CardTitle className="line-clamp-2 text-base">{item.brew.name}</CardTitle>
-								</Link>
-								<MethodRecommendationChips locale={locale} methods={item.brew.recommended_methods ?? []} />
-								<p className="mt-auto text-xs text-(--muted)">
-									{locale === "id" ? "Terakhir diseduh" : "Last brewed"}: {formatDate(item.last_brewed_at, locale)}
-								</p>
-							</div>
-						</Card>
-					))}
+					<div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-(--surface-elevated) p-4">
+						<p className="text-sm text-(--muted)">
+							{locale === "id"
+								? `Menampilkan ${visibleHistoryItems.length} dari ${history.length} brew.`
+								: `Showing ${visibleHistoryItems.length} of ${history.length} brews.`}
+						</p>
+						{canLoadMoreHistory ? (
+							<Button type="button" variant="outline" onClick={handleLoadMoreHistory}>
+								{locale === "id" ? "Muat lebih banyak" : "Load More"}
+							</Button>
+						) : null}
+					</div>
 				</div>
 			)}
 		</div>

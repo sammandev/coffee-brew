@@ -1,9 +1,10 @@
 "use client";
 
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { cn } from "@/lib/utils";
 
@@ -19,70 +20,66 @@ interface UnreadCountResponse {
 export function NavbarMessages({ userId, mobile = false }: NavbarMessagesProps) {
 	const pathname = usePathname();
 	const [unreadCount, setUnreadCount] = useState(0);
+	const unreadChannelRef = useRef<RealtimeChannel | null>(null);
+	const unreadSubscriptionGenerationRef = useRef(0);
+
+	const loadUnreadCount = useCallback(async () => {
+		const response = await fetch("/api/messages/unread-count", { method: "GET" }).catch(() => null);
+		if (!response?.ok) return;
+		const body = (await response.json().catch(() => ({}))) as UnreadCountResponse;
+		setUnreadCount(typeof body.unread_count === "number" ? body.unread_count : 0);
+	}, []);
 
 	useEffect(() => {
 		let active = true;
-		async function loadUnreadCount() {
+		async function loadInitialUnreadCount() {
 			const response = await fetch("/api/messages/unread-count", { method: "GET" }).catch(() => null);
 			if (!active || !response?.ok) return;
 			const body = (await response.json().catch(() => ({}))) as UnreadCountResponse;
 			setUnreadCount(typeof body.unread_count === "number" ? body.unread_count : 0);
 		}
-		void loadUnreadCount();
+		void loadInitialUnreadCount();
 		return () => {
 			active = false;
 		};
 	}, []);
 
 	useEffect(() => {
+		unreadSubscriptionGenerationRef.current += 1;
+		const generation = unreadSubscriptionGenerationRef.current;
 		const supabase = createSupabaseBrowserClient();
+		if (unreadChannelRef.current) {
+			void supabase.removeChannel(unreadChannelRef.current);
+			unreadChannelRef.current = null;
+		}
 		const channel = supabase
 			.channel(`dm-unread:${userId}`)
 			.on("postgres_changes", { event: "*", schema: "public", table: "dm_messages" }, () => {
-				void fetch("/api/messages/unread-count", { method: "GET" })
-					.then(async (response) => {
-						if (!response.ok) return null;
-						return (await response.json().catch(() => ({}))) as UnreadCountResponse;
-					})
-					.then((body) => {
-						if (!body) return;
-						setUnreadCount(typeof body.unread_count === "number" ? body.unread_count : 0);
-					});
+				if (generation !== unreadSubscriptionGenerationRef.current) return;
+				void loadUnreadCount();
 			})
 			.on(
 				"postgres_changes",
 				{ event: "*", schema: "public", table: "dm_participants", filter: `user_id=eq.${userId}` },
 				() => {
-					void fetch("/api/messages/unread-count", { method: "GET" })
-						.then(async (response) => {
-							if (!response.ok) return null;
-							return (await response.json().catch(() => ({}))) as UnreadCountResponse;
-						})
-						.then((body) => {
-							if (!body) return;
-							setUnreadCount(typeof body.unread_count === "number" ? body.unread_count : 0);
-						});
+					if (generation !== unreadSubscriptionGenerationRef.current) return;
+					void loadUnreadCount();
 				},
 			)
 			.subscribe();
+		unreadChannelRef.current = channel;
 
 		return () => {
+			unreadSubscriptionGenerationRef.current += 1;
+			unreadChannelRef.current = null;
 			void supabase.removeChannel(channel);
 		};
-	}, [userId]);
+	}, [loadUnreadCount, userId]);
 
 	useEffect(() => {
 		if (!pathname.startsWith("/messages")) return;
-		void fetch("/api/messages/unread-count", { method: "GET" })
-			.then(async (response) => {
-				if (!response.ok) return null;
-				return (await response.json().catch(() => ({}))) as UnreadCountResponse;
-			})
-			.then((body) => {
-				if (!body) return;
-				setUnreadCount(typeof body.unread_count === "number" ? body.unread_count : 0);
-			});
-	}, [pathname]);
+		void loadUnreadCount();
+	}, [loadUnreadCount, pathname]);
 
 	return (
 		<Link

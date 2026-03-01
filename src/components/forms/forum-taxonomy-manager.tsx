@@ -26,19 +26,27 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 	const { locale } = useAppPreferences();
 	const [categoryNameEn, setCategoryNameEn] = useState("");
 	const [categoryNameId, setCategoryNameId] = useState("");
+	const [categoryDescriptionEn, setCategoryDescriptionEn] = useState("");
+	const [categoryDescriptionId, setCategoryDescriptionId] = useState("");
 	const [subforumCategoryId, setSubforumCategoryId] = useState(categories[0]?.id ?? "");
 	const [subforumNameEn, setSubforumNameEn] = useState("");
 	const [subforumNameId, setSubforumNameId] = useState("");
+	const [subforumDescriptionEn, setSubforumDescriptionEn] = useState("");
+	const [subforumDescriptionId, setSubforumDescriptionId] = useState("");
 	const [busy, setBusy] = useState<null | string>(null);
 	const [error, setError] = useState<string | null>(null);
 
 	const [editingCategory, setEditingCategory] = useState<string | null>(null);
 	const [editCatNameEn, setEditCatNameEn] = useState("");
 	const [editCatNameId, setEditCatNameId] = useState("");
+	const [editCatDescriptionEn, setEditCatDescriptionEn] = useState("");
+	const [editCatDescriptionId, setEditCatDescriptionId] = useState("");
 
 	const [editingSubforum, setEditingSubforum] = useState<string | null>(null);
 	const [editSubNameEn, setEditSubNameEn] = useState("");
 	const [editSubNameId, setEditSubNameId] = useState("");
+	const [editSubDescriptionEn, setEditSubDescriptionEn] = useState("");
+	const [editSubDescriptionId, setEditSubDescriptionId] = useState("");
 
 	const categoryMap = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
 
@@ -49,8 +57,8 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 			slug: slugify(categoryNameEn),
 			name_en: categoryNameEn,
 			name_id: categoryNameId || categoryNameEn,
-			description_en: null,
-			description_id: null,
+			description_en: categoryDescriptionEn.trim() || null,
+			description_id: categoryDescriptionId.trim() || null,
 			order_index: categories.length,
 			is_visible: true,
 		};
@@ -76,8 +84,8 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 			slug: slugify(subforumNameEn),
 			name_en: subforumNameEn,
 			name_id: subforumNameId || subforumNameEn,
-			description_en: null,
-			description_id: null,
+			description_en: subforumDescriptionEn.trim() || null,
+			description_id: subforumDescriptionId.trim() || null,
 			order_index: subforums.filter((subforum) => subforum.category_id === subforumCategoryId).length,
 			is_visible: true,
 		};
@@ -132,8 +140,8 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 				slug: slugify(editCatNameEn || category.name_en),
 				name_en: editCatNameEn || category.name_en,
 				name_id: editCatNameId || category.name_id,
-				description_en: category.description_en,
-				description_id: category.description_id,
+				description_en: editCatDescriptionEn.trim() || null,
+				description_id: editCatDescriptionId.trim() || null,
 				order_index: category.order_index,
 				is_visible: category.is_visible,
 			}),
@@ -202,8 +210,8 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 				slug: slugify(editSubNameEn || subforum.name_en),
 				name_en: editSubNameEn || subforum.name_en,
 				name_id: editSubNameId || subforum.name_id,
-				description_en: subforum.description_en,
-				description_id: subforum.description_id,
+				description_en: editSubDescriptionEn.trim() || null,
+				description_id: editSubDescriptionId.trim() || null,
 				order_index: subforum.order_index,
 				is_visible: subforum.is_visible,
 			}),
@@ -237,12 +245,16 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 		setEditingCategory(category.id);
 		setEditCatNameEn(category.name_en);
 		setEditCatNameId(category.name_id);
+		setEditCatDescriptionEn(category.description_en ?? "");
+		setEditCatDescriptionId(category.description_id ?? "");
 	}
 
 	function startEditSubforum(subforum: ForumSubforum) {
 		setEditingSubforum(subforum.id);
 		setEditSubNameEn(subforum.name_en);
 		setEditSubNameId(subforum.name_id);
+		setEditSubDescriptionEn(subforum.description_en ?? "");
+		setEditSubDescriptionId(subforum.description_id ?? "");
 	}
 
 	return (
@@ -264,6 +276,22 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 							id="forum-category-name-id"
 							value={categoryNameId}
 							onChange={(event) => setCategoryNameId(event.currentTarget.value)}
+						/>
+					</div>
+					<div>
+						<Label htmlFor="forum-category-description-en">Description (EN)</Label>
+						<Input
+							id="forum-category-description-en"
+							value={categoryDescriptionEn}
+							onChange={(event) => setCategoryDescriptionEn(event.currentTarget.value)}
+						/>
+					</div>
+					<div>
+						<Label htmlFor="forum-category-description-id">Description (ID)</Label>
+						<Input
+							id="forum-category-description-id"
+							value={categoryDescriptionId}
+							onChange={(event) => setCategoryDescriptionId(event.currentTarget.value)}
 						/>
 					</div>
 				</div>
@@ -309,6 +337,22 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 							onChange={(event) => setSubforumNameId(event.currentTarget.value)}
 						/>
 					</div>
+					<div>
+						<Label htmlFor="forum-subforum-description-en">Description (EN)</Label>
+						<Input
+							id="forum-subforum-description-en"
+							value={subforumDescriptionEn}
+							onChange={(event) => setSubforumDescriptionEn(event.currentTarget.value)}
+						/>
+					</div>
+					<div>
+						<Label htmlFor="forum-subforum-description-id">Description (ID)</Label>
+						<Input
+							id="forum-subforum-description-id"
+							value={subforumDescriptionId}
+							onChange={(event) => setSubforumDescriptionId(event.currentTarget.value)}
+						/>
+					</div>
 				</div>
 				<div className="flex items-center justify-end">
 					<Button type="button" onClick={() => void createSubforum()} disabled={busy !== null || !subforumNameEn.trim()}>
@@ -339,6 +383,16 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 											onChange={(e) => setEditCatNameId(e.currentTarget.value)}
 											placeholder="Name (ID)"
 										/>
+										<Input
+											value={editCatDescriptionEn}
+											onChange={(e) => setEditCatDescriptionEn(e.currentTarget.value)}
+											placeholder="Description (EN)"
+										/>
+										<Input
+											value={editCatDescriptionId}
+											onChange={(e) => setEditCatDescriptionId(e.currentTarget.value)}
+											placeholder="Description (ID)"
+										/>
 									</div>
 									<div className="flex gap-2">
 										<Button type="button" size="sm" onClick={() => void saveCategory(category)} disabled={busy !== null}>
@@ -358,6 +412,11 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 												<span className="ml-2 text-xs text-(--muted)">({locale === "id" ? "Tersembunyi" : "Hidden"})</span>
 											)}
 										</p>
+										{(locale === "id" ? category.description_id : category.description_en) ? (
+											<p className="text-xs text-(--muted)">
+												{locale === "id" ? category.description_id : category.description_en}
+											</p>
+										) : null}
 										<p className="text-xs text-(--muted)">/{category.slug}</p>
 									</div>
 									<div className="flex items-center gap-1">
@@ -414,6 +473,16 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 															onChange={(e) => setEditSubNameId(e.currentTarget.value)}
 															placeholder="Name (ID)"
 														/>
+														<Input
+															value={editSubDescriptionEn}
+															onChange={(e) => setEditSubDescriptionEn(e.currentTarget.value)}
+															placeholder="Description (EN)"
+														/>
+														<Input
+															value={editSubDescriptionId}
+															onChange={(e) => setEditSubDescriptionId(e.currentTarget.value)}
+															placeholder="Description (ID)"
+														/>
 													</div>
 													<div className="flex gap-2">
 														<Button type="button" size="sm" onClick={() => void saveSubforum(subforum)} disabled={busy !== null}>
@@ -433,6 +502,11 @@ export function ForumTaxonomyManager({ categories, subforums }: ForumTaxonomyMan
 																<span className="ml-2 text-xs text-(--muted)">({locale === "id" ? "Tersembunyi" : "Hidden"})</span>
 															)}
 														</p>
+														{(locale === "id" ? subforum.description_id : subforum.description_en) ? (
+															<p className="text-xs text-(--muted)">
+																{locale === "id" ? subforum.description_id : subforum.description_en}
+															</p>
+														) : null}
 														<p className="text-xs text-(--muted)">
 															/{category.slug}/f/{subforum.slug} · {categoryMap.get(subforum.category_id)?.slug}
 														</p>

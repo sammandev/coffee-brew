@@ -1,5 +1,6 @@
 import { requireRole } from "@/components/auth-guard";
 import { ProfileSettingsPanel } from "@/components/forms/profile-settings-panel";
+import { ForumBreadcrumbs } from "@/components/forum/forum-breadcrumbs";
 import { getServerI18n } from "@/lib/i18n/server";
 import { getSiteSettings } from "@/lib/site-settings";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -25,6 +26,13 @@ export default async function MeProfilePage() {
 
 	return (
 		<div className="space-y-5">
+			<ForumBreadcrumbs
+				items={[
+					{ href: "/", label: locale === "id" ? "Beranda" : "Home" },
+					{ href: "/me", label: locale === "id" ? "Dashboard Saya" : "My Dashboard" },
+					{ label: locale === "id" ? "Profil" : "Profile" },
+				]}
+			/>
 			<h1 className="font-heading text-4xl text-[var(--espresso)]">{locale === "id" ? "Profil" : "Profile"}</h1>
 			<ProfileSettingsPanel
 				avatarUrl={profile?.avatar_url ?? null}

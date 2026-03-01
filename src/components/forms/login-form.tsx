@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { GoogleIcon } from "@/components/icons/google-icon";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -34,6 +35,8 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 	const [isLoading, setIsLoading] = useState(false);
 	const [success, setSuccess] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [validationIssues, setValidationIssues] = useState<string[]>([]);
+	const [magicSentEmail, setMagicSentEmail] = useState<string | null>(null);
 	const [magicCooldownUntil, setMagicCooldownUntil] = useState<number | null>(null);
 	const [magicCooldownSeconds, setMagicCooldownSeconds] = useState(0);
 
@@ -87,20 +90,48 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 		setMode(nextMode);
 		setError(null);
 		setSuccess(null);
+		setValidationIssues([]);
+		setMagicSentEmail(null);
+	}
+
+	function getClientValidationIssues(params: { email: string; mode: LoginMode; password: string }) {
+		const issues: string[] = [];
+		const emailValue = params.email.trim();
+		if (emailValue.length === 0) {
+			issues.push(locale === "id" ? "Email wajib diisi." : "Email is required.");
+		} else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
+			issues.push(locale === "id" ? "Format email tidak valid." : "Email format is invalid.");
+		}
+		if (params.mode === "password" && params.password.length < 8) {
+			issues.push(
+				locale === "id"
+					? "Kata sandi minimal 8 karakter untuk mode Email + Kata Sandi."
+					: "Password must be at least 8 characters for Email + Password mode.",
+			);
+		}
+		return issues;
 	}
 
 	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setError(null);
 		setSuccess(null);
+		setMagicSentEmail(null);
+		setValidationIssues([]);
 		setIsLoading(true);
 
 		const formData = new FormData(event.currentTarget);
 		const email = String(formData.get("email") ?? "");
+		const password = String(formData.get("password") ?? "");
+		const issues = getClientValidationIssues({ email, mode, password });
+		if (issues.length > 0) {
+			setValidationIssues(issues);
+			setIsLoading(false);
+			return;
+		}
 		const supabase = createSupabaseBrowserClient();
 
 		if (mode === "password") {
-			const password = String(formData.get("password") ?? "");
 			const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
 			if (authError) {
@@ -162,6 +193,7 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 		}
 
 		setSuccess(t("auth.magicLinkSent"));
+		setMagicSentEmail(email.trim());
 		setIsLoading(false);
 	}
 
@@ -210,6 +242,18 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 						/>
 					</div>
 				)}
+				{validationIssues.length > 0 ? (
+					<Card className="space-y-2 border-(--danger)/40 bg-(--danger)/5 p-4">
+						<p className="text-sm font-semibold text-(--danger)">
+							{locale === "id" ? "Periksa kembali input Anda" : "Please review your input"}
+						</p>
+						<ul className="list-disc space-y-1 pl-5 text-sm text-(--danger)">
+							{validationIssues.map((issue) => (
+								<li key={issue}>{issue}</li>
+							))}
+						</ul>
+					</Card>
+				) : null}
 				<Button type="submit" disabled={isLoading || (mode === "magic" && magicCooldownSeconds > 0)}>
 					{mode === "password"
 						? isLoading
@@ -255,10 +299,24 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 						{t("auth.continueGoogle")}
 					</Button>
 				)}
-
-				{success && <p className="text-sm text-(--accent)">{success}</p>}
-				{error && <p className="text-sm text-(--danger)">{error}</p>}
+				{error ? <Card className="border-(--danger)/40 bg-(--danger)/5 p-4 text-sm text-(--danger)">{error}</Card> : null}
+				{success ? (
+					<Card className="border-(--accent)/40 bg-(--accent)/10 p-4 text-sm text-(--accent)">{success}</Card>
+				) : null}
 			</form>
+
+			{mode === "magic" && magicSentEmail ? (
+				<Card className="space-y-2 rounded-3xl border border-(--accent)/30 bg-(--surface-elevated) p-5">
+					<p className="text-sm font-semibold text-(--espresso)">
+						{locale === "id" ? "Periksa inbox email Anda" : "Check Your Email Inbox"}
+					</p>
+					<p className="text-sm text-(--muted)">
+						{locale === "id"
+							? `Kami baru saja mengirim magic link ke ${magicSentEmail}. Buka inbox (dan folder spam/junk) lalu klik tautannya untuk masuk.`
+							: `We just sent a magic link to ${magicSentEmail}. Open your inbox (and spam/junk folder) and click the link to sign in.`}
+					</p>
+				</Card>
+			) : null}
 		</div>
 	);
 }

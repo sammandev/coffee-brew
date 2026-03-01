@@ -7,7 +7,6 @@ import { RichTextContent } from "@/components/ui/rich-text-content";
 import { FORUM_REACTION_TYPES, type ForumReactionType, REACTION_EMOJI } from "@/lib/constants";
 import { BLOG_POSTS, localizeBlogText } from "@/lib/content/blog";
 import { getServerI18n } from "@/lib/i18n/server";
-import { clampPlainText } from "@/lib/rich-text";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 

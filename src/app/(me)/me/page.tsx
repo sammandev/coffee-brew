@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireRole } from "@/components/auth-guard";
+import { ForumBreadcrumbs } from "@/components/forum/forum-breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getServerI18n } from "@/lib/i18n/server";
@@ -22,6 +23,10 @@ export default async function MePage() {
 
 	return (
 		<div className="space-y-6">
+			<ForumBreadcrumbs
+				items={[{ href: "/", label: t("nav.home") }, { label: locale === "id" ? "Dashboard Saya" : "My Dashboard" }]}
+			/>
+
 			<header className="flex flex-wrap items-center justify-between gap-4">
 				<div>
 					<Badge>{t("nav.dashboard")}</Badge>

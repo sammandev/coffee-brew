@@ -48,6 +48,7 @@ package-lock.json
 /developer-config.json
 /development-docs
 /docs
+.github/prompts
 
 # Playwright
 node_modules/

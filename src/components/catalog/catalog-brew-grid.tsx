@@ -36,6 +36,8 @@ interface CatalogBrewGridProps {
 }
 
 const COMPARE_STORAGE_KEY = "coffee-brew.compare.ids";
+const INITIAL_VISIBLE_CARDS = 12;
+const LOAD_MORE_STEP = 9;
 
 function toNextParam(value: string) {
 	return encodeURIComponent(value);
@@ -66,6 +68,7 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 	const [compareIds, setCompareIds] = useState<string[]>([]);
 	const [wishlistBusyId, setWishlistBusyId] = useState<string | null>(null);
 	const [feedback, setFeedback] = useState<string | null>(null);
+	const [visibleCount, setVisibleCount] = useState(() => Math.min(INITIAL_VISIBLE_CARDS, brews.length));
 
 	const brewNameMap = useMemo(() => new Map(brews.map((brew) => [brew.id, brew.name])), [brews]);
 
@@ -88,6 +91,10 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 			// no-op
 		}
 	}, [compareIds]);
+
+	useEffect(() => {
+		setVisibleCount(Math.min(INITIAL_VISIBLE_CARDS, brews.length));
+	}, [brews.length]);
 
 	useEffect(() => {
 		if (!isAuthenticated) return;
@@ -150,6 +157,8 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 
 	const compareHref =
 		compareIds.length > 0 ? `/catalog/compare?ids=${encodeURIComponent(compareIds.join(","))}` : "/catalog/compare";
+	const visibleBrews = useMemo(() => brews.slice(0, visibleCount), [brews, visibleCount]);
+	const canLoadMore = visibleCount < brews.length;
 
 	const m = (key: Parameters<typeof getMessage>[1]) => getMessage(locale, key);
 
@@ -158,7 +167,7 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 			{feedback ? <p className="text-sm text-(--danger)">{feedback}</p> : null}
 
 			<div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-				{brews.map((brew, index) => {
+				{visibleBrews.map((brew, index) => {
 					const isWishlisted = wishlistIds.has(brew.id);
 					const inCompare = compareIds.includes(brew.id);
 					const discussHref = isAuthenticated
@@ -272,6 +281,25 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 					);
 				})}
 			</div>
+
+			{brews.length > INITIAL_VISIBLE_CARDS ? (
+				<div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-(--surface-elevated) p-4">
+					<p className="text-sm text-(--muted)">
+						{locale === "id"
+							? `Menampilkan ${visibleBrews.length} dari ${brews.length} brew.`
+							: `Showing ${visibleBrews.length} of ${brews.length} brews.`}
+					</p>
+					{canLoadMore ? (
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => setVisibleCount((current) => Math.min(current + LOAD_MORE_STEP, brews.length))}
+						>
+							{locale === "id" ? "Muat lebih banyak" : "Load More"}
+						</Button>
+					) : null}
+				</div>
+			) : null}
 
 			{/* Compare Tray */}
 			{compareIds.length > 0 ? (

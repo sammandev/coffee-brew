@@ -400,8 +400,10 @@ export function MessageThread({
 	const [typingCount, setTypingCount] = useState(0);
 	const typingSentAtRef = useRef(0);
 	const typingStatesRef = useRef<Record<string, number>>({});
+	const messageChannelRef = useRef<RealtimeChannel | null>(null);
 	const typingChannelRef = useRef<RealtimeChannel | null>(null);
 	const typingChannelSubscribedRef = useRef(false);
+	const subscriptionGenerationRef = useRef(0);
 	const [reportOpen, setReportOpen] = useState(false);
 	const [reportMessageId, setReportMessageId] = useState<string | null>(null);
 	const [reportReason, setReportReason] = useState("");
@@ -470,13 +472,29 @@ export function MessageThread({
 	}, [loadMessages, markRead]);
 
 	useEffect(() => {
+		subscriptionGenerationRef.current += 1;
+		const generation = subscriptionGenerationRef.current;
 		const supabase = createSupabaseBrowserClient();
+
+		if (messageChannelRef.current) {
+			void supabase.removeChannel(messageChannelRef.current);
+			messageChannelRef.current = null;
+		}
+		if (typingChannelRef.current) {
+			void supabase.removeChannel(typingChannelRef.current);
+			typingChannelRef.current = null;
+		}
+		typingChannelSubscribedRef.current = false;
+		typingStatesRef.current = {};
+		setTypingCount(0);
+
 		const messageChannel = supabase
 			.channel(`dm-thread:${conversationId}`)
 			.on(
 				"postgres_changes",
 				{ event: "*", schema: "public", table: "dm_messages", filter: `conversation_id=eq.${conversationId}` },
 				() => {
+					if (generation !== subscriptionGenerationRef.current) return;
 					void loadMessages({ appendOlder: false }).then(() => void markRead());
 				},
 			)
@@ -484,14 +502,17 @@ export function MessageThread({
 				"postgres_changes",
 				{ event: "UPDATE", schema: "public", table: "dm_participants", filter: `conversation_id=eq.${conversationId}` },
 				() => {
+					if (generation !== subscriptionGenerationRef.current) return;
 					void loadMessages({ appendOlder: false });
 				},
 			)
 			.subscribe();
+		messageChannelRef.current = messageChannel;
 
 		const typingChannel = supabase.channel(`dm-typing-${conversationId}`);
 		typingChannel
 			.on("broadcast", { event: "typing" }, ({ payload }) => {
+				if (generation !== subscriptionGenerationRef.current) return;
 				const userId = typeof payload?.userId === "string" ? payload.userId : "";
 				if (!userId || userId === currentUserId) return;
 				typingStatesRef.current[userId] = Date.now();
@@ -499,19 +520,24 @@ export function MessageThread({
 				setTypingCount(activeCount);
 			})
 			.subscribe((status) => {
+				if (generation !== subscriptionGenerationRef.current) return;
 				typingChannelSubscribedRef.current = status === "SUBSCRIBED";
 			});
 		typingChannelRef.current = typingChannel;
 
 		const interval = setInterval(() => {
+			if (generation !== subscriptionGenerationRef.current) return;
 			const activeCount = Object.values(typingStatesRef.current).filter((at) => Date.now() - at <= 4000).length;
 			setTypingCount(activeCount);
 		}, 1000);
 
 		return () => {
+			subscriptionGenerationRef.current += 1;
 			clearInterval(interval);
+			messageChannelRef.current = null;
 			typingChannelRef.current = null;
 			typingChannelSubscribedRef.current = false;
+			typingStatesRef.current = {};
 			void supabase.removeChannel(messageChannel);
 			void supabase.removeChannel(typingChannel);
 		};

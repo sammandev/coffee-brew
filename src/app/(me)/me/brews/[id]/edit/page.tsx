@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireRole } from "@/components/auth-guard";
 import { BrewForm } from "@/components/forms/brew-form";
+import { ForumBreadcrumbs } from "@/components/forum/forum-breadcrumbs";
 import { getServerI18n } from "@/lib/i18n/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -25,6 +26,14 @@ export default async function MeEditBrewPage({ params }: { params: Promise<{ id:
 
 	return (
 		<div className="space-y-4">
+			<ForumBreadcrumbs
+				items={[
+					{ href: "/", label: locale === "id" ? "Beranda" : "Home" },
+					{ href: "/me", label: locale === "id" ? "Dashboard Saya" : "My Dashboard" },
+					{ label: locale === "id" ? "Ubah Racikan" : "Edit Brew" },
+					{ label: brew.name },
+				]}
+			/>
 			<h1 className="font-heading text-4xl text-(--espresso)">{locale === "id" ? "Ubah Racikan" : "Edit Brew"}</h1>
 			<BrewForm mode="edit" brewId={id} initialValues={brew} />
 		</div>

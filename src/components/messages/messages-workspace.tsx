@@ -1,8 +1,9 @@
 "use client";
 
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { Archive, ArchiveRestore, Loader2, MessageCircle, Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageThread } from "@/components/messages/message-thread";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,6 +77,8 @@ export function MessagesWorkspace({
 	const [error, setError] = useState<string | null>(null);
 	const [hasMore, setHasMore] = useState(false);
 	const [nextCursor, setNextCursor] = useState<string | null>(null);
+	const workspaceChannelRef = useRef<RealtimeChannel | null>(null);
+	const workspaceSubscriptionGenerationRef = useRef(0);
 
 	const copy = useMemo(
 		() => ({
@@ -177,22 +180,33 @@ export function MessagesWorkspace({
 	}, [loadConversations]);
 
 	useEffect(() => {
+		workspaceSubscriptionGenerationRef.current += 1;
+		const generation = workspaceSubscriptionGenerationRef.current;
 		const supabase = createSupabaseBrowserClient();
+		if (workspaceChannelRef.current) {
+			void supabase.removeChannel(workspaceChannelRef.current);
+			workspaceChannelRef.current = null;
+		}
 		const channel = supabase
 			.channel(`dm-workspace:${currentUserId}`)
 			.on("postgres_changes", { event: "*", schema: "public", table: "dm_messages" }, () => {
+				if (generation !== workspaceSubscriptionGenerationRef.current) return;
 				void loadConversations({ reset: true });
 			})
 			.on(
 				"postgres_changes",
 				{ event: "*", schema: "public", table: "dm_participants", filter: `user_id=eq.${currentUserId}` },
 				() => {
+					if (generation !== workspaceSubscriptionGenerationRef.current) return;
 					void loadConversations({ reset: true });
 				},
 			)
 			.subscribe();
+		workspaceChannelRef.current = channel;
 
 		return () => {
+			workspaceSubscriptionGenerationRef.current += 1;
+			workspaceChannelRef.current = null;
 			void supabase.removeChannel(channel);
 		};
 	}, [currentUserId, loadConversations]);
