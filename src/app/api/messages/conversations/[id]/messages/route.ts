@@ -36,6 +36,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 	}
 
 	const { limit, cursor } = parsed.data;
+	const pageLimit = limit + 1;
 
 	const query = supabase
 		.from("dm_messages")
@@ -60,7 +61,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 		)
 		.eq("conversation_id", id)
 		.order("created_at", { ascending: false })
-		.limit(limit);
+		.limit(pageLimit);
 
 	const scopedQuery = cursor ? query.lt("created_at", cursor) : query;
 	const { data, error } = await scopedQuery;
@@ -91,7 +92,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 		]),
 	);
 
-	const messages = (data ?? []).map((message) => ({
+	const rows = data ?? [];
+	const hasMore = rows.length > limit;
+	const pageRows = hasMore ? rows.slice(0, limit) : rows;
+	const nextCursor = hasMore ? (pageRows.at(-1)?.created_at ?? null) : null;
+
+	const messages = pageRows.map((message) => ({
 		id: message.id,
 		conversation_id: message.conversation_id,
 		sender_id: message.sender_id,
@@ -129,6 +135,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 					: null,
 			};
 		}),
+		has_more: hasMore,
+		next_cursor: nextCursor,
 	});
 }
 

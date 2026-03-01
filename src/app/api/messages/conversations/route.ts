@@ -25,6 +25,7 @@ export async function GET(request: Request) {
 
 	const { view, q, limit, cursor } = parsed.data;
 	const searchQuery = (q ?? "").trim().toLowerCase();
+	const fetchLimit = Math.max(limit * 4, 40);
 
 	const participantsQuery = supabase
 		.from("dm_participants")
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
 		)
 		.eq("user_id", context.userId)
 		.order("last_message_at", { ascending: false, referencedTable: "dm_conversations" })
-		.limit(Math.max(limit * 3, 30));
+		.limit(fetchLimit);
 
 	const scopedParticipantsQuery =
 		view === "archived" ? participantsQuery.not("archived_at", "is", null) : participantsQuery.is("archived_at", null);
@@ -182,7 +183,7 @@ export async function GET(request: Request) {
 	);
 	const unreadCount = Array.from(unreadCountByConversationId.values()).reduce((total, value) => total + value, 0);
 
-	const conversations = rows
+	const filteredConversations = rows
 		.map((row) => {
 			const conversation = Array.isArray(row.dm_conversations) ? row.dm_conversations[0] : row.dm_conversations;
 			if (!conversation) return null;
@@ -229,13 +230,18 @@ export async function GET(request: Request) {
 					`${value?.counterpart?.display_name ?? ""} ${value?.last_message?.body_text ?? ""}`
 						.toLowerCase()
 						.includes(searchQuery)),
-		)
-		.slice(0, limit);
+		);
+
+	const conversations = filteredConversations.slice(0, limit);
+	const hasMore = filteredConversations.length > conversations.length;
+	const nextCursor = hasMore ? (conversations.at(-1)?.last_message_at ?? null) : null;
 
 	return apiOk({
 		conversations,
 		view,
 		unread_count: unreadCount,
+		has_more: hasMore,
+		next_cursor: nextCursor,
 	});
 }
 

@@ -42,6 +42,7 @@ interface RichTextEditorProps {
 	name?: string;
 	onChange: (value: string) => void;
 	value: string;
+	variant?: "chat" | "default";
 }
 
 const Video = Node.create({
@@ -97,6 +98,7 @@ export function RichTextEditor({
 	name,
 	onChange,
 	value,
+	variant = "default",
 }: RichTextEditorProps) {
 	const [linkInputOpen, setLinkInputOpen] = useState(false);
 	const [linkValue, setLinkValue] = useState("");
@@ -157,6 +159,8 @@ export function RichTextEditor({
 	}, [editor, value]);
 
 	const plainTextLength = useMemo(() => toPlainText(value).length, [value]);
+	const isChatVariant = variant === "chat";
+	const toolbarButtonClass = isChatVariant ? "h-7 w-7 p-0" : "h-8 px-3";
 	const showLengthError =
 		plainTextLength > 0 &&
 		(plainTextLength < minPlainTextLength || (maxPlainTextLength ? plainTextLength > maxPlainTextLength : false));
@@ -289,12 +293,17 @@ export function RichTextEditor({
 
 	return (
 		<div className={cn("grid gap-2", className)}>
-			<div className="flex flex-wrap items-center gap-1 rounded-2xl border bg-(--surface) p-2">
+			<div
+				className={cn(
+					"flex items-center gap-1 rounded-2xl border bg-(--surface) p-2",
+					isChatVariant ? "flex-nowrap overflow-x-auto" : "flex-wrap",
+				)}
+			>
 				<Button
 					type="button"
 					size="sm"
 					variant="ghost"
-					className={cn("h-8 px-3", isActiveClass(Boolean(editor?.isActive("bold"))))}
+					className={cn(toolbarButtonClass, isActiveClass(Boolean(editor?.isActive("bold"))))}
 					onClick={() => editor?.chain().focus().toggleBold().run()}
 					disabled={disabled || !editor}
 					aria-label="Bold"
@@ -305,7 +314,7 @@ export function RichTextEditor({
 					type="button"
 					size="sm"
 					variant="ghost"
-					className={cn("h-8 px-3", isActiveClass(Boolean(editor?.isActive("italic"))))}
+					className={cn(toolbarButtonClass, isActiveClass(Boolean(editor?.isActive("italic"))))}
 					onClick={() => editor?.chain().focus().toggleItalic().run()}
 					disabled={disabled || !editor}
 					aria-label="Italic"
@@ -316,7 +325,7 @@ export function RichTextEditor({
 					type="button"
 					size="sm"
 					variant="ghost"
-					className={cn("h-8 px-3", isActiveClass(Boolean(editor?.isActive("underline"))))}
+					className={cn(toolbarButtonClass, isActiveClass(Boolean(editor?.isActive("underline"))))}
 					onClick={() => editor?.chain().focus().toggleUnderline().run()}
 					disabled={disabled || !editor}
 					aria-label="Underline"
@@ -327,7 +336,7 @@ export function RichTextEditor({
 					type="button"
 					size="sm"
 					variant="ghost"
-					className={cn("h-8 px-3", isActiveClass(Boolean(editor?.isActive("bulletList"))))}
+					className={cn(toolbarButtonClass, isActiveClass(Boolean(editor?.isActive("bulletList"))))}
 					onClick={() => editor?.chain().focus().toggleBulletList().run()}
 					disabled={disabled || !editor}
 					aria-label="Bullet list"
@@ -338,7 +347,7 @@ export function RichTextEditor({
 					type="button"
 					size="sm"
 					variant="ghost"
-					className={cn("h-8 px-3", isActiveClass(Boolean(editor?.isActive("orderedList"))))}
+					className={cn(toolbarButtonClass, isActiveClass(Boolean(editor?.isActive("orderedList"))))}
 					onClick={() => editor?.chain().focus().toggleOrderedList().run()}
 					disabled={disabled || !editor}
 					aria-label="Numbered list"
@@ -349,7 +358,7 @@ export function RichTextEditor({
 					type="button"
 					size="sm"
 					variant="ghost"
-					className={cn("h-8 px-3", isActiveClass(Boolean(editor?.isActive("blockquote"))))}
+					className={cn(toolbarButtonClass, isActiveClass(Boolean(editor?.isActive("blockquote"))))}
 					onClick={() => editor?.chain().focus().toggleBlockquote().run()}
 					disabled={disabled || !editor}
 					aria-label="Quote"
@@ -360,7 +369,7 @@ export function RichTextEditor({
 					type="button"
 					size="sm"
 					variant="ghost"
-					className={cn("h-8 px-3", isActiveClass(Boolean(editor?.isActive("link"))))}
+					className={cn(toolbarButtonClass, isActiveClass(Boolean(editor?.isActive("link"))))}
 					onClick={() => {
 						if (!editor) return;
 						const currentHref = editor.getAttributes("link").href as string | undefined;
@@ -382,7 +391,7 @@ export function RichTextEditor({
 					type="button"
 					size="sm"
 					variant="ghost"
-					className="h-8 px-3"
+					className={toolbarButtonClass}
 					onClick={() => editor?.chain().focus().clearNodes().unsetAllMarks().run()}
 					disabled={disabled || !editor}
 					aria-label="Clear formatting"
@@ -395,7 +404,7 @@ export function RichTextEditor({
 							type="button"
 							size="sm"
 							variant="ghost"
-							className="h-8 px-3"
+							className={toolbarButtonClass}
 							onClick={() => fileInputRef.current?.click()}
 							disabled={disabled || !editor || isUploadingImage}
 							aria-label="Upload image"
@@ -422,7 +431,7 @@ export function RichTextEditor({
 							type="button"
 							size="sm"
 							variant="ghost"
-							className="h-8 px-3"
+							className={toolbarButtonClass}
 							onClick={() => mediaInputRef.current?.click()}
 							disabled={disabled || !editor || isUploadingMedia}
 							aria-label="Upload media"
@@ -448,7 +457,7 @@ export function RichTextEditor({
 						type="button"
 						size="sm"
 						variant="ghost"
-						className={cn("h-8 px-3", mentionOpen && "bg-(--sand)/30")}
+						className={cn(toolbarButtonClass, mentionOpen && "bg-(--sand)/30")}
 						onClick={() => setMentionOpen((current) => !current)}
 						disabled={disabled || !editor}
 						aria-label="Mention user"
@@ -524,7 +533,10 @@ export function RichTextEditor({
 				<EditorContent
 					id={id}
 					editor={editor}
-					className="min-h-32 px-4 py-3 text-sm text-foreground focus-within:ring-2 focus-within:ring-(--accent)/20 [&_.ProseMirror]:min-h-24 [&_.ProseMirror]:outline-none [&_.ProseMirror_a]:text-(--accent) [&_.ProseMirror_a]:underline [&_.ProseMirror_blockquote]:border-l-2 [&_.ProseMirror_blockquote]:border-(--border) [&_.ProseMirror_blockquote]:pl-3 [&_.ProseMirror_li]:ml-4 [&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ul]:list-disc"
+					className={cn(
+						"text-sm text-foreground focus-within:ring-2 focus-within:ring-(--accent)/20 [&_.ProseMirror]:outline-none [&_.ProseMirror_a]:text-(--accent) [&_.ProseMirror_a]:underline [&_.ProseMirror_blockquote]:border-l-2 [&_.ProseMirror_blockquote]:border-(--border) [&_.ProseMirror_blockquote]:pl-3 [&_.ProseMirror_li]:ml-4 [&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ul]:list-disc",
+						isChatVariant ? "min-h-24 px-3 py-2 [&_.ProseMirror]:min-h-16" : "min-h-32 px-4 py-3 [&_.ProseMirror]:min-h-24",
+					)}
 				/>
 			</div>
 

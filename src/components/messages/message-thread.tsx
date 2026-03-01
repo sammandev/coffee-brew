@@ -1,8 +1,8 @@
 "use client";
 
-import { Flag, Loader2, Pencil, Send, Trash2 } from "lucide-react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { EllipsisVertical, Flag, Loader2, Pencil, Send, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import { Button } from "@/components/ui/button";
 import { FormModal } from "@/components/ui/form-modal";
 import { Input } from "@/components/ui/input";
@@ -52,19 +52,347 @@ interface ThreadMessage {
 interface ThreadResponse {
 	messages?: ThreadMessage[];
 	participants?: ThreadParticipant[];
+	has_more?: boolean;
+	next_cursor?: string | null;
 }
 
 interface MessageThreadProps {
 	conversationId: string;
 	currentUserId: string;
 	initialCounterpartName: string;
+	locale: "en" | "id";
+	onBack?: () => void;
 }
 
-export function MessageThread({ conversationId, currentUserId, initialCounterpartName }: MessageThreadProps) {
-	const { locale } = useAppPreferences();
+interface ThreadHeaderProps {
+	counterpartAvatarUrl: string | null;
+	counterpartName: string;
+	counterpartVerified: boolean;
+	isTyping: boolean;
+	lastSeenAt: string | null;
+	locale: "en" | "id";
+	onBack?: () => void;
+}
+
+interface ThreadTimelineProps {
+	currentUserId: string;
+	counterpartReadAtMs: number;
+	hasMore: boolean;
+	loading: boolean;
+	loadingOlder: boolean;
+	locale: "en" | "id";
+	messages: ThreadMessage[];
+	onDelete: (messageId: string) => Promise<void>;
+	onEdit: (message: ThreadMessage) => void;
+	onLoadOlder: () => Promise<void>;
+	onReport: (messageId: string) => void;
+}
+
+interface ThreadComposerProps {
+	composerHtml: string;
+	editingMessageId: string | null;
+	locale: "en" | "id";
+	onCancelEdit: () => void;
+	onChange: (nextHtml: string) => void;
+	onSend: () => Promise<void>;
+	sending: boolean;
+}
+
+function toInitial(name: string) {
+	const first = name.trim().charAt(0).toUpperCase();
+	return first || "U";
+}
+
+function mergeUniqueMessages(current: ThreadMessage[], nextRows: ThreadMessage[]) {
+	const map = new Map<string, ThreadMessage>();
+	for (const message of current) {
+		map.set(message.id, message);
+	}
+	for (const message of nextRows) {
+		map.set(message.id, message);
+	}
+	return Array.from(map.values()).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+}
+
+export function ThreadHeader({
+	counterpartAvatarUrl,
+	counterpartName,
+	counterpartVerified,
+	isTyping,
+	lastSeenAt,
+	locale,
+	onBack,
+}: ThreadHeaderProps) {
+	const presenceText = isTyping
+		? locale === "id"
+			? "sedang mengetik..."
+			: "typing..."
+		: lastSeenAt
+			? locale === "id"
+				? `Terakhir aktif ${formatDate(lastSeenAt, locale)}`
+				: `Last seen ${formatDate(lastSeenAt, locale)}`
+			: locale === "id"
+				? "Percakapan pribadi"
+				: "Private conversation";
+
+	return (
+		<header className="sticky top-0 z-20 border-b border-(--border) bg-(--surface-elevated)/95 px-3 py-2.5 backdrop-blur-sm sm:px-4">
+			<div className="flex items-center gap-2">
+				{onBack ? (
+					<Button type="button" variant="ghost" size="icon" onClick={onBack} className="lg:hidden">
+						<span className="sr-only">{locale === "id" ? "Kembali" : "Back"}</span>←
+					</Button>
+				) : null}
+				<span className="inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-(--sand)/20 text-sm font-semibold text-(--espresso)">
+					{counterpartAvatarUrl ? (
+						// biome-ignore lint/performance/noImgElement: avatar URL may be remote Supabase storage path
+						<img src={counterpartAvatarUrl} alt={counterpartName} className="h-full w-full object-cover" />
+					) : (
+						toInitial(counterpartName)
+					)}
+				</span>
+				<div className="min-w-0">
+					<p className="truncate text-sm font-semibold text-(--espresso)">
+						{counterpartName}
+						{counterpartVerified ? " ✓" : ""}
+					</p>
+					<p className="truncate text-xs text-(--muted)">{presenceText}</p>
+				</div>
+			</div>
+		</header>
+	);
+}
+
+export function ThreadTimeline({
+	currentUserId,
+	counterpartReadAtMs,
+	hasMore,
+	loading,
+	loadingOlder,
+	locale,
+	messages,
+	onDelete,
+	onEdit,
+	onLoadOlder,
+	onReport,
+}: ThreadTimelineProps) {
+	const [menuMessageId, setMenuMessageId] = useState<string | null>(null);
+
+	useEffect(() => {
+		if (!menuMessageId) return;
+		const closeMenu = () => setMenuMessageId(null);
+		document.addEventListener("click", closeMenu);
+		return () => {
+			document.removeEventListener("click", closeMenu);
+		};
+	}, [menuMessageId]);
+
+	return (
+		<div className="flex flex-1 flex-col overflow-y-auto bg-[linear-gradient(160deg,color-mix(in_oklab,var(--sand)_10%,transparent),transparent_45%)] p-3 sm:p-4">
+			<div className="mb-2 flex justify-center">
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					onClick={() => void onLoadOlder()}
+					disabled={loadingOlder || !hasMore}
+				>
+					{loadingOlder ? <Loader2 size={14} className="animate-spin" /> : null}
+					<span className="ml-1">
+						{hasMore
+							? locale === "id"
+								? "Muat pesan lebih lama"
+								: "Load older messages"
+							: locale === "id"
+								? "Semua pesan sudah dimuat"
+								: "All messages loaded"}
+					</span>
+				</Button>
+			</div>
+
+			{loading ? (
+				<p className="inline-flex items-center gap-2 py-4 text-sm text-(--muted)">
+					<Loader2 size={14} className="animate-spin" />
+					{locale === "id" ? "Memuat pesan..." : "Loading messages..."}
+				</p>
+			) : messages.length === 0 ? (
+				<p className="py-4 text-sm text-(--muted)">{locale === "id" ? "Belum ada pesan." : "No messages yet."}</p>
+			) : (
+				<div className="space-y-2.5">
+					{messages.map((message, index) => {
+						const mine = message.sender_id === currentUserId;
+						const readByCounterpart =
+							mine && counterpartReadAtMs > 0 && new Date(message.created_at).getTime() <= counterpartReadAtMs;
+						const currentDay = new Date(message.created_at).toDateString();
+						const previousDay = index > 0 ? new Date(messages[index - 1]?.created_at ?? "").toDateString() : null;
+						const showDayDivider = index === 0 || previousDay !== currentDay;
+						const showMenu = menuMessageId === message.id;
+						const standaloneAttachments = message.attachments.filter(
+							(attachment) => !message.body_html.includes(attachment.public_url),
+						);
+
+						return (
+							<div key={message.id}>
+								{showDayDivider ? (
+									<div className="my-2 flex justify-center">
+										<span className="rounded-full border border-(--border) bg-(--surface-elevated) px-3 py-0.5 text-[11px] text-(--muted)">
+											{formatDate(message.created_at, locale)}
+										</span>
+									</div>
+								) : null}
+
+								<article className={cn("group flex", mine ? "justify-end" : "justify-start")}>
+									<div
+										className={cn(
+											"relative max-w-[86%] rounded-2xl border px-3 py-2 shadow-sm sm:max-w-[75%]",
+											mine
+												? "border-(--border) bg-[color-mix(in_oklab,var(--accent)_22%,var(--surface))]"
+												: "border-(--border) bg-(--surface)",
+										)}
+									>
+										<div className="prose prose-sm max-w-none text-foreground">
+											<RichTextContent html={message.body_html} />
+										</div>
+
+										{standaloneAttachments.length > 0 ? (
+											<div className="mt-2 grid gap-2 sm:grid-cols-2">
+												{standaloneAttachments.map((attachment) => (
+													<a
+														key={attachment.id}
+														href={attachment.public_url}
+														target="_blank"
+														rel="noopener noreferrer"
+														className="overflow-hidden rounded-lg border"
+													>
+														{/* biome-ignore lint/performance/noImgElement: attachment URLs are remote/public */}
+														<img src={attachment.public_url} alt="message attachment" className="h-28 w-full object-cover" />
+													</a>
+												))}
+											</div>
+										) : null}
+
+										<div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-(--muted)">
+											<span className="truncate">
+												{formatDate(message.created_at, locale)}
+												{message.edited_at ? ` • ${locale === "id" ? "diedit" : "edited"}` : ""}
+											</span>
+											{mine ? <span>{readByCounterpart ? (locale === "id" ? "dibaca" : "read") : "sent"}</span> : <span />}
+										</div>
+
+										<button
+											type="button"
+											className="absolute top-1 right-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-(--surface-elevated)/80 text-(--muted) opacity-0 transition hover:border-(--border) hover:text-foreground group-hover:opacity-100"
+											onClick={() => setMenuMessageId((current) => (current === message.id ? null : message.id))}
+											aria-label={locale === "id" ? "Aksi pesan" : "Message actions"}
+										>
+											<EllipsisVertical size={14} />
+										</button>
+
+										{showMenu ? (
+											<div className="absolute top-8 right-2 z-20 min-w-36 rounded-lg border border-(--border) bg-(--surface-elevated) p-1 shadow-lg">
+												{mine ? (
+													<>
+														<button
+															type="button"
+															className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-(--sand)/20"
+															onClick={() => {
+																setMenuMessageId(null);
+																onEdit(message);
+															}}
+														>
+															<Pencil size={12} />
+															{locale === "id" ? "Edit" : "Edit"}
+														</button>
+														<button
+															type="button"
+															className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-(--danger) transition hover:bg-(--danger)/10"
+															onClick={() => {
+																setMenuMessageId(null);
+																void onDelete(message.id);
+															}}
+														>
+															<Trash2 size={12} />
+															{locale === "id" ? "Hapus" : "Delete"}
+														</button>
+													</>
+												) : (
+													<button
+														type="button"
+														className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-(--sand)/20"
+														onClick={() => {
+															setMenuMessageId(null);
+															onReport(message.id);
+														}}
+													>
+														<Flag size={12} />
+														{locale === "id" ? "Laporkan" : "Report"}
+													</button>
+												)}
+											</div>
+										) : null}
+									</div>
+								</article>
+							</div>
+						);
+					})}
+				</div>
+			)}
+		</div>
+	);
+}
+
+export function ThreadComposer({
+	composerHtml,
+	editingMessageId,
+	locale,
+	onCancelEdit,
+	onChange,
+	onSend,
+	sending,
+}: ThreadComposerProps) {
+	return (
+		<div className="sticky bottom-0 z-20 border-t border-(--border) bg-(--surface-elevated)/95 p-2 backdrop-blur-sm sm:p-3">
+			<div className="rounded-xl border border-(--border) bg-(--surface) p-2">
+				<RichTextEditor
+					variant="chat"
+					value={composerHtml}
+					onChange={onChange}
+					enableImageUpload
+					imageUploadEndpoint="/api/messages/media"
+					minPlainTextLength={0}
+					maxPlainTextLength={12000}
+				/>
+				<div className="mt-2 flex items-center justify-between gap-2">
+					{editingMessageId ? (
+						<Button type="button" size="sm" variant="ghost" onClick={onCancelEdit}>
+							{locale === "id" ? "Batal edit" : "Cancel edit"}
+						</Button>
+					) : (
+						<span />
+					)}
+					<Button type="button" size="sm" onClick={() => void onSend()} disabled={sending}>
+						{sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+						<span className="ml-1">
+							{editingMessageId ? (locale === "id" ? "Simpan" : "Save") : locale === "id" ? "Kirim" : "Send"}
+						</span>
+					</Button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+export function MessageThread({
+	conversationId,
+	currentUserId,
+	initialCounterpartName,
+	locale,
+	onBack,
+}: MessageThreadProps) {
 	const [messages, setMessages] = useState<ThreadMessage[]>([]);
 	const [participants, setParticipants] = useState<ThreadParticipant[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [loadingOlder, setLoadingOlder] = useState(false);
 	const [sending, setSending] = useState(false);
 	const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 	const [composerHtml, setComposerHtml] = useState("<p></p>");
@@ -72,47 +400,73 @@ export function MessageThread({ conversationId, currentUserId, initialCounterpar
 	const [typingCount, setTypingCount] = useState(0);
 	const typingSentAtRef = useRef(0);
 	const typingStatesRef = useRef<Record<string, number>>({});
+	const typingChannelRef = useRef<RealtimeChannel | null>(null);
+	const typingChannelSubscribedRef = useRef(false);
 	const [reportOpen, setReportOpen] = useState(false);
 	const [reportMessageId, setReportMessageId] = useState<string | null>(null);
 	const [reportReason, setReportReason] = useState("");
 	const [reportDetail, setReportDetail] = useState("");
 	const [reporting, setReporting] = useState(false);
+	const [hasMore, setHasMore] = useState(false);
+	const [nextCursor, setNextCursor] = useState<string | null>(null);
 
 	const counterpart = useMemo(
 		() => participants.find((participant) => participant.user_id !== currentUserId) ?? null,
 		[participants, currentUserId],
 	);
-
 	const counterpartName =
 		counterpart?.profile?.display_name || counterpart?.profile?.email || initialCounterpartName || "Conversation";
-
+	const counterpartAvatarUrl = counterpart?.profile?.avatar_url ?? null;
+	const counterpartVerified = Boolean(counterpart?.profile?.is_verified);
+	const counterpartLastSeenAt = counterpart?.last_seen_at ?? null;
 	const counterpartReadAtMs = counterpart?.last_read_at ? new Date(counterpart.last_read_at).getTime() : 0;
 
-	const loadMessages = useCallback(async () => {
-		setLoading(true);
-		setError(null);
-		const response = await fetch(`/api/messages/conversations/${conversationId}/messages?limit=60`, {
-			method: "GET",
-		}).catch(() => null);
-		if (!response?.ok) {
-			setError(locale === "id" ? "Gagal memuat pesan." : "Could not load messages.");
-			setMessages([]);
-			setParticipants([]);
+	const loadMessages = useCallback(
+		async ({ appendOlder, cursor }: { appendOlder: boolean; cursor?: string | null }) => {
+			if (appendOlder) {
+				setLoadingOlder(true);
+			} else {
+				setLoading(true);
+			}
+			setError(null);
+
+			const response = await fetch(
+				`/api/messages/conversations/${conversationId}/messages?limit=40${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+				{ method: "GET" },
+			).catch(() => null);
+
+			if (!response?.ok) {
+				setError(locale === "id" ? "Gagal memuat pesan." : "Could not load messages.");
+				if (!appendOlder) {
+					setMessages([]);
+					setParticipants([]);
+					setHasMore(false);
+					setNextCursor(null);
+				}
+				setLoading(false);
+				setLoadingOlder(false);
+				return;
+			}
+
+			const body = (await response.json().catch(() => ({}))) as ThreadResponse;
+			const nextRows = Array.isArray(body.messages) ? body.messages : [];
+			const nextParticipants = Array.isArray(body.participants) ? body.participants : [];
+			setParticipants(nextParticipants);
+			setHasMore(Boolean(body.has_more));
+			setNextCursor(typeof body.next_cursor === "string" ? body.next_cursor : null);
+			setMessages((current) => (appendOlder ? mergeUniqueMessages(nextRows, current) : mergeUniqueMessages([], nextRows)));
 			setLoading(false);
-			return;
-		}
-		const body = (await response.json().catch(() => ({}))) as ThreadResponse;
-		setMessages(Array.isArray(body.messages) ? body.messages : []);
-		setParticipants(Array.isArray(body.participants) ? body.participants : []);
-		setLoading(false);
-	}, [conversationId, locale]);
+			setLoadingOlder(false);
+		},
+		[conversationId, locale],
+	);
 
 	const markRead = useCallback(async () => {
 		await fetch(`/api/messages/conversations/${conversationId}/read`, { method: "PATCH" }).catch(() => null);
 	}, [conversationId]);
 
 	useEffect(() => {
-		void loadMessages().then(() => void markRead());
+		void loadMessages({ appendOlder: false }).then(() => void markRead());
 	}, [loadMessages, markRead]);
 
 	useEffect(() => {
@@ -123,14 +477,14 @@ export function MessageThread({ conversationId, currentUserId, initialCounterpar
 				"postgres_changes",
 				{ event: "*", schema: "public", table: "dm_messages", filter: `conversation_id=eq.${conversationId}` },
 				() => {
-					void loadMessages().then(() => void markRead());
+					void loadMessages({ appendOlder: false }).then(() => void markRead());
 				},
 			)
 			.on(
 				"postgres_changes",
 				{ event: "UPDATE", schema: "public", table: "dm_participants", filter: `conversation_id=eq.${conversationId}` },
 				() => {
-					void loadMessages();
+					void loadMessages({ appendOlder: false });
 				},
 			)
 			.subscribe();
@@ -144,7 +498,10 @@ export function MessageThread({ conversationId, currentUserId, initialCounterpar
 				const activeCount = Object.values(typingStatesRef.current).filter((at) => Date.now() - at <= 4000).length;
 				setTypingCount(activeCount);
 			})
-			.subscribe();
+			.subscribe((status) => {
+				typingChannelSubscribedRef.current = status === "SUBSCRIBED";
+			});
+		typingChannelRef.current = typingChannel;
 
 		const interval = setInterval(() => {
 			const activeCount = Object.values(typingStatesRef.current).filter((at) => Date.now() - at <= 4000).length;
@@ -153,6 +510,8 @@ export function MessageThread({ conversationId, currentUserId, initialCounterpar
 
 		return () => {
 			clearInterval(interval);
+			typingChannelRef.current = null;
+			typingChannelSubscribedRef.current = false;
 			void supabase.removeChannel(messageChannel);
 			void supabase.removeChannel(typingChannel);
 		};
@@ -179,7 +538,7 @@ export function MessageThread({ conversationId, currentUserId, initialCounterpar
 		setComposerHtml("<p></p>");
 		setEditingMessageId(null);
 		setSending(false);
-		await loadMessages();
+		await loadMessages({ appendOlder: false });
 		await markRead();
 	}
 
@@ -191,7 +550,12 @@ export function MessageThread({ conversationId, currentUserId, initialCounterpar
 			setError(body?.details || body?.error || (locale === "id" ? "Gagal menghapus pesan." : "Could not delete message."));
 			return;
 		}
-		await loadMessages();
+		await loadMessages({ appendOlder: false });
+	}
+
+	async function loadOlder() {
+		if (!hasMore || !nextCursor) return;
+		await loadMessages({ appendOlder: true, cursor: nextCursor });
 	}
 
 	async function submitReport() {
@@ -226,139 +590,63 @@ export function MessageThread({ conversationId, currentUserId, initialCounterpar
 		const now = Date.now();
 		if (now - typingSentAtRef.current < 1200) return;
 		typingSentAtRef.current = now;
-		const supabase = createSupabaseBrowserClient();
-		const channel = supabase.channel(`dm-typing-${conversationId}`);
-		channel.subscribe((status) => {
-			if (status !== "SUBSCRIBED") return;
-			void channel.send({
-				type: "broadcast",
-				event: "typing",
-				payload: {
-					userId: currentUserId,
-				},
-			});
-			setTimeout(() => {
-				void supabase.removeChannel(channel);
-			}, 300);
+
+		if (!typingChannelRef.current || !typingChannelSubscribedRef.current) return;
+		void typingChannelRef.current.send({
+			type: "broadcast",
+			event: "typing",
+			payload: { userId: currentUserId },
 		});
 	}
 
 	return (
-		<div className="grid gap-4">
-			<header className="rounded-2xl border bg-(--surface-elevated) p-4">
-				<h1 className="font-heading text-2xl text-(--espresso)">{counterpartName}</h1>
-				<p className="text-sm text-(--muted)">
-					{typingCount > 0
-						? locale === "id"
-							? `${typingCount} pengguna sedang mengetik...`
-							: `${typingCount} user${typingCount > 1 ? "s are" : " is"} typing...`
-						: locale === "id"
-							? "Percakapan pribadi"
-							: "Private conversation"}
-				</p>
-			</header>
+		<div className="flex h-full min-h-0 w-full flex-col">
+			<ThreadHeader
+				counterpartAvatarUrl={counterpartAvatarUrl}
+				counterpartName={counterpartName}
+				counterpartVerified={counterpartVerified}
+				isTyping={typingCount > 0}
+				lastSeenAt={counterpartLastSeenAt}
+				locale={locale}
+				onBack={onBack}
+			/>
 
-			{error ? <p className="text-sm text-(--danger)">{error}</p> : null}
+			{error ? (
+				<p className="border-b border-(--danger)/30 bg-(--danger)/10 px-3 py-2 text-sm text-(--danger)">{error}</p>
+			) : null}
 
-			<div className="max-h-[58dvh] space-y-3 overflow-y-auto rounded-2xl border bg-(--surface) p-3">
-				{loading ? (
-					<p className="inline-flex items-center gap-2 text-sm text-(--muted)">
-						<Loader2 size={14} className="animate-spin" />
-						{locale === "id" ? "Memuat pesan..." : "Loading messages..."}
-					</p>
-				) : messages.length === 0 ? (
-					<p className="text-sm text-(--muted)">{locale === "id" ? "Belum ada pesan." : "No messages yet."}</p>
-				) : (
-					messages.map((message) => {
-						const mine = message.sender_id === currentUserId;
-						const readByCounterpart =
-							mine && counterpartReadAtMs > 0 && new Date(message.created_at).getTime() <= counterpartReadAtMs;
-						return (
-							<article
-								key={message.id}
-								className={cn(
-									"max-w-[85%] rounded-2xl border px-3 py-2 text-sm",
-									mine ? "ml-auto bg-(--surface-elevated)" : "mr-auto bg-(--surface)",
-								)}
-							>
-								<div className="prose prose-sm max-w-none text-foreground">
-									<RichTextContent html={message.body_html} />
-								</div>
-								<div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-(--muted)">
-									<span>{formatDate(message.created_at, locale)}</span>
-									{message.edited_at ? <span>{locale === "id" ? "diedit" : "edited"}</span> : null}
-									{mine ? <span>{readByCounterpart ? (locale === "id" ? "dibaca" : "read") : "sent"}</span> : null}
-								</div>
-								<div className="mt-2 flex items-center gap-2">
-									{mine ? (
-										<>
-											<Button
-												type="button"
-												size="sm"
-												variant="ghost"
-												onClick={() => {
-													setEditingMessageId(message.id);
-													setComposerHtml(message.body_html);
-												}}
-											>
-												<Pencil size={13} />
-											</Button>
-											<Button type="button" size="sm" variant="ghost" onClick={() => void deleteMessage(message.id)}>
-												<Trash2 size={13} />
-											</Button>
-										</>
-									) : (
-										<Button
-											type="button"
-											size="sm"
-											variant="ghost"
-											onClick={() => {
-												setReportMessageId(message.id);
-												setReportOpen(true);
-											}}
-										>
-											<Flag size={13} />
-										</Button>
-									)}
-								</div>
-							</article>
-						);
-					})
-				)}
-			</div>
+			<ThreadTimeline
+				currentUserId={currentUserId}
+				counterpartReadAtMs={counterpartReadAtMs}
+				hasMore={hasMore}
+				loading={loading}
+				loadingOlder={loadingOlder}
+				locale={locale}
+				messages={messages}
+				onDelete={deleteMessage}
+				onEdit={(message) => {
+					setEditingMessageId(message.id);
+					setComposerHtml(message.body_html);
+				}}
+				onLoadOlder={loadOlder}
+				onReport={(messageId) => {
+					setReportMessageId(messageId);
+					setReportOpen(true);
+				}}
+			/>
 
-			<div className="grid gap-2 rounded-2xl border bg-(--surface-elevated) p-3">
-				<RichTextEditor
-					value={composerHtml}
-					onChange={handleComposerChange}
-					enableImageUpload
-					imageUploadEndpoint="/api/messages/media"
-					minPlainTextLength={0}
-					maxPlainTextLength={12000}
-				/>
-				<div className="flex items-center justify-between gap-2">
-					{editingMessageId ? (
-						<Button
-							type="button"
-							variant="ghost"
-							onClick={() => {
-								setEditingMessageId(null);
-								setComposerHtml("<p></p>");
-							}}
-						>
-							{locale === "id" ? "Batal edit" : "Cancel edit"}
-						</Button>
-					) : (
-						<span />
-					)}
-					<Button type="button" onClick={() => void sendMessage()} disabled={sending}>
-						{sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-						<span className="ml-1">
-							{editingMessageId ? (locale === "id" ? "Simpan" : "Save") : locale === "id" ? "Kirim" : "Send"}
-						</span>
-					</Button>
-				</div>
-			</div>
+			<ThreadComposer
+				composerHtml={composerHtml}
+				editingMessageId={editingMessageId}
+				locale={locale}
+				onCancelEdit={() => {
+					setEditingMessageId(null);
+					setComposerHtml("<p></p>");
+				}}
+				onChange={handleComposerChange}
+				onSend={sendMessage}
+				sending={sending}
+			/>
 
 			<FormModal
 				open={reportOpen}

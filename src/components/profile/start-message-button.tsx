@@ -37,7 +37,7 @@ export function StartMessageButton({ disabled = false, disabledReason, recipient
 			setError("Conversation could not be created.");
 			return;
 		}
-		router.push(`/messages/${body.conversation_id}`);
+		router.push(`/messages?c=${encodeURIComponent(body.conversation_id)}`);
 	}
 
 	return (

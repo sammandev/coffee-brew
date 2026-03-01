@@ -1,127 +1,344 @@
 # Coffee Brew
 
-Coffee-themed full-stack web app built with Next.js App Router, Supabase, Resend, and Brevo newsletter provider.
+Coffee Brew is a full-stack coffee community platform built with Next.js + Supabase.
+It combines:
 
-## Stack
+- Public content surfaces (Landing, Catalog, Brew Detail, Blog, Forum)
+- Role-based operations workspace (admin/superuser dashboards)
+- Realtime social features (notifications, forum updates, direct messages)
+- Strong moderation and RBAC controls
 
-- Next.js 16 + TypeScript
-- Supabase (Auth, Postgres, Storage, Realtime)
-- Resend (transactional email events)
-- Brevo provider adapter (Newsletter)
-- Tailwind CSS v4 with custom coffee design tokens
-- Biome (lint + format)
-- Vitest for unit tests
+## Table of Contents
 
-## Features Implemented
+- [Core Features](#core-features)
+- [Tech Stack](#tech-stack)
+- [Architecture Overview](#architecture-overview)
+- [Role Model](#role-model)
+- [Prerequisites](#prerequisites)
+- [Environment Variables](#environment-variables)
+- [Getting Started](#getting-started)
+- [Database &amp; Migrations](#database--migrations)
+- [Storage Buckets](#storage-buckets)
+- [Scripts](#scripts)
+- [Route Map](#route-map)
+- [API Overview](#api-overview)
+- [Testing &amp; Quality Gates](#testing--quality-gates)
+- [Deployment](#deployment)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
 
-- Dynamic landing page with multilingual (`en` + `id`) sections from `landing_sections`
-- System-aware dark mode with manual persisted preference
-- App-wide language switching (`cb_locale`) and theme switching (`cb_theme`)
-- New public pages: About, Contact, Blog index/detail, human sitemap
-- SEO metadata sitemap (`/sitemap.xml`)
-- Admin-editable FAQ CMS (`faq_items`) with bilingual content
-- Auth flows: email/password, Google OAuth, magic link
-- Role model: `user`, `admin`, `superuser` with RBAC matrix
-- Brew CRUD and personal dashboard
-- Public brew catalog (published entries)
-- Forum (threads/comments/reactions) + realtime update notice
-- Brew reviews with 1-5 scoring dimensions and one review per user/brew
-- Moderation hide/unhide for brews/threads/comments
-- Superuser controls for RBAC and user lifecycle (block/disable/delete)
-- Transactional email service wrapper via Resend
-- Newsletter subscribe/unsubscribe via provider adapter
+## Core Features
+
+### Public Experience
+
+- Dynamic multilingual landing page (EN/ID)
+- Brew catalog with compare, wishlist, and collection sharing
+- Brew detail with radar, reviews, tags, recommendations, and sightings
+- Blog platform with CMS-managed posts, rich content, reactions, and TTS
+- Forum platform with categories/subforums, polls, moderation reports, realtime activity
+
+### Auth & Identity
+
+- Email/password authentication
+- Magic link authentication
+- Google OAuth
+- Public profiles with privacy controls
+- Presence + optional online visibility
+
+### Direct Messages
+
+- 1:1 conversations with group-ready schema
+- Realtime message updates
+- Typing indicators
+- Attachment upload (image)
+- Archive/restore
+- Per-user DM privacy and user blocking
+- DM report flow (private by default, superuser review only via report context)
+
+### Operations & Governance
+
+- Role-based dashboards (`user`, `admin`, `superuser`)
+- RBAC matrix editor (superuser)
+- User lifecycle controls (disable/delete/verify + role assignment flows)
+- Landing/FAQ/Blog CMS
+- Brew operations moderation
+- Forum moderation and report queue
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router), React 19, TypeScript
+- **Package manager**: pnpm
+- **Database/Auth/Realtime/Storage**: Supabase
+- **Rich text**: TipTap
+- **Validation**: Zod
+- **Styling/UI**: Tailwind CSS v4 + custom component system
+- **Email**: Resend (transactional), Brevo (newsletter sync)
+- **Quality**: Biome (lint/format), Vitest (unit tests), Playwright config included
+
+## Architecture Overview
+
+- `src/app`: App Router pages, layouts, API routes
+- `src/components`: UI, forms, feature components
+- `src/lib`: business logic, validators, services, helpers
+- `supabase/migrations`: SQL migrations (schema, RLS, functions, policies)
+- `scripts`: developer tooling (migration runner, user creation/role assignment)
+- `tests/unit`: unit tests (Vitest)
+
+Important route groups:
+
+- `src/app/(public)/*` public pages
+- `src/app/(me)/*` user dashboard
+- `src/app/(dashboard)/*` admin/superuser dashboard
+- `src/app/(messages)/*` dedicated full-height messages shell (header only, no public footer)
+
+## Role Model
+
+Canonical roles:
+
+- `user`
+- `admin`
+- `superuser`
+
+High-level behavior:
+
+- `user` accesses `/me/*`
+- `admin` and `superuser` access `/dashboard/*`
+- Role checks and permissions are enforced by server-side guards + Supabase policies/functions
+
+## Prerequisites
+
+- Node.js 20+ recommended
+- pnpm 10+
+- Supabase project (URL, anon key, service role key, database URL)
+- Optional for full feature set:
+  - Resend account + verified sender
+  - Brevo account + list IDs
+  - Google OAuth credentials (configured in Supabase)
+  - Cloudflare Turnstile keys (forum anti-spam controls)
 
 ## Environment Variables
 
-Create `.env.local`:
+Copy `.env.example` to `.env.local` (or `.env`) and fill values.
 
-```bash
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY
-SUPABASE_DATABASE_URL=postgresql://postgres.your-project:database-password@database-host:database-port/postgres
+| Variable                           | Required                    | Description                                             |
+| ---------------------------------- | --------------------------- | ------------------------------------------------------- |
+| `APP_MAINTENANCE_MODE`           | No (default `false`)      | Redirect non-excluded traffic to `/503` when `true` |
+| `NEXT_PUBLIC_APP_URL`            | Yes                         | App base URL (local/prod)                               |
+| `NEXT_PUBLIC_SUPABASE_URL`       | Yes                         | Supabase project URL                                    |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`  | Yes                         | Supabase anon key                                       |
+| `SUPABASE_SERVICE_ROLE_KEY`      | Yes                         | Service role key for privileged server operations       |
+| `SUPABASE_DATABASE_URL`          | Yes (for migration scripts) | Postgres connection string for `migrate:list/push`    |
+| `RESEND_API_KEY`                 | Optional                    | Transactional email provider key                        |
+| `RESEND_FROM_EMAIL`              | Optional                    | Sender identity used by Resend                          |
+| `BREVO_API_KEY`                  | Optional                    | Newsletter sync provider key                            |
+| `BREVO_BASE_URL`                 | Optional                    | Brevo API base URL (`https://api.brevo.com/v3`)       |
+| `BREVO_LIST_IDS`                 | Optional                    | CSV list IDs for newsletter sync                        |
+| `TURNSTILE_SECRET_KEY`           | Optional                    | Server-side Turnstile validation                        |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Optional                    | Client-side Turnstile site key                          |
 
-RESEND_API_KEY=YOUR_RESEND_API_KEY
-RESEND_FROM_EMAIL=Coffee Brew <noreply@yourdomain.com>
-
-BREVO_API_KEY=YOUR_BREVO_API_KEY
-BREVO_BASE_URL=https://api.brevo.com/v3
-BREVO_LIST_IDS=2,7
-# Optional legacy fallback:
-# BREVO_LIST_ID=2
-```
-
-## Supabase Setup
-
-1. Run migration SQL in [supabase/migrations/202602280001_init.sql](/d:/Samuel/Projects/coffee-brew/supabase/migrations/202602280001_init.sql).
-2. Run migration SQL in [supabase/migrations/202602280002_content_localization_and_faq.sql](/d:/Samuel/Projects/coffee-brew/supabase/migrations/202602280002_content_localization_and_faq.sql).
-3. Run seed SQL in [supabase/seed/seed.sql](/d:/Samuel/Projects/coffee-brew/supabase/seed/seed.sql).
-4. Create your first auth user, then promote to superuser:
-
-```sql
-select public.promote_user_to_role('you@example.com', 'superuser');
-```
-
-## Run
+## Getting Started
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-## Deployment
+App default local URL:
 
-- Vercel + Supabase runbook: [docs/deploy-vercel-supabase.md](/d:/Samuel/Projects/coffee-brew/docs/deploy-vercel-supabase.md)
+- `http://localhost:3000`
 
-## Quality Checks
+## Database & Migrations
 
-```bash
-pnpm lint
-pnpm lint:fix
-pnpm format
-pnpm typecheck
-pnpm test
-```
+All schema changes live in `supabase/migrations`.
 
-## Database Migrations
-
-Use `SUPABASE_DATABASE_URL` from your environment:
+Run migration scripts:
 
 ```bash
 pnpm migrate:list
 pnpm migrate:push
 ```
 
-`SUPABASE_DATABASE_URL` must be a valid URL-encoded Postgres connection string.
-Do not wrap the password in `[]`. If your password has special characters, percent-encode them.
+Notes:
 
-## Create User + Role
+- `SUPABASE_DATABASE_URL` must be valid and URL-safe.
+- Do not wrap password in square brackets.
+- Percent-encode special password characters as needed.
 
-Create or update an auth user and assign role (`user`, `admin`, `superuser`):
+Seed data:
+
+- `supabase/seed/seed.sql`
+
+Create/promote users quickly:
 
 ```bash
 pnpm user:create -- --email jane@example.com --password "Str0ngPass!" --role user --display-name "Jane Doe"
 pnpm user:create -- --email admin@example.com --password "Str0ngPass!" --role admin --display-name "Admin One"
 ```
 
-## API Surface
+Promote via SQL if needed:
 
-- `GET /api/landing`
-- `GET /api/faq`
-- `POST|PUT|DELETE /api/admin/landing/sections`
-- `POST|PUT|DELETE /api/admin/faq`
-- `POST /api/admin/moderation/hide`
-- `GET|POST /api/brews`
-- `GET|PATCH|DELETE /api/brews/:id`
-- `GET /api/catalog`
-- `GET|POST /api/forum/threads`
-- `GET|POST /api/forum/threads/:id/comments`
-- `POST /api/forum/reactions`
-- `GET|PUT /api/reviews/:brewId`
-- `GET|PUT /api/superuser/rbac`
-- `POST /api/superuser/users/:id/block`
-- `POST /api/superuser/users/:id/disable`
-- `DELETE /api/superuser/users/:id`
-- `POST /api/newsletter/subscribe`
-- `POST /api/newsletter/unsubscribe`
+```sql
+select public.promote_user_to_role('you@example.com', 'superuser');
+```
+
+## Storage Buckets
+
+The app uses Supabase Storage buckets for media uploads.
+
+Required buckets used by code paths:
+
+- `avatars`
+- `brew-images`
+- `blog-images`
+- `blog-media`
+- `forum-media`
+- `dm-media`
+- `tab-icons`
+
+Most upload APIs attempt bucket initialization/creation if missing, but production should pre-provision and validate policy access.
+
+## Scripts
+
+From `package.json`:
+
+- `pnpm dev` start local development server
+- `pnpm build` production build
+- `pnpm start` run built app
+- `pnpm lint` biome check
+- `pnpm lint:fix` biome auto-fix
+- `pnpm format` biome formatting
+- `pnpm typecheck` TypeScript noEmit check
+- `pnpm test` run Vitest tests
+- `pnpm check:all` build + lint fix + lint + typecheck + tests
+- `pnpm migrate:list` inspect migration status
+- `pnpm migrate:push` apply migrations
+- `pnpm user:create` create/update user + assign role
+
+## Route Map
+
+### Public
+
+- `/`
+- `/catalog`
+- `/catalog/compare`
+- `/brew/[id]`
+- `/forum`
+- `/forum/f/[subforumSlug]`
+- `/forum/[threadId]`
+- `/blog`
+- `/blog/[slug]`
+- `/users/[userId]`
+- `/collections/share/[token]`
+- `/messages` (authenticated)
+
+### Auth
+
+- `/login`
+- `/signup`
+- `/session/resolve`
+
+### User Dashboard
+
+- `/me`
+- `/me/profile`
+- `/me/brews/new`
+- `/me/brews/[id]/edit`
+- `/me/collections`
+
+### Admin/Superuser Dashboard
+
+- `/dashboard`
+- `/dashboard/brews`
+- `/dashboard/blog`
+- `/dashboard/landing`
+- `/dashboard/faq`
+- `/dashboard/moderation`
+- `/dashboard/moderation/reports`
+- `/dashboard/forum`
+- `/dashboard/profile`
+- `/dashboard/collections`
+- `/dashboard/users` (superuser)
+- `/dashboard/rbac` (superuser)
+- `/dashboard/settings` (superuser)
+- `/dashboard/badges` (superuser)
+
+### Status Pages
+
+- `/401`, `/403`, `/404`, `/500`, `/503`
+
+## API Overview
+
+The app uses App Router route handlers under `src/app/api`.
+
+### Key groups
+
+- `api/auth/*`: auth callbacks and session flows
+- `api/profile/*`: profile settings, avatar, privacy
+- `api/catalog`, `api/brews/*`, `api/reviews/*`: brew lifecycle and review data
+- `api/forum/*`: thread/comment/reaction/media/report/poll/mentions
+- `api/blog/*` + `api/admin/blog/*`: public blog data + CMS/admin ops
+- `api/messages/*`: DM conversations/messages/media/blocks/reports/unread count
+- `api/admin/messages/*`: superuser DM report moderation context
+- `api/notifications/*`: in-app notifications read/archive/delete
+- `api/admin/*`, `api/superuser/*`: moderation, CMS, settings, RBAC, user lifecycle
+
+## Testing & Quality Gates
+
+### Required checks
+
+```bash
+pnpm run lint
+pnpm run typecheck
+pnpm run test
+pnpm run build
+```
+
+### Playwright
+
+Playwright config is present at `playwright.config.ts`.
+Current e2e sample spec is minimal (`e2e/example.spec.ts`) and should be expanded for production-grade CI coverage.
+
+For manual browser validation, include:
+
+- Public routes (`/`, `/catalog`, `/forum`, `/blog`, `/brew/[id]`)
+- Role routes (`/me/*`, `/dashboard/*`)
+- Messages routes (`/messages`, `/messages?c=<conversationId>`)
+
+## Deployment
+
+Deployment guide:
+
+- [Vercel + Supabase Runbook](development-docs/deploy-vercel-supabase.md)
+
+## Troubleshooting
+
+### `pnpm run migrate:*` issues
+
+- Confirm `SUPABASE_DATABASE_URL` exists and is URL-safe.
+- If local CLI linkage fails, migration runner falls back to `pnpm dlx supabase@<version>`.
+
+### Auth redirects or 401/403 surprises
+
+- Validate `NEXT_PUBLIC_APP_URL`.
+- Check Supabase Auth Site URL + Redirect URLs.
+- Confirm role/profile status in `profiles` and `user_roles`.
+
+### Realtime updates not arriving
+
+- Confirm tables are in `supabase_realtime` publication (migrations handle this for core tables).
+- Check browser console/network for websocket or channel errors.
+
+### Media upload failures
+
+- Verify required storage buckets exist.
+- Verify MIME/size constraints for each upload endpoint.
+- Confirm storage policies and service-role usage in server routes.
+
+### UI route mismatch after refactors
+
+- Ensure role access follows `/me/*` vs `/dashboard/*`.
+- `/messages/[conversationId]` is compatibility-safe but canonical route is `/messages?c=<id>`.
+
+## License
+
+[MIT](LICENSE)
