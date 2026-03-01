@@ -4,22 +4,16 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAppPreferences } from "@/components/providers/app-preferences-provider";
 import type { ForumReactionType } from "@/lib/constants";
-import { FORUM_REACTION_TYPES } from "@/lib/constants";
+import { FORUM_REACTION_TYPES, REACTION_EMOJI } from "@/lib/constants";
 
 interface ReactionBarProps {
 	counts?: Partial<Record<ForumReactionType, number>>;
+	myReaction?: ForumReactionType | null;
 	targetType: "thread" | "comment";
 	targetId: string;
 }
 
-const reactionLabel: Record<(typeof FORUM_REACTION_TYPES)[number], string> = {
-	like: "👍",
-	coffee: "☕",
-	fire: "🔥",
-	mindblown: "🤯",
-};
-
-export function ReactionBar({ counts, targetType, targetId }: ReactionBarProps) {
+export function ReactionBar({ counts, myReaction = null, targetType, targetId }: ReactionBarProps) {
 	const { locale } = useAppPreferences();
 	const router = useRouter();
 	const [loading, setLoading] = useState<string | null>(null);
@@ -55,10 +49,12 @@ export function ReactionBar({ counts, targetType, targetId }: ReactionBarProps) 
 						type="button"
 						disabled={loading !== null}
 						onClick={() => addReaction(reaction)}
-						className="rounded-full border bg-(--surface) px-3 py-1 text-sm hover:bg-(--sand)/20 disabled:opacity-60"
+						className={`rounded-full border px-3 py-1 text-sm transition hover:bg-(--sand)/20 disabled:opacity-60 ${
+							myReaction === reaction ? "border-(--accent) bg-(--accent)/15 text-(--accent)" : "bg-(--surface) text-foreground"
+						}`}
 						title={locale === "id" ? "Tambah reaksi" : "Add reaction"}
 					>
-						{reactionLabel[reaction]} {counts?.[reaction] ?? 0} {loading === reaction ? "..." : ""}
+						{REACTION_EMOJI[reaction]} {counts?.[reaction] ?? 0} {loading === reaction ? "..." : ""}
 					</button>
 				))}
 			</div>

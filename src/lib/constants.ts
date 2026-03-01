@@ -53,9 +53,20 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, Array<{ resource: ResourceKe
 
 export const APP_NAME = "Coffee Brew";
 
-export const FORUM_REACTION_TYPES = ["like", "coffee", "fire", "mindblown"] as const;
+export const FORUM_REACTION_TYPES = ["like", "coffee", "fire", "mindblown", "dislike"] as const;
 
 export type ForumReactionType = (typeof FORUM_REACTION_TYPES)[number];
+
+export const REACTION_EMOJI: Record<ForumReactionType, string> = {
+	like: "👍",
+	coffee: "☕",
+	fire: "🔥",
+	mindblown: "🤯",
+	dislike: "👎",
+};
+
+export const POSITIVE_REACTION_TYPES: ForumReactionType[] = ["like", "coffee", "fire", "mindblown"];
+export const NEGATIVE_REACTION_TYPES: ForumReactionType[] = ["dislike"];
 
 export const FORUM_THREAD_SORT_VALUES = ["latest", "oldest", "most_reacted", "most_discussed"] as const;
 export type ForumThreadSortValue = (typeof FORUM_THREAD_SORT_VALUES)[number];

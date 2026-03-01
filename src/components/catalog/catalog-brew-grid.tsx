@@ -134,7 +134,7 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 			{feedback ? <p className="text-sm text-(--danger)">{feedback}</p> : null}
 
 			<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-				{brews.map((brew) => {
+				{brews.map((brew, index) => {
 					const isWishlisted = wishlistIds.has(brew.id);
 					const inCompare = compareIds.includes(brew.id);
 					const discussHref = isAuthenticated
@@ -153,6 +153,8 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 										alt={brew.image_alt || brew.name}
 										fill
 										sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+										loading={index < 3 ? "eager" : "lazy"}
+										fetchPriority={index < 3 ? "high" : "auto"}
 										className="object-cover"
 									/>
 								</div>
@@ -195,10 +197,15 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 
 								<div className="grid grid-cols-3 gap-2 pt-1 sm:flex sm:flex-wrap">
 									<Link href={discussHref} className="block sm:inline-flex">
-										<Button type="button" size="sm" variant="outline" className="w-full gap-2 sm:w-auto">
+										<Button
+											type="button"
+											size="sm"
+											variant="outline"
+											className="w-full gap-2 sm:w-auto"
+											aria-label={locale === "id" ? "Diskusikan brew ini" : "Discuss this brew"}
+										>
 											<MessageSquare size={14} />
 											<span className="hidden sm:inline">{locale === "id" ? "Diskusikan" : "Discuss this brew"}</span>
-											<span className="sr-only">{locale === "id" ? "Diskusikan Brew Ini" : "Discuss this brew"}</span>
 										</Button>
 									</Link>
 									<Button
@@ -214,15 +221,6 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 										<span className="hidden sm:inline">
 											{isWishlisted ? (locale === "id" ? "Wishlist" : "Wishlisted") : locale === "id" ? "Simpan" : "Wishlist"}
 										</span>
-										<span className="sr-only">
-											{isWishlisted
-												? locale === "id"
-													? "Hapus dari wishlist"
-													: "Remove from wishlist"
-												: locale === "id"
-													? "Simpan ke wishlist"
-													: "Add to wishlist"}
-										</span>
 									</Button>
 									<Button
 										type="button"
@@ -235,15 +233,6 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 										<GitCompare size={14} />
 										<span className="hidden sm:inline">
 											{inCompare ? (locale === "id" ? "Dipilih" : "Selected") : locale === "id" ? "Bandingkan" : "Compare"}
-										</span>
-										<span className="sr-only">
-											{inCompare
-												? locale === "id"
-													? "Hapus dari compare"
-													: "Remove from compare"
-												: locale === "id"
-													? "Tambah ke compare"
-													: "Add to compare"}
 										</span>
 									</Button>
 								</div>

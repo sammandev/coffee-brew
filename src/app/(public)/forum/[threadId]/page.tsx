@@ -13,12 +13,14 @@ import { ThreadTypingIndicator } from "@/components/forum/thread-typing-indicato
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { RichTextContent } from "@/components/ui/rich-text-content";
+import { UserIdentitySummary } from "@/components/user/user-identity-summary";
 import { getSessionContext } from "@/lib/auth";
 import { FORUM_REACTION_TYPES, type ForumReactionType } from "@/lib/constants";
 import { getServerI18n } from "@/lib/i18n/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ForumPollRecord } from "@/lib/types";
+import { buildHighestBadgeMap, resolveUserDisplayName } from "@/lib/user-identity";
 import { formatDate } from "@/lib/utils";
 
 interface ForumCommentRow {
@@ -56,11 +58,11 @@ export async function generateMetadata({ params }: { params: Promise<{ threadId:
 	const { data: thread } = await supabase.from("forum_threads").select("title").eq("id", threadId).maybeSingle();
 	if (!thread) {
 		return {
-			title: "Thread Not Found | Forum | Coffee Brew",
+			title: "Thread Not Found | Forum",
 		};
 	}
 	return {
-		title: `${thread.title} | Forum | Coffee Brew`,
+		title: `${thread.title} | Forum`,
 		description: `Join the discussion: ${thread.title}`,
 	};
 }
@@ -173,49 +175,70 @@ export default async function ThreadDetailPage({ params, searchParams }: ThreadD
 	const threadReactionCounts = buildReactionCounts(threadReactions as Array<{ reaction: string }>);
 	const profileIds = Array.from(new Set([thread.author_id, ...pagedComments.map((commentRow) => commentRow.author_id)]));
 	const supabaseAdmin = createSupabaseAdminClient();
-	const [{ data: profileRows }, { data: userBadges }] = await Promise.all([
+	const [{ data: profileRows }, { data: userBadges }, { data: reviewerRows }] = await Promise.all([
 		profileIds.length > 0
-			? supabaseAdmin.from("profiles").select("id, display_name, email, is_verified, karma_points").in("id", profileIds)
+			? supabaseAdmin
+					.from("profiles")
+					.select("id, display_name, email, avatar_url, created_at, is_verified, karma_points, mention_handle")
+					.in("id", profileIds)
 			: Promise.resolve({
 					data: [] as Array<{
 						id: string;
 						display_name: string | null;
 						email: string | null;
+						avatar_url: string | null;
+						created_at: string;
 						is_verified: boolean;
 						karma_points: number;
+						mention_handle: string | null;
 					}>,
 				}),
 		profileIds.length > 0
 			? supabaseAdmin
 					.from("user_badges")
-					.select("user_id, badge_id, badge_definitions(label_en, label_id)")
+					.select("user_id, badge_id, badge_definitions(label_en, label_id, min_points)")
 					.in("user_id", profileIds)
 			: Promise.resolve({
-					data: [] as Array<{ user_id: string; badge_definitions: { label_en: string; label_id: string } | null }>,
+					data: [] as Array<{
+						user_id: string;
+						badge_definitions: { label_en: string; label_id: string; min_points: number } | null;
+					}>,
 				}),
+		profileIds.length > 0
+			? supabaseAdmin.from("brew_reviews").select("reviewer_id").in("reviewer_id", profileIds).limit(5000)
+			: Promise.resolve({ data: [] as Array<{ reviewer_id: string }> }),
 	]);
 
+	const reviewerCountByUserId = new Map<string, number>();
+	for (const row of reviewerRows ?? []) {
+		reviewerCountByUserId.set(row.reviewer_id, (reviewerCountByUserId.get(row.reviewer_id) ?? 0) + 1);
+	}
+	const topBadgeByUserId = buildHighestBadgeMap(userBadges ?? [], locale);
 	const profileById = new Map(
 		(profileRows ?? []).map((profileRow) => [
 			profileRow.id,
 			{
-				name: profileRow.display_name?.trim() || profileRow.email || "Unknown User",
+				avatarUrl: profileRow.avatar_url,
+				joinedAt: profileRow.created_at,
+				mentionHandle: profileRow.mention_handle,
+				name: resolveUserDisplayName(profileRow),
+				topBadge: topBadgeByUserId.get(profileRow.id) ?? null,
+				totalReviews: reviewerCountByUserId.get(profileRow.id) ?? 0,
 				verified: Boolean(profileRow.is_verified),
 				karma: Number(profileRow.karma_points ?? 0),
 			},
 		]),
 	);
-	const badgeByUserId = new Map<string, string[]>();
-	for (const row of userBadges ?? []) {
-		const badgeDefinition = Array.isArray(row.badge_definitions) ? row.badge_definitions[0] : row.badge_definitions;
-		const label = badgeDefinition ? (locale === "id" ? badgeDefinition.label_id : badgeDefinition.label_en) : null;
-		if (!label) continue;
-		const existing = badgeByUserId.get(row.user_id) ?? [];
-		existing.push(label);
-		badgeByUserId.set(row.user_id, existing);
-	}
-
-	const authorInfo = profileById.get(thread.author_id) ?? { name: "Unknown User", verified: false, karma: 0 };
+	const authorInfo = profileById.get(thread.author_id) ?? {
+		avatarUrl: null,
+		joinedAt: thread.created_at,
+		mentionHandle: null,
+		name: "Unknown User",
+		topBadge: null,
+		totalReviews: 0,
+		verified: false,
+		karma: 0,
+	};
 	const hasUpdate = new Date(thread.updated_at).getTime() > new Date(thread.created_at).getTime();
 	const isModerator = session?.role === "admin" || session?.role === "superuser";
 	const normalizedPoll: ForumPollRecord | null = poll
@@ -268,32 +291,42 @@ export default async function ThreadDetailPage({ params, searchParams }: ThreadD
 			const commentReactions =
 				reactions?.filter((reaction) => reaction.target_type === "comment" && reaction.target_id === comment.id) ?? [];
 			const commentReactionCounts = buildReactionCounts(commentReactions as Array<{ reaction: string }>);
-			const commentAuthor = profileById.get(comment.author_id) ?? { name: "Unknown User", verified: false, karma: 0 };
-			const commentBadges = badgeByUserId.get(comment.author_id) ?? [];
+			const commentAuthor = profileById.get(comment.author_id) ?? {
+				avatarUrl: null,
+				joinedAt: comment.created_at,
+				mentionHandle: null,
+				name: "Unknown User",
+				topBadge: null,
+				totalReviews: 0,
+				verified: false,
+				karma: 0,
+			};
 			const isReply = Boolean(comment.parent_comment_id);
 
 			return (
 				<div key={comment.id} className="space-y-3" style={{ marginLeft: `${depth * 1.2}rem` }}>
 					<Card className="space-y-4">
 						<span id={`comment-${comment.id}`} className="block h-0 w-0 overflow-hidden" aria-hidden="true" />
+						<div className="flex flex-wrap items-center justify-between gap-3">
+							<UserIdentitySummary
+								userId={comment.author_id}
+								displayName={commentAuthor.name}
+								avatarUrl={commentAuthor.avatarUrl}
+								joinedAt={commentAuthor.joinedAt}
+								karma={commentAuthor.karma}
+								totalReviews={commentAuthor.totalReviews}
+								locale={locale}
+								variant="compact"
+								hideJoined
+								isVerified={commentAuthor.verified}
+								mentionHandle={commentAuthor.mentionHandle}
+								badges={commentAuthor.topBadge ? [commentAuthor.topBadge] : []}
+							/>
+							<ForumReportAction targetType={isReply ? "reply" : "comment"} targetId={comment.id} />
+						</div>
 						<RichTextContent html={comment.content} />
 						<div className="flex flex-wrap items-center justify-between gap-2">
-							<p className="text-xs text-[var(--muted)]">
-								<Link href={`/users/${comment.author_id}`} className="font-semibold hover:text-(--espresso)">
-									{commentAuthor.name}
-								</Link>{" "}
-								{commentAuthor.verified ? <span className="rounded-full border px-1 text-[10px]">✓</span> : null}
-								{" | "}
-								{formatDate(comment.created_at, locale)}
-								{" | "}
-								{locale === "id" ? "Karma" : "Karma"}: {commentAuthor.karma}
-							</p>
-							<div className="flex items-center gap-2">
-								{commentBadges.slice(0, 2).map((badge) => (
-									<Badge key={`${comment.id}-${badge}`}>{badge}</Badge>
-								))}
-								<ForumReportAction targetType={isReply ? "reply" : "comment"} targetId={comment.id} />
-							</div>
+							<p className="text-xs text-[var(--muted)]">{formatDate(comment.created_at, locale)}</p>
 						</div>
 						<ReactionBar targetType="comment" targetId={comment.id} counts={commentReactionCounts} />
 					</Card>
@@ -367,23 +400,27 @@ export default async function ThreadDetailPage({ params, searchParams }: ThreadD
 						))}
 					</div>
 				) : null}
-				<p className="text-[var(--muted)]">
-					<Link href={`/users/${thread.author_id}`} className="font-semibold hover:text-(--espresso)">
-						{authorInfo.name}
-					</Link>{" "}
-					{authorInfo.verified ? <span className="rounded-full border px-1 text-[10px]">✓</span> : null}
-					{" | "}
-					{locale === "id" ? "Diposting" : "Posted"}: {formatDate(thread.created_at, locale)}
-					{hasUpdate ? ` | ${locale === "id" ? "Diperbarui" : "Updated"}: ${formatDate(thread.updated_at, locale)}` : ""}
-					{" | "}
-					{locale === "id" ? "Karma" : "Karma"}: {authorInfo.karma}
-				</p>
-				<div className="flex flex-wrap items-center gap-2">
-					{(badgeByUserId.get(thread.author_id) ?? []).slice(0, 3).map((badge) => (
-						<Badge key={`${thread.id}-${badge}`}>{badge}</Badge>
-					))}
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<UserIdentitySummary
+						userId={thread.author_id}
+						displayName={authorInfo.name}
+						avatarUrl={authorInfo.avatarUrl}
+						joinedAt={authorInfo.joinedAt}
+						karma={authorInfo.karma}
+						totalReviews={authorInfo.totalReviews}
+						locale={locale}
+						variant="compact"
+						hideJoined
+						isVerified={authorInfo.verified}
+						mentionHandle={authorInfo.mentionHandle}
+						badges={authorInfo.topBadge ? [authorInfo.topBadge] : []}
+					/>
 					<ForumReportAction targetType="thread" targetId={thread.id} />
 				</div>
+				<p className="text-xs text-[var(--muted)]">
+					{locale === "id" ? "Diposting" : "Posted"}: {formatDate(thread.created_at, locale)}
+					{hasUpdate ? ` | ${locale === "id" ? "Diperbarui" : "Updated"}: ${formatDate(thread.updated_at, locale)}` : ""}
+				</p>
 			</header>
 
 			<ForumThreadModerationControls

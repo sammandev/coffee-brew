@@ -64,6 +64,7 @@ export function ProfilePasswordForm() {
 					id="next_password"
 					value={nextPassword}
 					onChange={(event) => setNextPassword(event.currentTarget.value)}
+					autoComplete="new-password"
 					minLength={PASSWORD_MIN_LENGTH}
 					required
 					showLabel={locale === "id" ? "Tampilkan kata sandi" : "Show password"}
@@ -76,6 +77,7 @@ export function ProfilePasswordForm() {
 					id="confirm_password"
 					value={confirmPassword}
 					onChange={(event) => setConfirmPassword(event.currentTarget.value)}
+					autoComplete="new-password"
 					minLength={PASSWORD_MIN_LENGTH}
 					required
 					showLabel={locale === "id" ? "Tampilkan kata sandi" : "Show password"}

@@ -1,4 +1,5 @@
 import { sortCatalogRows } from "@/lib/brew-catalog";
+import { FORUM_REACTION_TYPES, type ForumReactionType } from "@/lib/constants";
 import { aggregateRatings } from "@/lib/rating";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isMissingColumnError } from "@/lib/supabase-errors";
@@ -221,6 +222,21 @@ async function getProfileNameMap(profileIds: string[]) {
 	return new Map((data ?? []).map((profile) => [profile.id, profile.display_name || profile.email || "Unknown author"]));
 }
 
+function buildReactionCountMap(
+	rows: Array<{ post_id: string; reaction: ForumReactionType }> | Array<{ reaction: ForumReactionType }>,
+) {
+	const counts = Object.fromEntries(FORUM_REACTION_TYPES.map((reactionType) => [reactionType, 0])) as Record<
+		ForumReactionType,
+		number
+	>;
+	for (const row of rows) {
+		if (!FORUM_REACTION_TYPES.includes(row.reaction as ForumReactionType)) continue;
+		const reactionType = row.reaction as ForumReactionType;
+		counts[reactionType] = (counts[reactionType] ?? 0) + 1;
+	}
+	return counts;
+}
+
 export async function getPublishedBlogPosts(limit = 24) {
 	const supabase = await createSupabaseServerClient();
 	const { data, error } = await supabase
@@ -245,11 +261,24 @@ export async function getPublishedBlogPosts(limit = 24) {
 	);
 
 	const nameMap = await getProfileNameMap(profileIds);
+	const postIds = data.map((post) => post.id);
+	const { data: reactionRows, error: reactionRowsError } =
+		postIds.length > 0
+			? await supabase.from("blog_reactions").select("post_id, reaction").in("post_id", postIds)
+			: { data: [] as Array<{ post_id: string; reaction: ForumReactionType }> };
+	const safeReactionRows = reactionRowsError ? [] : (reactionRows ?? []);
+	const reactionRowsByPostId = new Map<string, Array<{ reaction: ForumReactionType }>>();
+	for (const row of safeReactionRows) {
+		const current = reactionRowsByPostId.get(row.post_id) ?? [];
+		current.push({ reaction: row.reaction as ForumReactionType });
+		reactionRowsByPostId.set(row.post_id, current);
+	}
 
 	return data.map((post) => ({
 		...post,
 		author_name: post.author_id ? (nameMap.get(post.author_id) ?? "Unknown author") : "System",
 		editor_name: post.editor_id ? (nameMap.get(post.editor_id) ?? "Unknown editor") : null,
+		reaction_counts: buildReactionCountMap(reactionRowsByPostId.get(post.id) ?? []),
 	}));
 }
 
@@ -270,11 +299,18 @@ export async function getPublishedBlogPostBySlug(slug: string) {
 		(id): id is string => typeof id === "string" && id.length > 0,
 	);
 	const nameMap = await getProfileNameMap(profileIds);
+	const { data: reactionRows, error: reactionRowsError } = await supabase
+		.from("blog_reactions")
+		.select("reaction")
+		.eq("post_id", data.id);
 
 	return {
 		...data,
 		author_name: data.author_id ? (nameMap.get(data.author_id) ?? "Unknown author") : "System",
 		editor_name: data.editor_id ? (nameMap.get(data.editor_id) ?? "Unknown editor") : null,
+		reaction_counts: buildReactionCountMap(
+			(reactionRowsError ? [] : (reactionRows ?? [])).map((row) => ({ reaction: row.reaction as ForumReactionType })),
+		),
 	};
 }
 

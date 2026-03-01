@@ -12,6 +12,7 @@ const ALLOWED_TAGS = [
 	"blockquote",
 	"a",
 	"img",
+	"video",
 	"figure",
 	"figcaption",
 	"iframe",
@@ -20,6 +21,7 @@ const ALLOWED_TAGS = [
 const ALLOWED_ATTRIBUTES: IOptions["allowedAttributes"] = {
 	a: ["href", "target", "rel"],
 	img: ["src", "alt", "width", "height", "loading"],
+	video: ["src", "controls", "loop", "muted", "playsinline", "preload", "poster", "class"],
 	iframe: ["src", "title", "allow", "allowfullscreen", "frameborder", "width", "height"],
 	figure: ["class"],
 	figcaption: ["class"],
@@ -28,6 +30,7 @@ const ALLOWED_ATTRIBUTES: IOptions["allowedAttributes"] = {
 const ALLOWED_SCHEMES = ["http", "https", "mailto"];
 const YOUTUBE_HOSTS = ["www.youtube.com", "youtube.com", "www.youtube-nocookie.com", "youtu.be"];
 const TWITTER_HOSTS = ["x.com", "www.x.com", "twitter.com", "www.twitter.com"];
+const BLOG_MEDIA_PUBLIC_PATH = "/storage/v1/object/public/blog-media/";
 
 const HAS_HTML_TAG_PATTERN = /<\/?[a-z][^>]*>/i;
 
@@ -58,6 +61,7 @@ function sanitizeRichHtml(value: string) {
 		allowedSchemesByTag: {
 			a: ALLOWED_SCHEMES,
 			img: ["http", "https"],
+			video: ["http", "https"],
 			iframe: ["http", "https"],
 		},
 		transformTags: {
@@ -65,6 +69,17 @@ function sanitizeRichHtml(value: string) {
 				target: "_blank",
 				rel: "noopener noreferrer nofollow",
 			}),
+		},
+		exclusiveFilter: (frame) => {
+			if (frame.tag !== "video") return false;
+			const src = frame.attribs.src ?? "";
+			if (!src) return true;
+			try {
+				const url = new URL(src);
+				return !url.pathname.includes(BLOG_MEDIA_PUBLIC_PATH);
+			} catch {
+				return true;
+			}
 		},
 	});
 }

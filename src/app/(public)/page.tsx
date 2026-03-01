@@ -158,11 +158,13 @@ export default async function LandingPage() {
 		};
 	});
 
-	const prioritizedImageSectionId =
-		landingSections.find((section) => {
+	const prioritizedImageSectionIds = landingSections
+		.filter((section) => {
 			const config = resolveLocalizedConfig(locale, section.config, section.config_id);
 			return typeof config.assetUrl === "string" && config.assetUrl.trim().length > 0;
-		})?.id ?? null;
+		})
+		.slice(0, 3)
+		.map((section) => section.id);
 
 	return (
 		<div className="space-y-8">
@@ -186,7 +188,11 @@ export default async function LandingPage() {
 			<div className="space-y-6">
 				{landingSections.map((section, index) => (
 					<div className="fade-up" style={{ animationDelay: `${index * 100}ms` }} key={section.id}>
-						<LandingSectionRenderer section={section} locale={locale} eagerImage={section.id === prioritizedImageSectionId} />
+						<LandingSectionRenderer
+							section={section}
+							locale={locale}
+							eagerImage={prioritizedImageSectionIds.includes(section.id)}
+						/>
 					</div>
 				))}
 			</div>

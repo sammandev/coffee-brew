@@ -92,17 +92,18 @@ export function SignupForm({ enableGoogleLogin = true }: SignupFormProps) {
 				<h2 className="font-heading text-2xl text-(--espresso)">{t("auth.createAccount")}</h2>
 				<div>
 					<Label htmlFor="displayName">{locale === "id" ? "Nama Tampilan" : "Display Name"}</Label>
-					<Input id="displayName" name="displayName" required />
+					<Input id="displayName" name="displayName" autoComplete="name" required />
 				</div>
 				<div>
 					<Label htmlFor="email">Email</Label>
-					<Input id="email" name="email" type="email" required />
+					<Input id="email" name="email" type="email" autoComplete="email" required />
 				</div>
 				<div>
 					<Label htmlFor="password">Password</Label>
 					<PasswordInput
 						id="password"
 						name="password"
+						autoComplete="new-password"
 						required
 						minLength={8}
 						showLabel={t("auth.showPassword")}

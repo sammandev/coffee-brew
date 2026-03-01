@@ -1,4 +1,4 @@
-import { MessageSquare, UserRound } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -7,12 +7,14 @@ import { ForumLiveAutoRefresh } from "@/components/forum/forum-live-auto-refresh
 import { ForumSearchControls } from "@/components/forum/forum-search-controls";
 import { ThreadComposerModal } from "@/components/forum/thread-composer-modal";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import { UserIdentitySummary } from "@/components/user/user-identity-summary";
 import { getSessionContext } from "@/lib/auth";
-import { FORUM_REACTION_TYPES, type ForumReactionType } from "@/lib/constants";
+import { FORUM_REACTION_TYPES, type ForumReactionType, REACTION_EMOJI } from "@/lib/constants";
 import { buildReactionCountMap } from "@/lib/forum";
 import { getServerI18n } from "@/lib/i18n/server";
 import { clampPlainText } from "@/lib/rich-text";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { buildHighestBadgeMap, resolveUserDisplayName } from "@/lib/user-identity";
 import { formatDate } from "@/lib/utils";
 
 interface SubforumPageProps {
@@ -22,8 +24,13 @@ interface SubforumPageProps {
 
 export async function generateMetadata({ params }: { params: Promise<{ subforumSlug: string }> }): Promise<Metadata> {
 	const { subforumSlug } = await params;
+	const readableSubforum = subforumSlug
+		.split("-")
+		.filter(Boolean)
+		.map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+		.join(" ");
 	return {
-		title: `${subforumSlug.replaceAll("-", " ")} | Forum | Coffee Brew`,
+		title: `${readableSubforum} | Forum`,
 		description: "Browse and search threads in this forum sub-forum.",
 	};
 }
@@ -133,54 +140,78 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 	const threadIds = threadRows.map((thread) => thread.id);
 	const authorIds = Array.from(new Set(threadRows.map((thread) => thread.author_id)));
 
-	const [{ data: reactions }, { data: comments }, { data: authors }, { data: userBadges }, { data: allTagsSource }] =
-		await Promise.all([
-			threadIds.length > 0
-				? supabase
-						.from("forum_reactions")
-						.select("target_id, reaction")
-						.eq("target_type", "thread")
-						.in("target_id", threadIds)
-				: Promise.resolve({ data: [] as Array<{ target_id: string; reaction: ForumReactionType }> }),
-			threadIds.length > 0
-				? supabase.from("forum_comments").select("thread_id, id").eq("status", "visible").in("thread_id", threadIds)
-				: Promise.resolve({ data: [] as Array<{ thread_id: string; id: string }> }),
-			authorIds.length > 0
-				? supabase.from("profiles").select("id, display_name, email, is_verified, karma_points").in("id", authorIds)
-				: Promise.resolve({
-						data: [] as Array<{
-							id: string;
-							display_name: string | null;
-							email: string | null;
-							is_verified: boolean;
-							karma_points: number;
-						}>,
-					}),
-			authorIds.length > 0
-				? supabase.from("user_badges").select("user_id, badge_definitions(label_en, label_id)").in("user_id", authorIds)
-				: Promise.resolve({
-						data: [] as Array<{ user_id: string; badge_definitions: { label_en: string; label_id: string } | null }>,
-					}),
-			supabase.from("forum_threads").select("tags").eq("status", "visible").eq("subforum_id", subforum.id).limit(300),
-		]);
+	const [
+		{ data: reactions },
+		{ data: comments },
+		{ data: authors },
+		{ data: userBadges },
+		{ data: allTagsSource },
+		{ data: authorReviewRows },
+	] = await Promise.all([
+		threadIds.length > 0
+			? supabase
+					.from("forum_reactions")
+					.select("target_id, reaction")
+					.eq("target_type", "thread")
+					.in("target_id", threadIds)
+			: Promise.resolve({ data: [] as Array<{ target_id: string; reaction: ForumReactionType }> }),
+		threadIds.length > 0
+			? supabase.from("forum_comments").select("thread_id, id").eq("status", "visible").in("thread_id", threadIds)
+			: Promise.resolve({ data: [] as Array<{ thread_id: string; id: string }> }),
+		authorIds.length > 0
+			? supabase
+					.from("profiles")
+					.select("id, display_name, email, avatar_url, created_at, is_verified, karma_points, mention_handle")
+					.in("id", authorIds)
+			: Promise.resolve({
+					data: [] as Array<{
+						id: string;
+						display_name: string | null;
+						email: string | null;
+						avatar_url: string | null;
+						created_at: string;
+						is_verified: boolean;
+						karma_points: number;
+						mention_handle: string | null;
+					}>,
+				}),
+		authorIds.length > 0
+			? supabase
+					.from("user_badges")
+					.select("user_id, badge_definitions(label_en, label_id, min_points)")
+					.in("user_id", authorIds)
+			: Promise.resolve({
+					data: [] as Array<{
+						user_id: string;
+						badge_definitions: { label_en: string; label_id: string; min_points: number } | null;
+					}>,
+				}),
+		supabase.from("forum_threads").select("tags").eq("status", "visible").eq("subforum_id", subforum.id).limit(300),
+		authorIds.length > 0
+			? supabase.from("brew_reviews").select("reviewer_id").in("reviewer_id", authorIds).limit(5000)
+			: Promise.resolve({ data: [] as Array<{ reviewer_id: string }> }),
+	]);
 
+	const authorReviewCountMap = new Map<string, number>();
+	for (const row of authorReviewRows ?? []) {
+		authorReviewCountMap.set(row.reviewer_id, (authorReviewCountMap.get(row.reviewer_id) ?? 0) + 1);
+	}
+	const topBadgeByUserId = buildHighestBadgeMap(userBadges ?? [], locale);
 	const authorById = new Map(
 		(authors ?? []).map((authorRow) => [
 			authorRow.id,
 			{
-				name: authorRow.display_name?.trim() || authorRow.email || "Unknown User",
+				avatarUrl: authorRow.avatar_url,
+				joinedAt: authorRow.created_at,
+				mentionHandle: authorRow.mention_handle,
+				name: resolveUserDisplayName(authorRow),
+				topBadge: topBadgeByUserId.get(authorRow.id) ?? null,
+				totalReviews: authorReviewCountMap.get(authorRow.id) ?? 0,
 				verified: Boolean(authorRow.is_verified),
 				karma: Number(authorRow.karma_points ?? 0),
 			},
 		]),
 	);
-	const topBadgeByUserId = new Map<string, string>();
-	for (const row of userBadges ?? []) {
-		const badgeDefinition = Array.isArray(row.badge_definitions) ? row.badge_definitions[0] : row.badge_definitions;
-		if (!badgeDefinition) continue;
-		if (topBadgeByUserId.has(row.user_id)) continue;
-		topBadgeByUserId.set(row.user_id, locale === "id" ? badgeDefinition.label_id : badgeDefinition.label_en);
-	}
 	const reactionRowsByThread = new Map<string, Array<{ reaction: ForumReactionType }>>();
 	for (const reaction of reactions ?? []) {
 		const current = reactionRowsByThread.get(reaction.target_id) ?? [];
@@ -307,7 +338,16 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 
 			<section className="space-y-3">
 				{threadRows.map((thread) => {
-					const authorInfo = authorById.get(thread.author_id) ?? { name: "Unknown User", verified: false, karma: 0 };
+					const authorInfo = authorById.get(thread.author_id) ?? {
+						avatarUrl: null,
+						joinedAt: thread.created_at,
+						mentionHandle: null,
+						name: "Unknown User",
+						topBadge: null,
+						totalReviews: 0,
+						verified: false,
+						karma: 0,
+					};
 					const reactionCounts = buildReactionCountMap(reactionRowsByThread.get(thread.id) ?? []);
 					return (
 						<Card key={thread.id} className="transition hover:-translate-y-1">
@@ -324,18 +364,21 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 								) : null}
 								<CardDescription className="mt-2 line-clamp-2">{clampPlainText(thread.content, 200)}</CardDescription>
 							</Link>
-							<div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-(--muted)">
-								<span className="inline-flex items-center gap-1">
-									<UserRound size={13} />
-									<Link href={`/users/${thread.author_id}`} className="font-semibold hover:text-(--espresso)">
-										{authorInfo.name}
-									</Link>
-									{authorInfo.verified ? <span className="rounded-full border px-1 text-[10px]">✓</span> : null}
-									{topBadgeByUserId.get(thread.author_id) ? (
-										<span className="rounded-full border px-1.5 text-[10px]">{topBadgeByUserId.get(thread.author_id)}</span>
-									) : null}
-									<span>{locale === "id" ? `Karma ${authorInfo.karma}` : `Karma ${authorInfo.karma}`}</span>
-								</span>
+							<div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-(--muted)">
+								<UserIdentitySummary
+									userId={thread.author_id}
+									displayName={authorInfo.name}
+									avatarUrl={authorInfo.avatarUrl}
+									joinedAt={authorInfo.joinedAt}
+									karma={authorInfo.karma}
+									totalReviews={authorInfo.totalReviews}
+									locale={locale}
+									variant="compact"
+									hideJoined
+									isVerified={authorInfo.verified}
+									mentionHandle={authorInfo.mentionHandle}
+									badges={authorInfo.topBadge ? [authorInfo.topBadge] : []}
+								/>
 								<span className="inline-flex items-center gap-1">
 									<MessageSquare size={13} />
 									{commentCountByThread.get(thread.id) ?? 0}
@@ -344,8 +387,7 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 							<div className="mt-2 flex flex-wrap gap-2 text-xs">
 								{FORUM_REACTION_TYPES.map((reactionType) => (
 									<span key={`${thread.id}-${reactionType}`} className="rounded-full border px-2 py-0.5 text-(--muted)">
-										{reactionType === "like" ? "👍" : reactionType === "coffee" ? "☕" : reactionType === "fire" ? "🔥" : "🤯"}{" "}
-										{reactionCounts[reactionType] ?? 0}
+										{REACTION_EMOJI[reactionType]} {reactionCounts[reactionType] ?? 0}
 									</span>
 								))}
 							</div>

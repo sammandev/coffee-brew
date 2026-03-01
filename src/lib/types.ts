@@ -214,6 +214,15 @@ export interface BlogPostRecord {
 	updated_at: string;
 }
 
+export interface BlogReactionRecord {
+	id: string;
+	post_id: string;
+	user_id: string;
+	reaction: "like" | "coffee" | "fire" | "mindblown" | "dislike";
+	created_at: string;
+	updated_at: string;
+}
+
 export interface ForumCategory {
 	id: string;
 	slug: string;

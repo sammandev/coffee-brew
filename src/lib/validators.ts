@@ -268,6 +268,13 @@ export const blogPostSchema = z.object({
 	published_at: z.string().datetime().nullable().optional(),
 });
 
+export const blogReactionSchema = z
+	.object({
+		postId: z.string().uuid(),
+		reaction: z.enum(FORUM_REACTION_TYPES),
+	})
+	.strict();
+
 export const siteSettingsSchema = z.object({
 	app_name: z.string().trim().min(2).max(80),
 	tab_title: z.string().trim().min(2).max(80),

@@ -15,6 +15,7 @@ import { getServerI18n } from "@/lib/i18n/server";
 import { getBrewDetail } from "@/lib/queries";
 import { clampPlainText } from "@/lib/rich-text";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { buildHighestBadgeMap, resolveUserDisplayName } from "@/lib/user-identity";
 import { formatDate } from "@/lib/utils";
 
 export default async function BrewDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -39,14 +40,18 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 				.maybeSingle()
 		: { data: null };
 	const reviewerIds = Array.from(new Set(reviews.map((review) => review.reviewer_id)));
-	const [{ data: reviewerProfiles }, { data: reviewerReviewRows }] =
+	const [{ data: reviewerProfiles }, { data: reviewerReviewRows }, { data: reviewerBadges }] =
 		reviewerIds.length > 0
 			? await Promise.all([
 					supabase
 						.from("profiles")
-						.select("id, display_name, email, avatar_url, created_at, karma_points")
+						.select("id, display_name, email, avatar_url, created_at, karma_points, is_verified, mention_handle")
 						.in("id", reviewerIds),
 					supabase.from("brew_reviews").select("reviewer_id").in("reviewer_id", reviewerIds).limit(5000),
+					supabase
+						.from("user_badges")
+						.select("user_id, badge_definitions(label_en, label_id, min_points)")
+						.in("user_id", reviewerIds),
 				])
 			: [
 					{
@@ -57,24 +62,36 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 							avatar_url: string | null;
 							created_at: string;
 							karma_points: number | null;
+							is_verified: boolean;
+							mention_handle: string | null;
 						}>,
 					},
 					{
 						data: [] as Array<{ reviewer_id: string }>,
+					},
+					{
+						data: [] as Array<{
+							user_id: string;
+							badge_definitions: { label_en: string; label_id: string; min_points: number } | null;
+						}>,
 					},
 				];
 	const reviewerCountMap = new Map<string, number>();
 	for (const row of reviewerReviewRows ?? []) {
 		reviewerCountMap.set(row.reviewer_id, (reviewerCountMap.get(row.reviewer_id) ?? 0) + 1);
 	}
+	const topBadgeByUserId = buildHighestBadgeMap(reviewerBadges ?? [], locale);
 	const reviewerMetaById = new Map(
 		(reviewerProfiles ?? []).map((profile) => [
 			profile.id,
 			{
 				avatarUrl: profile.avatar_url,
-				displayName: profile.display_name?.trim() || profile.email || "Unknown user",
+				displayName: resolveUserDisplayName(profile),
 				joinedAt: profile.created_at,
 				karma: Number(profile.karma_points ?? 0),
+				isVerified: Boolean(profile.is_verified),
+				mentionHandle: profile.mention_handle,
+				topBadge: topBadgeByUserId.get(profile.id) ?? null,
 				totalReviews: reviewerCountMap.get(profile.id) ?? 0,
 			},
 		]),
@@ -295,6 +312,13 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 							joinedAt={reviewerMetaById.get(review.reviewer_id)?.joinedAt ?? review.updated_at}
 							karma={reviewerMetaById.get(review.reviewer_id)?.karma ?? 0}
 							totalReviews={reviewerMetaById.get(review.reviewer_id)?.totalReviews ?? 0}
+							isVerified={reviewerMetaById.get(review.reviewer_id)?.isVerified ?? false}
+							mentionHandle={reviewerMetaById.get(review.reviewer_id)?.mentionHandle ?? null}
+							badges={
+								reviewerMetaById.get(review.reviewer_id)?.topBadge
+									? [String(reviewerMetaById.get(review.reviewer_id)?.topBadge)]
+									: []
+							}
 							locale={locale}
 						/>
 						<p className="mt-3 text-sm text-[var(--muted)]">

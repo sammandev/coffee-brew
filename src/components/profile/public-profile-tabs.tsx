@@ -1,12 +1,13 @@
 "use client";
 
-import { Coffee, FileText, MessageSquare } from "lucide-react";
+import { Coffee, FileText, MessageSquare, Star } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { UserIdentitySummary } from "@/components/user/user-identity-summary";
 import type { ForumReactionType } from "@/lib/constants";
-import { FORUM_REACTION_TYPES } from "@/lib/constants";
+import { FORUM_REACTION_TYPES, REACTION_EMOJI } from "@/lib/constants";
 import { formatDate } from "@/lib/utils";
 
 interface BrewListItem {
@@ -38,22 +39,99 @@ interface ThreadListItem {
 	reaction_counts: Partial<Record<ForumReactionType, number>>;
 }
 
+interface ReviewListItem {
+	brew_id: string;
+	brew_name: string;
+	id: string;
+	identity_avatar_url: string | null;
+	identity_badge: string | null;
+	identity_display_name: string;
+	identity_is_verified: boolean;
+	identity_joined_at: string;
+	identity_karma: number;
+	identity_mention_handle: string | null;
+	identity_total_reviews: number;
+	identity_user_id: string;
+	notes_preview: string;
+	overall: number;
+	updated_at: string;
+}
+
 interface PublicProfileTabsProps {
 	blogs: BlogListItem[];
 	brews: BrewListItem[];
 	locale: "en" | "id";
+	reviewsGiven: ReviewListItem[];
+	reviewsReceived: ReviewListItem[];
 	showStatuses: boolean;
 	threads: ThreadListItem[];
 }
 
-type TabId = "brews" | "blogs" | "threads";
+type ReviewsTabId = "received" | "given";
+type TabId = "brews" | "blogs" | "threads" | "reviews";
 
-export function PublicProfileTabs({ blogs, brews, locale, showStatuses, threads }: PublicProfileTabsProps) {
+function ReviewList({ items, locale, title }: { items: ReviewListItem[]; locale: "en" | "id"; title: string }) {
+	return (
+		<div className="space-y-3">
+			<h3 className="text-sm font-semibold text-(--espresso)">{title}</h3>
+			{items.length === 0 ? (
+				<Card>
+					<p className="text-sm text-(--muted)">
+						{locale === "id" ? "Belum ada review pada kategori ini." : "No reviews in this category yet."}
+					</p>
+				</Card>
+			) : (
+				items.map((review) => (
+					<Card key={review.id} className="space-y-3">
+						<div className="flex flex-wrap items-center justify-between gap-2">
+							<Link href={`/brew/${review.brew_id}`} className="font-semibold text-(--espresso) hover:underline">
+								{review.brew_name}
+							</Link>
+							<span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-500">
+								<Star size={14} />
+								{review.overall.toFixed(2)}
+							</span>
+						</div>
+						<UserIdentitySummary
+							userId={review.identity_user_id}
+							displayName={review.identity_display_name}
+							avatarUrl={review.identity_avatar_url}
+							joinedAt={review.identity_joined_at}
+							karma={review.identity_karma}
+							totalReviews={review.identity_total_reviews}
+							locale={locale}
+							variant="compact"
+							hideJoined
+							isVerified={review.identity_is_verified}
+							mentionHandle={review.identity_mention_handle}
+							badges={review.identity_badge ? [review.identity_badge] : []}
+						/>
+						{review.notes_preview ? <p className="line-clamp-2 text-sm text-(--muted)">{review.notes_preview}</p> : null}
+						<p className="text-xs text-(--muted)">
+							{locale === "id" ? "Diperbarui" : "Updated"} {formatDate(review.updated_at, locale)}
+						</p>
+					</Card>
+				))
+			)}
+		</div>
+	);
+}
+
+export function PublicProfileTabs({
+	blogs,
+	brews,
+	locale,
+	reviewsGiven,
+	reviewsReceived,
+	showStatuses,
+	threads,
+}: PublicProfileTabsProps) {
 	const [activeTab, setActiveTab] = useState<TabId>("brews");
+	const [reviewsTab, setReviewsTab] = useState<ReviewsTabId>("received");
 
 	return (
 		<section className="space-y-4">
-			<div className="inline-flex rounded-xl border bg-(--surface) p-1">
+			<div className="inline-flex flex-wrap rounded-xl border bg-(--surface) p-1">
 				<button
 					type="button"
 					onClick={() => setActiveTab("brews")}
@@ -77,6 +155,14 @@ export function PublicProfileTabs({ blogs, brews, locale, showStatuses, threads 
 				>
 					<MessageSquare size={15} />
 					{locale === "id" ? "Thread" : "Threads"}
+				</button>
+				<button
+					type="button"
+					onClick={() => setActiveTab("reviews")}
+					className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold ${activeTab === "reviews" ? "bg-(--espresso) text-(--surface-elevated)" : "text-(--muted)"}`}
+				>
+					<Star size={15} />
+					{locale === "id" ? "Review" : "Reviews"}
 				</button>
 			</div>
 
@@ -155,13 +241,46 @@ export function PublicProfileTabs({ blogs, brews, locale, showStatuses, threads 
 								<div className="flex flex-wrap gap-2 text-xs">
 									{FORUM_REACTION_TYPES.map((reactionType) => (
 										<span key={`${thread.id}-${reactionType}`} className="rounded-full border px-2 py-0.5 text-(--muted)">
-											{reactionType === "like" ? "👍" : reactionType === "coffee" ? "☕" : reactionType === "fire" ? "🔥" : "🤯"}{" "}
-											{thread.reaction_counts[reactionType] ?? 0}
+											{REACTION_EMOJI[reactionType]} {thread.reaction_counts[reactionType] ?? 0}
 										</span>
 									))}
 								</div>
 							</Card>
 						))
+					)}
+				</div>
+			) : null}
+
+			{activeTab === "reviews" ? (
+				<div className="space-y-3">
+					<div className="inline-flex rounded-xl border bg-(--surface) p-1">
+						<button
+							type="button"
+							onClick={() => setReviewsTab("received")}
+							className={`inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-semibold ${reviewsTab === "received" ? "bg-(--espresso) text-(--surface-elevated)" : "text-(--muted)"}`}
+						>
+							{locale === "id" ? "Diterima" : "Received"}
+						</button>
+						<button
+							type="button"
+							onClick={() => setReviewsTab("given")}
+							className={`inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-semibold ${reviewsTab === "given" ? "bg-(--espresso) text-(--surface-elevated)" : "text-(--muted)"}`}
+						>
+							{locale === "id" ? "Diberikan" : "Given"}
+						</button>
+					</div>
+					{reviewsTab === "received" ? (
+						<ReviewList
+							items={reviewsReceived}
+							locale={locale}
+							title={locale === "id" ? "Review yang diterima" : "Reviews received"}
+						/>
+					) : (
+						<ReviewList
+							items={reviewsGiven}
+							locale={locale}
+							title={locale === "id" ? "Review yang diberikan" : "Reviews given"}
+						/>
 					)}
 				</div>
 			) : null}

@@ -109,7 +109,7 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 
 				<div>
 					<Label htmlFor="login-email">Email</Label>
-					<Input id="login-email" name="email" type="email" required />
+					<Input id="login-email" name="email" type="email" autoComplete="email" required />
 				</div>
 				{mode === "password" && (
 					<div>
@@ -117,6 +117,7 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 						<PasswordInput
 							id="password"
 							name="password"
+							autoComplete="current-password"
 							required
 							minLength={8}
 							showLabel={t("auth.showPassword")}

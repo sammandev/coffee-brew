@@ -40,14 +40,7 @@ export function ThreadComposerModal({
 			<Button type="button" size="sm" onClick={() => setOpen(true)}>
 				{triggerLabel}
 			</Button>
-			<FormModal
-				open={open}
-				onClose={() => setOpen(false)}
-				title={title}
-				description={description}
-				allowFullscreen
-				defaultFullscreen
-			>
+			<FormModal open={open} onClose={() => setOpen(false)} title={title} description={description} allowFullscreen>
 				<ThreadComposer
 					hideTitle
 					variant="embedded"

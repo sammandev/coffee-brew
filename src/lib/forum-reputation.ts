@@ -23,12 +23,15 @@ const POINTS_BY_EVENT: Record<ForumReputationEventType, number> = {
 export async function applyForumReputation(params: {
 	userId: string;
 	eventType: ForumReputationEventType;
+	pointsDelta?: number;
 	actorId?: string | null;
 	sourceType?: string | null;
 	sourceId?: string | null;
 	metadata?: Record<string, unknown>;
 }) {
-	const delta = POINTS_BY_EVENT[params.eventType] ?? 0;
+	const delta = Number.isFinite(params.pointsDelta)
+		? Number(params.pointsDelta)
+		: (POINTS_BY_EVENT[params.eventType] ?? 0);
 	if (!params.userId || delta === 0) return;
 
 	const supabase = createSupabaseAdminClient();

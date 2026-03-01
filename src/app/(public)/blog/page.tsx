@@ -4,6 +4,7 @@ import { BlogSearchControls } from "@/components/blog/blog-search-controls";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardTitle } from "@/components/ui/card";
 import { RichTextContent } from "@/components/ui/rich-text-content";
+import { FORUM_REACTION_TYPES, type ForumReactionType, REACTION_EMOJI } from "@/lib/constants";
 import { BLOG_POSTS, localizeBlogText } from "@/lib/content/blog";
 import { getServerI18n } from "@/lib/i18n/server";
 import { getPublishedBlogPosts } from "@/lib/queries";
@@ -17,6 +18,13 @@ interface BlogPageProps {
 function getFirstParam(value: string | string[] | undefined) {
 	if (Array.isArray(value)) return value[0] ?? "";
 	return value ?? "";
+}
+
+function emptyReactionCounts() {
+	return Object.fromEntries(FORUM_REACTION_TYPES.map((reactionType) => [reactionType, 0])) as Record<
+		ForumReactionType,
+		number
+	>;
 }
 
 export default async function BlogPage({ searchParams }: BlogPageProps) {
@@ -45,6 +53,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 					readingTime: post.reading_time_minutes,
 					tags: post.tags,
 					authorName: post.author_name,
+					reactionCounts: (post.reaction_counts ?? emptyReactionCounts()) as Record<ForumReactionType, number>,
 				}))
 			: BLOG_POSTS.map((post) => {
 					const localized = localizeBlogText(post, locale);
@@ -58,6 +67,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 						readingTime: Math.max(3, Math.ceil(post.bodyEn.join(" ").split(/\s+/).length / 220)),
 						tags: [],
 						authorName: "Coffee Brew Team",
+						reactionCounts: emptyReactionCounts(),
 					};
 				});
 
@@ -104,12 +114,15 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 			return new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime();
 		});
 
+	const featuredPost = filteredPosts[0] ?? null;
+	const secondaryPosts = featuredPost ? filteredPosts.slice(1) : [];
+
 	return (
 		<div className="space-y-6">
 			<header className="space-y-3">
 				<Badge>{t("nav.blog")}</Badge>
 				<h1 className="font-heading text-4xl text-[var(--espresso)]">{t("blog.title")}</h1>
-				<p className="text-[var(--muted)]">{t("blog.subtitle")}</p>
+				<p className="max-w-3xl text-[var(--muted)]">{t("blog.subtitle")}</p>
 				<BlogSearchControls
 					locale={locale}
 					initialQuery={q}
@@ -127,39 +140,111 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 					<p className="mt-2 text-sm text-[var(--muted)]">{t("blog.noResultsDescription")}</p>
 				</Card>
 			) : (
-				<div className="grid gap-4 md:grid-cols-2">
-					{filteredPosts.map((post) => {
-						return (
-							<Link key={post.slug} href={`/blog/${post.slug}`}>
-								<Card className="h-full overflow-hidden transition hover:-translate-y-1">
-									<div className="relative -m-6 mb-4 h-52 border-b">
+				<div className="space-y-4">
+					{featuredPost ? (
+						<Link href={`/blog/${featuredPost.slug}`} className="block">
+							<Card className="overflow-hidden p-0 transition hover:-translate-y-1">
+								<div className="grid gap-0 lg:grid-cols-[1.3fr_1fr]">
+									<div className="relative min-h-[240px]">
 										<Image
-											src={post.imageUrl}
-											alt={post.imageAlt}
+											src={featuredPost.imageUrl}
+											alt={featuredPost.imageAlt}
 											fill
-											sizes="(max-width: 768px) 100vw, 50vw"
+											sizes="(max-width: 1024px) 100vw, 65vw"
+											loading="eager"
 											className="object-cover"
 										/>
 									</div>
-									<CardTitle>{post.title}</CardTitle>
-									<RichTextContent html={post.excerpt} className="mt-2 line-clamp-3 text-[var(--muted)]" />
-									<p className="mt-3 text-xs text-[var(--muted)]">
-										{post.authorName} · {post.readingTime} {locale === "id" ? "menit baca" : "min read"}
-									</p>
-									{post.tags.length > 0 && (
-										<div className="mt-3 flex flex-wrap gap-2">
-											{post.tags.map((tag: string) => (
-												<span key={`${post.slug}-${tag}`} className="rounded-full border px-2 py-0.5 text-xs text-[var(--muted)]">
-													#{tag}
+									<div className="space-y-3 p-6">
+										<p className="text-xs font-semibold uppercase tracking-[0.12em] text-(--accent)">
+											{locale === "id" ? "Artikel Pilihan" : "Featured Story"}
+										</p>
+										<h2 className="font-heading text-3xl text-(--espresso)">{featuredPost.title}</h2>
+										<RichTextContent html={featuredPost.excerpt} className="line-clamp-4 text-sm text-(--muted)" />
+										<div className="flex flex-wrap items-center gap-2 text-xs text-(--muted)">
+											<span>{featuredPost.authorName}</span>
+											<span>•</span>
+											<span>{formatDate(featuredPost.publishedAt, locale)}</span>
+											<span>•</span>
+											<span>
+												{featuredPost.readingTime} {locale === "id" ? "menit baca" : "min read"}
+											</span>
+										</div>
+										<div className="flex flex-wrap items-center gap-2">
+											{featuredPost.tags.slice(0, 5).map((postTag: string) => (
+												<span
+													key={`${featuredPost.slug}-${postTag}`}
+													className="rounded-full border px-2 py-0.5 text-xs text-(--muted)"
+												>
+													#{postTag}
 												</span>
 											))}
 										</div>
-									)}
-									<p className="mt-4 text-xs text-[var(--muted)]">{formatDate(post.publishedAt, locale)}</p>
-								</Card>
-							</Link>
-						);
-					})}
+										<div className="flex flex-wrap items-center gap-2 text-xs text-(--muted)">
+											{FORUM_REACTION_TYPES.map((reactionType) => (
+												<span
+													key={`${featuredPost.slug}-${reactionType}`}
+													className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5"
+												>
+													{REACTION_EMOJI[reactionType]} {featuredPost.reactionCounts[reactionType] ?? 0}
+												</span>
+											))}
+										</div>
+									</div>
+								</div>
+							</Card>
+						</Link>
+					) : null}
+
+					{secondaryPosts.length > 0 ? (
+						<div className="grid gap-4 md:grid-cols-2">
+							{secondaryPosts.map((post) => (
+								<Link key={post.slug} href={`/blog/${post.slug}`}>
+									<Card className="h-full overflow-hidden p-0 transition hover:-translate-y-1">
+										<div className="relative h-52 border-b">
+											<Image
+												src={post.imageUrl}
+												alt={post.imageAlt}
+												fill
+												sizes="(max-width: 768px) 100vw, 50vw"
+												className="object-cover"
+											/>
+										</div>
+										<div className="space-y-3 p-5">
+											<CardTitle>{post.title}</CardTitle>
+											<RichTextContent html={post.excerpt} className="line-clamp-3 text-sm text-(--muted)" />
+											<p className="text-xs text-(--muted)">
+												{post.authorName} · {post.readingTime} {locale === "id" ? "menit baca" : "min read"}
+											</p>
+											<div className="flex flex-wrap items-center gap-2 text-xs text-(--muted)">
+												{FORUM_REACTION_TYPES.map((reactionType) => (
+													<span
+														key={`${post.slug}-${reactionType}`}
+														className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5"
+													>
+														{REACTION_EMOJI[reactionType]} {post.reactionCounts[reactionType] ?? 0}
+													</span>
+												))}
+											</div>
+											{post.tags.length > 0 ? (
+												<div className="flex flex-wrap gap-2">
+													{post.tags.slice(0, 5).map((postTag: string) => (
+														<span
+															key={`${post.slug}-tag-${postTag}`}
+															className="rounded-full border px-2 py-0.5 text-xs text-(--muted)"
+														>
+															#{postTag}
+														</span>
+													))}
+												</div>
+											) : null}
+											<p className="text-xs text-[var(--muted)]">{formatDate(post.publishedAt, locale)}</p>
+										</div>
+									</Card>
+								</Link>
+							))}
+						</div>
+					) : null}
 				</div>
 			)}
 		</div>

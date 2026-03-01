@@ -323,7 +323,12 @@ export function BlogPostForm({ formId, mode, onSaved, onSubmittingChange, post }
 						onChange={(nextValue) => update("body_en", nextValue)}
 						minPlainTextLength={10}
 						maxPlainTextLength={50000}
+						enableMediaUpload
+						mediaUploadEndpoint="/api/admin/blog/media"
 					/>
+					<p className="mt-1 text-xs text-(--muted)">
+						{locale === "id" ? "Mendukung GIF/WebM/MP4 hingga 10MB." : "Supports GIF/WebM/MP4 up to 10MB."}
+					</p>
 				</div>
 				<div>
 					<Label htmlFor={`${formId}-body-id`}>Body (ID)</Label>
@@ -333,7 +338,12 @@ export function BlogPostForm({ formId, mode, onSaved, onSubmittingChange, post }
 						onChange={(nextValue) => update("body_id", nextValue)}
 						minPlainTextLength={10}
 						maxPlainTextLength={50000}
+						enableMediaUpload
+						mediaUploadEndpoint="/api/admin/blog/media"
 					/>
+					<p className="mt-1 text-xs text-(--muted)">
+						{locale === "id" ? "Mendukung GIF/WebM/MP4 hingga 10MB." : "Supports GIF/WebM/MP4 up to 10MB."}
+					</p>
 				</div>
 			</div>
 

@@ -1,9 +1,15 @@
 import { apiError, apiOk } from "@/lib/api";
+import type { ForumReactionType } from "@/lib/constants";
 import { applyForumReputation } from "@/lib/forum-reputation";
 import { requirePermission } from "@/lib/guards";
 import { createNotifications } from "@/lib/notifications";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { forumReactionSchema } from "@/lib/validators";
+
+function reactionScore(reaction: ForumReactionType | null) {
+	if (!reaction) return 0;
+	return reaction === "dislike" ? -1 : 1;
+}
 
 export async function POST(request: Request) {
 	const permission = await requirePermission("forum", "create");
@@ -23,123 +29,134 @@ export async function POST(request: Request) {
 		.eq("id", permission.context.userId)
 		.maybeSingle<{ display_name: string | null; email: string | null }>();
 	const actorName = actorProfile?.display_name?.trim() || actorProfile?.email || "Someone";
+	let targetOwnerId = "";
+	let threadId = "";
+	let commentId: string | null = null;
+	let threadTitle: string | null = null;
+	let sourceType: "thread" | "comment" = "thread";
+	let sourceId = "";
 
 	if (parsed.data.targetType === "comment") {
-		const { data: comment } = await supabase
+		const { data: comment, error: commentError } = await supabase
 			.from("forum_comments")
 			.select("id, thread_id, author_id")
 			.eq("id", parsed.data.targetId)
 			.eq("status", "visible")
 			.maybeSingle();
+		if (commentError) return apiError("Could not resolve comment target", 400, commentError.message);
 		if (!comment) return apiError("Comment not found", 404);
 
-		const { data: thread } = await supabase
+		const { data: thread, error: threadError } = await supabase
 			.from("forum_threads")
 			.select("id, title")
 			.eq("id", comment.thread_id)
 			.eq("status", "visible")
 			.maybeSingle();
+		if (threadError) return apiError("Could not resolve thread target", 400, threadError.message);
+		if (!thread) return apiError("Thread not found", 404);
 
-		const { error } = await supabase
+		targetOwnerId = comment.author_id;
+		threadId = comment.thread_id;
+		commentId = comment.id;
+		threadTitle = thread.title;
+		sourceType = "comment";
+		sourceId = comment.id;
+	} else {
+		const { data: thread, error: threadError } = await supabase
+			.from("forum_threads")
+			.select("id, title, author_id")
+			.eq("id", parsed.data.targetId)
+			.eq("status", "visible")
+			.maybeSingle();
+		if (threadError) return apiError("Could not resolve thread target", 400, threadError.message);
+		if (!thread) return apiError("Thread not found", 404);
+
+		targetOwnerId = thread.author_id;
+		threadId = thread.id;
+		threadTitle = thread.title;
+		sourceType = "thread";
+		sourceId = thread.id;
+	}
+
+	const { data: existingReaction, error: existingReactionError } = await supabase
+		.from("forum_reactions")
+		.select("id, reaction")
+		.eq("user_id", permission.context.userId)
+		.eq("target_type", parsed.data.targetType)
+		.eq("target_id", parsed.data.targetId)
+		.order("created_at", { ascending: false })
+		.limit(1)
+		.maybeSingle<{ id: string; reaction: ForumReactionType }>();
+
+	if (existingReactionError) {
+		return apiError("Could not resolve existing reaction", 400, existingReactionError.message);
+	}
+
+	const previousReaction = existingReaction?.reaction ?? null;
+	let nextReaction: ForumReactionType | null = parsed.data.reaction;
+
+	if (existingReaction && existingReaction.reaction === parsed.data.reaction) {
+		const { error: deleteError } = await supabase.from("forum_reactions").delete().eq("id", existingReaction.id);
+		if (deleteError) return apiError("Could not remove reaction", 400, deleteError.message);
+		nextReaction = null;
+	} else if (existingReaction) {
+		const { error: updateError } = await supabase
 			.from("forum_reactions")
-			.upsert(
-				{
-					thread_id: comment.thread_id,
-					comment_id: comment.id,
-					target_type: parsed.data.targetType,
-					target_id: parsed.data.targetId,
-					reaction: parsed.data.reaction,
-					user_id: permission.context.userId,
-				},
-				{ onConflict: "user_id,target_type,target_id,reaction" },
-			)
-			.select("id")
-			.single();
+			.update({ reaction: parsed.data.reaction })
+			.eq("id", existingReaction.id);
+		if (updateError) return apiError("Could not update reaction", 400, updateError.message);
+	} else {
+		const { error: insertError } = await supabase.from("forum_reactions").insert({
+			thread_id: threadId,
+			comment_id: commentId,
+			target_type: parsed.data.targetType,
+			target_id: parsed.data.targetId,
+			reaction: parsed.data.reaction,
+			user_id: permission.context.userId,
+		});
+		if (insertError) return apiError("Could not add reaction", 400, insertError.message);
+	}
 
-		if (error) return apiError("Could not add reaction", 400, error.message);
+	if (targetOwnerId !== permission.context.userId) {
+		const delta = reactionScore(nextReaction) - reactionScore(previousReaction);
+		await applyForumReputation({
+			userId: targetOwnerId,
+			actorId: permission.context.userId,
+			eventType: "reaction_received",
+			pointsDelta: delta,
+			sourceType,
+			sourceId,
+			metadata: {
+				previous_reaction: previousReaction,
+				next_reaction: nextReaction,
+			},
+		});
 
-		if (comment.author_id !== permission.context.userId) {
-			await applyForumReputation({
-				userId: comment.author_id,
-				actorId: permission.context.userId,
-				eventType: "reaction_received",
-				sourceType: "comment",
-				sourceId: comment.id,
-				metadata: { reaction: parsed.data.reaction },
-			});
+		if (nextReaction) {
 			await createNotifications([
 				{
-					recipientId: comment.author_id,
+					recipientId: targetOwnerId,
 					actorId: permission.context.userId,
 					eventType: "reaction",
-					title: `${actorName} reacted to your comment`,
-					body: thread?.title
-						? `A new reaction was added in "${thread.title}".`
-						: "A new reaction was added to your comment.",
-					linkPath: `/forum/${comment.thread_id}#comment-${comment.id}`,
+					title: commentId ? `${actorName} reacted to your comment` : `${actorName} reacted to your thread`,
+					body: threadTitle
+						? `A ${nextReaction} reaction was added in "${threadTitle}".`
+						: `A ${nextReaction} reaction was added to your content.`,
+					linkPath: commentId ? `/forum/${threadId}#comment-${commentId}` : `/forum/${threadId}`,
 					metadata: {
-						thread_id: comment.thread_id,
-						comment_id: comment.id,
-						reaction: parsed.data.reaction,
+						thread_id: threadId,
+						comment_id: commentId,
+						previous_reaction: previousReaction,
+						next_reaction: nextReaction,
 					},
 				},
 			]);
 		}
-
-		return apiOk({ success: true });
 	}
 
-	const { data: thread } = await supabase
-		.from("forum_threads")
-		.select("id, title, author_id")
-		.eq("id", parsed.data.targetId)
-		.eq("status", "visible")
-		.maybeSingle();
-	if (!thread) return apiError("Thread not found", 404);
-
-	const { error } = await supabase
-		.from("forum_reactions")
-		.upsert(
-			{
-				thread_id: parsed.data.targetId,
-				target_type: parsed.data.targetType,
-				target_id: parsed.data.targetId,
-				reaction: parsed.data.reaction,
-				user_id: permission.context.userId,
-			},
-			{ onConflict: "user_id,target_type,target_id,reaction" },
-		)
-		.select("id")
-		.single();
-
-	if (error) {
-		return apiError("Could not add reaction", 400, error.message);
-	}
-
-	if (thread.author_id !== permission.context.userId) {
-		await applyForumReputation({
-			userId: thread.author_id,
-			actorId: permission.context.userId,
-			eventType: "reaction_received",
-			sourceType: "thread",
-			sourceId: thread.id,
-			metadata: { reaction: parsed.data.reaction },
-		});
-		await createNotifications([
-			{
-				recipientId: thread.author_id,
-				actorId: permission.context.userId,
-				eventType: "reaction",
-				title: `${actorName} reacted to your thread`,
-				body: `A new reaction was added in "${thread.title}".`,
-				linkPath: `/forum/${thread.id}`,
-				metadata: {
-					thread_id: thread.id,
-					reaction: parsed.data.reaction,
-				},
-			},
-		]);
-	}
-
-	return apiOk({ success: true });
+	return apiOk({
+		success: true,
+		reaction: nextReaction,
+		removed: nextReaction === null,
+	});
 }

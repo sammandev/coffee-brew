@@ -1,5 +1,6 @@
 "use client";
 
+import { mergeAttributes, Node } from "@tiptap/core";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
@@ -9,6 +10,7 @@ import {
 	AtSign,
 	Bold,
 	Eraser,
+	Film,
 	ImagePlus,
 	Italic,
 	Link2,
@@ -30,15 +32,52 @@ interface RichTextEditorProps {
 	className?: string;
 	disabled?: boolean;
 	enableImageUpload?: boolean;
+	enableMediaUpload?: boolean;
 	enableMentions?: boolean;
 	id?: string;
 	imageUploadEndpoint?: string;
+	mediaUploadEndpoint?: string;
 	maxPlainTextLength?: number;
 	minPlainTextLength?: number;
 	name?: string;
 	onChange: (value: string) => void;
 	value: string;
 }
+
+const Video = Node.create({
+	name: "video",
+	group: "block",
+	atom: true,
+	selectable: true,
+	draggable: false,
+	addAttributes() {
+		return {
+			src: { default: null },
+			controls: { default: true },
+			loop: { default: false },
+			muted: { default: true },
+			playsinline: { default: true },
+		};
+	},
+	parseHTML() {
+		return [{ tag: "video[src]" }];
+	},
+	renderHTML({ HTMLAttributes }) {
+		return [
+			"video",
+			mergeAttributes(
+				{
+					controls: true,
+					loop: true,
+					muted: true,
+					playsinline: true,
+					class: "max-h-96 w-full rounded-lg border",
+				},
+				HTMLAttributes,
+			),
+		];
+	},
+});
 
 function isActiveClass(active: boolean) {
 	return active ? "bg-[var(--sand)]/30" : "";
@@ -48,9 +87,11 @@ export function RichTextEditor({
 	className,
 	disabled = false,
 	enableImageUpload = false,
+	enableMediaUpload = false,
 	enableMentions = false,
 	id,
 	imageUploadEndpoint = "/api/forum/media",
+	mediaUploadEndpoint = "/api/admin/blog/media",
 	maxPlainTextLength,
 	minPlainTextLength = 0,
 	name,
@@ -60,7 +101,9 @@ export function RichTextEditor({
 	const [linkInputOpen, setLinkInputOpen] = useState(false);
 	const [linkValue, setLinkValue] = useState("");
 	const [isUploadingImage, setIsUploadingImage] = useState(false);
+	const [isUploadingMedia, setIsUploadingMedia] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const mediaInputRef = useRef<HTMLInputElement>(null);
 	const [mentionOpen, setMentionOpen] = useState(false);
 	const [mentionQuery, setMentionQuery] = useState("");
 	const [mentionLoading, setMentionLoading] = useState(false);
@@ -79,6 +122,7 @@ export function RichTextEditor({
 			Image.configure({
 				inline: false,
 			}),
+			Video,
 			Underline,
 			Link.configure({
 				openOnClick: false,
@@ -141,6 +185,44 @@ export function RichTextEditor({
 			editor.chain().focus().setImage({ src: imageUrl }).run();
 		} finally {
 			setIsUploadingImage(false);
+		}
+	}
+
+	async function uploadMedia(file: File) {
+		if (!enableMediaUpload || !mediaUploadEndpoint) return;
+		setIsUploadingMedia(true);
+		try {
+			const formData = new FormData();
+			formData.set("file", file);
+			const response = await fetch(mediaUploadEndpoint, {
+				method: "POST",
+				body: formData,
+			}).catch(() => null);
+
+			if (!response?.ok) {
+				setIsUploadingMedia(false);
+				return;
+			}
+
+			const payload = (await response.json().catch(() => ({}))) as { media_url?: string; url?: string };
+			const mediaUrl = payload.media_url || payload.url;
+			if (!mediaUrl || !editor) {
+				setIsUploadingMedia(false);
+				return;
+			}
+
+			if (file.type.startsWith("video/")) {
+				editor
+					.chain()
+					.focus()
+					.insertContent(`<video src="${mediaUrl}" controls loop muted playsinline preload="metadata"></video><p></p>`)
+					.run();
+				return;
+			}
+
+			editor.chain().focus().setImage({ src: mediaUrl }).run();
+		} finally {
+			setIsUploadingMedia(false);
 		}
 	}
 
@@ -329,6 +411,33 @@ export function RichTextEditor({
 								const file = event.currentTarget.files?.[0];
 								if (!file) return;
 								void uploadImage(file);
+								event.currentTarget.value = "";
+							}}
+						/>
+					</>
+				) : null}
+				{enableMediaUpload ? (
+					<>
+						<Button
+							type="button"
+							size="sm"
+							variant="ghost"
+							className="h-8 px-3"
+							onClick={() => mediaInputRef.current?.click()}
+							disabled={disabled || !editor || isUploadingMedia}
+							aria-label="Upload media"
+						>
+							{isUploadingMedia ? <Loader2 size={14} className="animate-spin" /> : <Film size={14} />}
+						</Button>
+						<input
+							ref={mediaInputRef}
+							type="file"
+							accept="image/gif,video/mp4,video/webm"
+							className="hidden"
+							onChange={(event) => {
+								const file = event.currentTarget.files?.[0];
+								if (!file) return;
+								void uploadMedia(file);
 								event.currentTarget.value = "";
 							}}
 						/>
