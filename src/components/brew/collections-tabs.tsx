@@ -103,7 +103,10 @@ export function CollectionsTabs({ history, locale, onRemoveWishlist, wishlist }:
 				) : (
 					<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 						{wishlist.map((item) => (
-							<Card key={`wishlist-${item.brew.id}`} className="group flex flex-col overflow-hidden p-0 transition-shadow hover:shadow-md">
+							<Card
+								key={`wishlist-${item.brew.id}`}
+								className="group flex flex-col overflow-hidden p-0 transition-shadow hover:shadow-md"
+							>
 								<div className="relative aspect-16/10 overflow-hidden">
 									<Image
 										src={resolveBrewImageUrl(item.brew.image_url)}
@@ -149,7 +152,10 @@ export function CollectionsTabs({ history, locale, onRemoveWishlist, wishlist }:
 			) : (
 				<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 					{history.map((item) => (
-						<Card key={`history-${item.brew.id}-${item.last_brewed_at}`} className="group flex flex-col overflow-hidden p-0 transition-shadow hover:shadow-md">
+						<Card
+							key={`history-${item.brew.id}-${item.last_brewed_at}`}
+							className="group flex flex-col overflow-hidden p-0 transition-shadow hover:shadow-md"
+						>
 							<div className="relative aspect-16/10 overflow-hidden">
 								<Image
 									src={resolveBrewImageUrl(item.brew.image_url)}

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Children, type ReactNode } from "react";
 import { FlavorRadarChart } from "@/components/brew/flavor-radar-chart";
 import { MethodRecommendationChips } from "@/components/brew/method-recommendation-chips";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +44,9 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 									{m("compare.backToCatalog")}
 								</Link>
 							</li>
-							<li aria-hidden="true" className="select-none">/</li>
+							<li aria-hidden="true" className="select-none">
+								/
+							</li>
 							<li className="font-medium text-(--espresso)">{m("compare.title")}</li>
 						</ol>
 					</nav>
@@ -135,9 +138,8 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 		}
 	}
 
-	const aggregates = new Map(
-		orderedBrews.map((brew) => [brew.id, aggregateRatings(reviewMap.get(brew.id) ?? [])]),
-	);
+	const aggregates = new Map(orderedBrews.map((brew) => [brew.id, aggregateRatings(reviewMap.get(brew.id) ?? [])]));
+	const getAggregate = (brewId: string) => aggregates.get(brewId) ?? aggregateRatings([]);
 
 	const DIMENSION_LABELS = [
 		{ key: "acidity", label: locale === "id" ? "Asiditas" : "Acidity" },
@@ -158,10 +160,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 		}
 	}
 
-	const gridCols =
-		orderedBrews.length === 2
-			? "grid-cols-[180px_1fr_1fr]"
-			: "grid-cols-[180px_1fr_1fr_1fr]";
+	const gridCols = orderedBrews.length === 2 ? "grid-cols-[180px_1fr_1fr]" : "grid-cols-[180px_1fr_1fr_1fr]";
 
 	return (
 		<div className="space-y-8">
@@ -174,7 +173,9 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 								{m("compare.backToCatalog")}
 							</Link>
 						</li>
-						<li aria-hidden="true" className="select-none">/</li>
+						<li aria-hidden="true" className="select-none">
+							/
+						</li>
 						<li className="font-medium text-(--espresso)">{m("compare.title")}</li>
 					</ol>
 				</nav>
@@ -188,13 +189,13 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 			{/* Hero cards: image + name + rating per brew */}
 			<div className={`grid gap-4 ${orderedBrews.length === 2 ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
 				{orderedBrews.map((brew) => {
-					const agg = aggregates.get(brew.id)!;
+					const agg = getAggregate(brew.id);
 					const wishCount = wishlistMap.get(brew.id) ?? 0;
 					const isBest = brew.id === bestOverallId;
 					return (
 						<Card key={brew.id} className="group relative overflow-hidden p-0 transition-shadow hover:shadow-lg">
 							{isBest && agg.total > 0 ? (
-								<span className="absolute top-3 right-3 z-10 rounded-full bg-(--accent) px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm">
+								<span className="absolute top-3 right-3 z-10 rounded-full bg-(--crema) px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm">
 									{m("compare.best")}
 								</span>
 							) : null}
@@ -219,8 +220,21 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 								</p>
 								<div className="flex items-center gap-3">
 									<div className="flex items-center gap-1">
-										{Array.from({ length: 5 }, (_, i) => (
-											<svg key={i} width="14" height="14" viewBox="0 0 24 24" fill={i < Math.round(agg.overall) ? "var(--crema)" : "none"} stroke={i < Math.round(agg.overall) ? "var(--crema)" : "var(--sand)"} strokeWidth="2" className="shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+										{[0, 1, 2, 3, 4].map((starIndex) => (
+											<svg
+												key={`${brew.id}-star-${starIndex}`}
+												width="14"
+												height="14"
+												viewBox="0 0 24 24"
+												fill={starIndex < Math.round(agg.overall) ? "var(--crema)" : "none"}
+												stroke={starIndex < Math.round(agg.overall) ? "var(--crema)" : "var(--sand)"}
+												strokeWidth="2"
+												className="shrink-0"
+												aria-hidden="true"
+												focusable="false"
+											>
+												<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+											</svg>
 										))}
 										<span className="ml-1 text-sm font-semibold text-(--espresso)">
 											{agg.total > 0 ? agg.overall.toFixed(1) : "—"}
@@ -228,7 +242,19 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 										<span className="text-xs text-(--muted)">({agg.total})</span>
 									</div>
 									<span className="inline-flex items-center gap-1 text-xs text-(--muted)">
-										<svg width="12" height="12" viewBox="0 0 24 24" fill={wishCount > 0 ? "var(--danger)" : "none"} stroke={wishCount > 0 ? "var(--danger)" : "var(--sand)"} strokeWidth="2" className="shrink-0"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+										<svg
+											width="12"
+											height="12"
+											viewBox="0 0 24 24"
+											fill={wishCount > 0 ? "var(--danger)" : "none"}
+											stroke={wishCount > 0 ? "var(--danger)" : "var(--sand)"}
+											strokeWidth="2"
+											className="shrink-0"
+											aria-hidden="true"
+											focusable="false"
+										>
+											<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+										</svg>
 										{wishCount}
 									</span>
 								</div>
@@ -255,12 +281,10 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 						{/* Overall Rating */}
 						<CompareRow label={m("compare.overallRating")} even>
 							{orderedBrews.map((brew) => {
-								const agg = aggregates.get(brew.id)!;
+								const agg = getAggregate(brew.id);
 								return (
 									<div key={`overall-${brew.id}`} className="flex flex-col items-center gap-1 p-3">
-										<span className="text-2xl font-bold text-(--accent)">
-											{agg.total > 0 ? agg.overall.toFixed(1) : "—"}
-										</span>
+										<span className="text-2xl font-bold text-(--espresso)">{agg.total > 0 ? agg.overall.toFixed(1) : "—"}</span>
 										<span className="text-xs text-(--muted)">
 											{agg.total > 0 ? `${agg.total} ${m("compare.reviews")}` : m("compare.noReviews")}
 										</span>
@@ -272,7 +296,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 						{/* Dimension bars */}
 						{DIMENSION_LABELS.map(({ key, label }, idx) => {
 							const values = orderedBrews.map((brew) => {
-								const agg = aggregates.get(brew.id)!;
+								const agg = getAggregate(brew.id);
 								return Number(agg[key]) || 0;
 							});
 							const maxVal = Math.max(...values);
@@ -286,11 +310,11 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 											<div key={`${key}-${brew.id}`} className="flex flex-col items-center gap-1 p-3">
 												<div className="h-2 w-full max-w-28 overflow-hidden rounded-full bg-(--sand)/20">
 													<div
-														className={`h-full rounded-full transition-all ${isMax ? "bg-(--accent)" : "bg-(--sand)/50"}`}
+														className={`h-full rounded-full transition-all ${isMax ? "bg-(--crema)" : "bg-(--sand)/50"}`}
 														style={{ width: `${pct}%` }}
 													/>
 												</div>
-												<span className={`text-xs font-semibold ${isMax ? "text-(--accent)" : "text-(--espresso)"}`}>
+												<span className={`text-xs font-semibold ${isMax ? "text-(--crema)" : "text-(--espresso)"}`}>
 													{val.toFixed(1)}
 												</span>
 											</div>
@@ -390,7 +414,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 				<h2 className="font-heading text-2xl text-(--espresso)">{m("compare.flavorProfile")}</h2>
 				<div className={`grid gap-4 ${orderedBrews.length === 2 ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
 					{orderedBrews.map((brew) => {
-						const aggregate = aggregates.get(brew.id)!;
+						const aggregate = getAggregate(brew.id);
 						const myReview = myReviewMap.get(brew.id) ?? null;
 						return (
 							<Card key={`radar-${brew.id}`} className="flex flex-col items-center gap-3 p-5">
@@ -442,7 +466,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 					<Link
 						key={`link-${brew.id}`}
 						href={`/brew/${brew.id}`}
-						className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold text-(--accent) transition hover:bg-(--sand)/15"
+						className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold text-(--espresso) transition hover:bg-(--sand)/15"
 					>
 						{brew.name}
 						<span aria-hidden="true">→</span>
@@ -453,22 +477,12 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 	);
 }
 
-function CompareRow({
-	label,
-	even,
-	children,
-}: {
-	label: string;
-	even: boolean;
-	children: React.ReactNode;
-}) {
+function CompareRow({ label, even, children }: { label: string; even: boolean; children: ReactNode }) {
 	const bg = even ? "bg-(--sand)/5" : "";
 	return (
 		<>
-			<div className={`flex items-center p-3 text-sm font-medium text-(--muted) ${bg}`}>
-				{label}
-			</div>
-			{React.Children.map(children, (child) => (
+			<div className={`flex items-center p-3 text-sm font-medium text-(--muted) ${bg}`}>{label}</div>
+			{Children.map(children, (child) => (
 				<div className={bg}>{child}</div>
 			))}
 		</>

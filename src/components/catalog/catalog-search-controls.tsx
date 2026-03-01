@@ -35,7 +35,10 @@ function toQueryString(entries: Record<string, string>) {
 	return serialized.length > 0 ? `?${serialized}` : "";
 }
 
-const SORT_OPTIONS: Array<{ labelKey: "sortLatest" | "sortSmart" | "sortHighestRated" | "sortMostReviewed" | "sortOldest"; value: CatalogSortValue }> = [
+const SORT_OPTIONS: Array<{
+	labelKey: "sortLatest" | "sortSmart" | "sortHighestRated" | "sortMostReviewed" | "sortOldest";
+	value: CatalogSortValue;
+}> = [
 	{ value: "newest", labelKey: "sortLatest" },
 	{ value: "smart", labelKey: "sortSmart" },
 	{ value: "highest_stars", labelKey: "sortHighestRated" },
@@ -180,9 +183,7 @@ export function CatalogSearchControls({
 						}}
 						className={cn(
 							"rounded-full px-3 py-1 text-xs font-semibold transition",
-							sort === option.value
-								? "bg-(--espresso) text-(--oat)"
-								: "bg-(--sand)/15 text-(--muted) hover:bg-(--sand)/30",
+							sort === option.value ? "bg-(--espresso) text-(--oat)" : "bg-(--sand)/15 text-(--muted) hover:bg-(--sand)/30",
 						)}
 					>
 						{labels[option.labelKey]}

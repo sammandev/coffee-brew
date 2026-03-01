@@ -46,18 +46,16 @@ function StarRating({ rating, count, locale }: { rating: number; count: number; 
 	return (
 		<div className="flex items-center gap-1.5">
 			<div className="flex items-center gap-px">
-				{Array.from({ length: 5 }, (_, i) => (
+				{[0, 1, 2, 3, 4].map((starIndex) => (
 					<Star
-						key={i}
+						key={`star-${starIndex}`}
 						size={14}
-						className={i < fullStars ? "fill-(--crema) text-(--crema)" : "text-(--sand)"}
+						className={starIndex < fullStars ? "fill-(--crema) text-(--crema)" : "text-(--sand)"}
 					/>
 				))}
 			</div>
 			<span className="text-xs font-medium text-(--muted)">
-				{count > 0
-					? `${rating.toFixed(1)} (${count})`
-					: getMessage(locale, "catalog.noReviews")}
+				{count > 0 ? `${rating.toFixed(1)} (${count})` : getMessage(locale, "catalog.noReviews")}
 			</span>
 		</div>
 	);
@@ -205,9 +203,12 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 
 							{/* Content */}
 							<div className="flex flex-1 flex-col gap-2.5 p-5">
-									<div className="flex items-center justify-between">
+								<div className="flex items-center justify-between">
 									<StarRating rating={brew.rating_avg} count={brew.review_total} locale={locale} />
-									<span className="inline-flex items-center gap-1 text-xs text-(--muted)" title={`${brew.wishlist_count} ${m("catalog.favorites")}`}>
+									<span
+										className="inline-flex items-center gap-1 text-xs text-(--muted)"
+										title={`${brew.wishlist_count} ${m("catalog.favorites")}`}
+									>
 										<Heart size={12} className={brew.wishlist_count > 0 ? "fill-(--danger) text-(--danger)" : "text-(--sand)"} />
 										{brew.wishlist_count}
 									</span>
@@ -258,9 +259,7 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 										onClick={() => toggleCompare(brew.id)}
 										className={cn(
 											"inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition",
-											inCompare
-												? "border-(--accent) bg-(--accent)/10 text-(--accent)"
-												: "text-(--muted) hover:bg-(--sand)/15",
+											inCompare ? "border-(--accent) bg-(--accent)/10 text-(--accent)" : "text-(--muted) hover:bg-(--sand)/15",
 										)}
 										aria-label={inCompare ? "Remove from compare" : "Add to compare"}
 									>
@@ -282,9 +281,7 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 							<span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-(--accent)/15 text-xs font-bold text-(--accent)">
 								{compareIds.length}
 							</span>
-							<p className="text-sm font-medium text-(--espresso)">
-								{m("catalog.compareTray")}
-							</p>
+							<p className="text-sm font-medium text-(--espresso)">{m("catalog.compareTray")}</p>
 							<p className="hidden text-sm text-(--muted) sm:block">
 								{compareIds.map((id) => brewNameMap.get(id) ?? id.slice(0, 8)).join(", ")}
 							</p>

@@ -153,14 +153,16 @@ export function Select({
 						menuClassName,
 					)}
 				>
-					<ul role="listbox" aria-labelledby={id} className="grid gap-0.5">
+					<div role="listbox" aria-labelledby={id} className="grid gap-0.5">
 						{options.map((option) => {
 							const isSelected = option.value === selectedValue;
 
 							return (
-							<li key={option.value} role="option" aria-selected={isSelected}>
-								<button
-									type="button"
+								<li key={option.value} role="none">
+									<button
+										type="button"
+										role="option"
+										aria-selected={isSelected}
 										disabled={option.disabled}
 										onClick={() => chooseOption(option.value)}
 										className={cn(
@@ -174,7 +176,7 @@ export function Select({
 								</li>
 							);
 						})}
-					</ul>
+					</div>
 				</div>
 			)}
 		</div>

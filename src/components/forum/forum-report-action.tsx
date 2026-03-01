@@ -62,7 +62,7 @@ export function ForumReportAction({ targetId, targetType }: ForumReportActionPro
 							{locale === "id" ? "Batal" : "Cancel"}
 						</Button>
 						<Button type="button" onClick={() => void submit()} disabled={submitting || !reason.trim()}>
-						{submitting ? <Loader2 size={14} className="animate-spin" /> : locale === "id" ? "Kirim" : "Submit"}
+							{submitting ? <Loader2 size={14} className="animate-spin" /> : locale === "id" ? "Kirim" : "Submit"}
 						</Button>
 					</div>
 				}

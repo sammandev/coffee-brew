@@ -104,9 +104,9 @@ export function FlavorRadarChart({
 
 				<polygon
 					points={polygonPoints(communityValues, radius, center, maxValue)}
-					fill="var(--accent)"
+					fill="var(--crema)"
 					fillOpacity={0.18}
-					stroke="var(--accent)"
+					stroke="var(--crema)"
 					strokeWidth={2}
 				/>
 
@@ -124,7 +124,7 @@ export function FlavorRadarChart({
 
 			<figcaption className="mt-2 flex flex-wrap gap-2 text-xs text-(--muted)">
 				<span className="inline-flex items-center gap-1">
-					<span className="h-2.5 w-2.5 rounded-full bg-(--accent)" />
+					<span className="h-2.5 w-2.5 rounded-full bg-(--crema)" />
 					{communityLabel}
 				</span>
 				{myReview ? (

@@ -34,12 +34,7 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 	const myReview = session ? (reviews.find((review) => review.reviewer_id === session.userId) ?? null) : null;
 	const [{ data: wishlistRow }, { data: wishlistCountRows }] = await Promise.all([
 		session
-			? supabase
-					.from("brew_wishlist")
-					.select("brew_id")
-					.eq("user_id", session.userId)
-					.eq("brew_id", brew.id)
-					.maybeSingle()
+			? supabase.from("brew_wishlist").select("brew_id").eq("user_id", session.userId).eq("brew_id", brew.id).maybeSingle()
 			: Promise.resolve({ data: null }),
 		supabase.rpc("get_brew_wishlist_counts", { brew_ids: [brew.id] }),
 	]);
@@ -168,7 +163,9 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 							{m("brew.backToCatalog")}
 						</Link>
 					</li>
-					<li aria-hidden="true" className="select-none">/</li>
+					<li aria-hidden="true" className="select-none">
+						/
+					</li>
 					<li className="truncate font-medium text-(--espresso)">{brew.name}</li>
 				</ol>
 			</nav>
@@ -207,14 +204,44 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 						<span className="text-3xl font-bold text-(--accent)">{aggregate.overall.toFixed(1)}</span>
 						<div>
 							<div className="flex items-center gap-px">
-								{Array.from({ length: 5 }, (_, i) => (
-									<svg key={i} width="16" height="16" viewBox="0 0 24 24" fill={i < Math.round(aggregate.overall) ? "var(--crema)" : "none"} stroke={i < Math.round(aggregate.overall) ? "var(--crema)" : "var(--sand)"} strokeWidth="2" className="shrink-0"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+								{[0, 1, 2, 3, 4].map((starIndex) => (
+									<svg
+										key={`${brew.id}-star-${starIndex}`}
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill={starIndex < Math.round(aggregate.overall) ? "var(--crema)" : "none"}
+										stroke={starIndex < Math.round(aggregate.overall) ? "var(--crema)" : "var(--sand)"}
+										strokeWidth="2"
+										className="shrink-0"
+										aria-hidden="true"
+										focusable="false"
+									>
+										<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+									</svg>
 								))}
 							</div>
-							<p className="text-xs text-(--muted)">{aggregate.total} {m("brew.totalReviews")}</p>
+							<p className="text-xs text-(--muted)">
+								{aggregate.total} {m("brew.totalReviews")}
+							</p>
 						</div>
-						<span className="ml-auto inline-flex items-center gap-1.5 text-sm text-(--muted)" title={`${wishlistCount} ${m("catalog.favorites")}`}>
-							<svg width="14" height="14" viewBox="0 0 24 24" fill={wishlistCount > 0 ? "var(--danger)" : "none"} stroke={wishlistCount > 0 ? "var(--danger)" : "var(--sand)"} strokeWidth="2" className="shrink-0"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+						<span
+							className="ml-auto inline-flex items-center gap-1.5 text-sm text-(--muted)"
+							title={`${wishlistCount} ${m("catalog.favorites")}`}
+						>
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill={wishlistCount > 0 ? "var(--danger)" : "none"}
+								stroke={wishlistCount > 0 ? "var(--danger)" : "var(--sand)"}
+								strokeWidth="2"
+								className="shrink-0"
+								aria-hidden="true"
+								focusable="false"
+							>
+								<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+							</svg>
 							{wishlistCount}
 						</span>
 					</div>
@@ -241,7 +268,20 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 							href={`/forum?discussBrewId=${brew.id}`}
 							className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold text-(--accent) transition hover:bg-(--sand)/15"
 						>
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								aria-hidden="true"
+								focusable="false"
+							>
+								<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+							</svg>
 							{m("brew.discuss")}
 						</Link>
 						{session ? (
@@ -291,7 +331,7 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 											<span className="font-semibold text-(--espresso)">{value.toFixed(1)}</span>
 										</div>
 										<div className="h-2 overflow-hidden rounded-full bg-(--sand)/20">
-											<div className="h-full rounded-full bg-(--accent) transition-all" style={{ width: `${pct}%` }} />
+											<div className="h-full rounded-full bg-(--crema) transition-all" style={{ width: `${pct}%` }} />
 										</div>
 									</div>
 								);
@@ -350,14 +390,27 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 										{sighting.display_name}
 									</Link>
 									<span className="inline-flex items-center gap-1 rounded-full bg-(--crema)/15 px-2 py-0.5 text-xs font-semibold text-(--accent)">
-										<svg width="12" height="12" viewBox="0 0 24 24" fill="var(--crema)" stroke="var(--crema)" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+										<svg
+											width="12"
+											height="12"
+											viewBox="0 0 24 24"
+											fill="var(--crema)"
+											stroke="var(--crema)"
+											strokeWidth="2"
+											aria-hidden="true"
+											focusable="false"
+										>
+											<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+										</svg>
 										{sighting.overall.toFixed(1)}
 									</span>
 								</div>
 								<p className="mt-1 text-xs text-(--muted)">
 									{m("brew.lastBrewed")}: {formatDate(sighting.updated_at, locale)}
 								</p>
-								{sighting.notes ? <p className="mt-2 line-clamp-3 text-sm text-(--muted)">{clampPlainText(sighting.notes, 180)}</p> : null}
+								{sighting.notes ? (
+									<p className="mt-2 line-clamp-3 text-sm text-(--muted)">{clampPlainText(sighting.notes, 180)}</p>
+								) : null}
 							</Card>
 						))}
 					</div>
@@ -393,10 +446,7 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 							{/* Dimension pills */}
 							<div className="flex flex-wrap gap-2">
 								{reviewDimensions.map(({ label, value }) => (
-									<span
-										key={label}
-										className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs"
-									>
+									<span key={label} className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs">
 										<span className="text-(--muted)">{label}</span>
 										<span className="font-semibold text-(--espresso)">{value}/5</span>
 									</span>
