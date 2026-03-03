@@ -1,12 +1,21 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AuthDiagnostics } from "@/components/auth/auth-diagnostics";
 import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { SignupForm } from "@/components/forms/signup-form";
+import { getSessionContext } from "@/lib/auth";
 import { getServerI18n } from "@/lib/i18n/server";
 import { getSiteSettings } from "@/lib/site-settings";
 
 export default async function SignupPage() {
-	const [{ locale, t }, settings] = await Promise.all([getServerI18n(), getSiteSettings()]);
+	const [{ locale, t }, settings, session] = await Promise.all([
+		getServerI18n(),
+		getSiteSettings(),
+		getSessionContext(),
+	]);
+	if (session) {
+		redirect("/");
+	}
 	const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? process.env.GOOGLE_CLIENT_ID ?? null;
 	const oneTapClientIdDetected = Boolean(googleClientId?.trim());
 

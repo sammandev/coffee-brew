@@ -360,22 +360,6 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 				</Card>
 			</div>
 
-			{/* Grind reference */}
-			<section className="space-y-3">
-				<h2 className="font-heading text-2xl text-(--espresso)">{m("brew.grindReference")}</h2>
-				<div className="group overflow-hidden rounded-3xl border bg-(--surface-elevated)">
-					<div className="relative aspect-4/3 w-full overflow-hidden sm:aspect-16/8">
-						<Image
-							src={resolveBrewImageUrl(brew.grind_reference_image_url)}
-							alt={brew.grind_reference_image_alt || `${brew.name} grind reference`}
-							fill
-							sizes="100vw"
-							className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-						/>
-					</div>
-				</div>
-			</section>
-
 			{/* Recent Sightings */}
 			<section className="space-y-4">
 				<div className="space-y-1">

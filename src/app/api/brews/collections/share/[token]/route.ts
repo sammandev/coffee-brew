@@ -13,8 +13,6 @@ interface SharedBrewRow {
 	brewer_name: string;
 	image_url: string | null;
 	image_alt: string | null;
-	grind_reference_image_url: string | null;
-	grind_reference_image_alt: string | null;
 	recommended_methods: string[];
 	tags: string[];
 	status: string;
@@ -63,7 +61,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
 			? await supabase
 					.from("brews")
 					.select(
-						"id, name, brew_method, bean_process, coffee_beans, brand_roastery, brewer_name, image_url, image_alt, grind_reference_image_url, grind_reference_image_alt, recommended_methods, tags, status, created_at, updated_at",
+						"id, name, brew_method, bean_process, coffee_beans, brand_roastery, brewer_name, image_url, image_alt, recommended_methods, tags, status, created_at, updated_at",
 					)
 					.in("id", brewIds)
 					.eq("status", "published")

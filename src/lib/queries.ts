@@ -14,8 +14,6 @@ const BREW_OPTIONAL_COLUMNS = [
 	"tags",
 	"bean_process",
 	"recommended_methods",
-	"grind_reference_image_url",
-	"grind_reference_image_alt",
 ] as const;
 
 function createSupabasePublicClient() {
@@ -92,7 +90,7 @@ const getPublishedBrewsCached = unstable_cache(
 		let { data, error } = await supabase
 			.from("brews")
 			.select(
-				"id, name, brew_method, bean_process, brand_roastery, coffee_beans, brewer_name, image_url, image_alt, grind_reference_image_url, grind_reference_image_alt, recommended_methods, tags, created_at",
+				"id, name, brew_method, bean_process, brand_roastery, coffee_beans, brewer_name, image_url, image_alt, recommended_methods, tags, created_at",
 			)
 			.eq("status", "published")
 			.order("created_at", { ascending: false })
@@ -110,8 +108,6 @@ const getPublishedBrewsCached = unstable_cache(
 				...brew,
 				image_url: null,
 				image_alt: null,
-				grind_reference_image_url: null,
-				grind_reference_image_alt: null,
 				bean_process: null,
 				recommended_methods: [],
 				tags: [],
@@ -167,7 +163,7 @@ const getHomeShowcaseCached = unstable_cache(
 		const { data: brewRows, error: brewError } = await supabase
 			.from("brews")
 			.select(
-				"id, name, brew_method, bean_process, brand_roastery, coffee_beans, brewer_name, image_url, image_alt, grind_reference_image_url, grind_reference_image_alt, recommended_methods, tags, created_at",
+				"id, name, brew_method, bean_process, brand_roastery, coffee_beans, brewer_name, image_url, image_alt, recommended_methods, tags, created_at",
 			)
 			.eq("status", "published")
 			.order("created_at", { ascending: false })
@@ -186,8 +182,6 @@ const getHomeShowcaseCached = unstable_cache(
 				...brew,
 				image_url: null,
 				image_alt: null,
-				grind_reference_image_url: null,
-				grind_reference_image_alt: null,
 				bean_process: null,
 				recommended_methods: [],
 				tags: [],

@@ -15,7 +15,7 @@ export async function GET(request: Request) {
 	const { data: brews, error } = await supabase
 		.from("brews")
 		.select(
-			"id, name, brew_method, bean_process, coffee_beans, brand_roastery, brewer_name, image_url, image_alt, grind_reference_image_url, grind_reference_image_alt, recommended_methods, tags, status, created_at, updated_at",
+			"id, name, brew_method, bean_process, coffee_beans, brand_roastery, brewer_name, image_url, image_alt, recommended_methods, tags, status, created_at, updated_at",
 		)
 		.in("id", ids)
 		.eq("status", "published");

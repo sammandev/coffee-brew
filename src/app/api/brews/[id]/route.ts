@@ -15,8 +15,6 @@ const BREW_OPTIONAL_COLUMNS = [
 	"tags",
 	"bean_process",
 	"recommended_methods",
-	"grind_reference_image_url",
-	"grind_reference_image_alt",
 ] as const;
 
 type BrewRecord = Record<string, unknown>;
@@ -150,10 +148,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 		const imageUrl = typeof payload.imageUrl === "string" ? payload.imageUrl.trim() : "";
 		const imageAlt = typeof payload.imageAlt === "string" ? payload.imageAlt.trim() : "";
 		const beanProcess = typeof payload.beanProcess === "string" ? payload.beanProcess.trim() : "";
-		const grindReferenceImageUrl =
-			typeof payload.grindReferenceImageUrl === "string" ? payload.grindReferenceImageUrl.trim() : "";
-		const grindReferenceImageAlt =
-			typeof payload.grindReferenceImageAlt === "string" ? payload.grindReferenceImageAlt.trim() : "";
 		const tags = normalizeTags(payload.tags);
 		const recommendedMethods = normalizeRecommendedMethods(payload.recommendedMethods);
 		return {
@@ -162,8 +156,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 			imageUrl: imageUrl.length > 0 ? imageUrl : null,
 			imageAlt: imageAlt.length > 0 ? imageAlt : null,
 			beanProcess: beanProcess.length > 0 ? beanProcess : null,
-			grindReferenceImageUrl: grindReferenceImageUrl.length > 0 ? grindReferenceImageUrl : null,
-			grindReferenceImageAlt: grindReferenceImageAlt.length > 0 ? grindReferenceImageAlt : null,
 			recommendedMethods,
 			tags,
 		};
@@ -181,15 +173,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 	if (parsed.data.imageAlt && !parsed.data.imageUrl) {
 		return apiError("Invalid brew payload", 400, "Image alt text requires an image URL.");
 	}
-	if (parsed.data.grindReferenceImageAlt && !parsed.data.grindReferenceImageUrl) {
-		return apiError("Invalid brew payload", 400, "Grind reference alt text requires an image URL.");
-	}
 
 	const previousImageUrl = typeof current.image_url === "string" ? current.image_url : null;
-	const previousGrindReferenceImageUrl =
-		typeof current.grind_reference_image_url === "string" ? current.grind_reference_image_url : null;
 	const nextImageUrl = parsed.data.imageUrl ?? null;
-	const nextGrindReferenceImageUrl = parsed.data.grindReferenceImageUrl ?? null;
+	const { data: ownerProfile } = await supabase
+		.from("profiles")
+		.select("display_name, email")
+		.eq("id", current.owner_id)
+		.maybeSingle<{ display_name: string | null; email: string | null }>();
+	const brewerName =
+		ownerProfile?.display_name?.trim() ||
+		ownerProfile?.email ||
+		(typeof current.brewer_name === "string" ? current.brewer_name : "Unknown");
 
 	const updatePayload = {
 		name: parsed.data.name,
@@ -204,12 +199,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 		grind_size: parsed.data.grindSize,
 		grind_clicks: parsed.data.grindClicks ?? null,
 		brew_time_seconds: parsed.data.brewTimeSeconds,
-		brewer_name: parsed.data.brewerName,
+		brewer_name: brewerName,
 		notes: parsed.data.notes ?? null,
 		status: parsed.data.status,
 		recommended_methods: parsed.data.recommendedMethods ?? [],
-		grind_reference_image_url: parsed.data.grindReferenceImageUrl ?? null,
-		grind_reference_image_alt: parsed.data.grindReferenceImageAlt ?? null,
 	};
 
 	let imageColumnsApplied = true;
@@ -230,10 +223,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 		const missingTagsColumn = isMissingColumnError(error, ["tags"]);
 		const missingBeanProcessColumn = isMissingColumnError(error, ["bean_process"]);
 		const missingRecommendedMethodsColumn = isMissingColumnError(error, ["recommended_methods"]);
-		const missingGrindReferenceImageColumns = isMissingColumnError(error, [
-			"grind_reference_image_url",
-			"grind_reference_image_alt",
-		]);
 		imageColumnsApplied = !missingImageColumns;
 
 		console.warn("[brews:update] optional columns missing; retrying update with compatibility payload");
@@ -249,11 +238,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 		};
 		if (missingBeanProcessColumn) delete compatibilityPayload.bean_process;
 		if (missingRecommendedMethodsColumn) delete compatibilityPayload.recommended_methods;
-		if (missingGrindReferenceImageColumns) {
-			delete compatibilityPayload.grind_reference_image_url;
-			delete compatibilityPayload.grind_reference_image_alt;
-		}
-
 		({ brew: data, error } = await updateAndLoadBrew(supabase, id, compatibilityPayload, current as BrewRecord));
 	}
 
@@ -265,10 +249,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 		const removedPaths: string[] = [];
 		if (previousImageUrl && previousImageUrl !== nextImageUrl) {
 			const previousPath = toManagedBrewImagePath(previousImageUrl);
-			if (previousPath) removedPaths.push(previousPath);
-		}
-		if (previousGrindReferenceImageUrl && previousGrindReferenceImageUrl !== nextGrindReferenceImageUrl) {
-			const previousPath = toManagedBrewImagePath(previousGrindReferenceImageUrl);
 			if (previousPath) removedPaths.push(previousPath);
 		}
 
@@ -320,9 +300,6 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 
 	const removedPaths = [
 		toManagedBrewImagePath(typeof current.image_url === "string" ? current.image_url : null),
-		toManagedBrewImagePath(
-			typeof current.grind_reference_image_url === "string" ? current.grind_reference_image_url : null,
-		),
 	].filter((value): value is string => Boolean(value));
 	if (removedPaths.length > 0) {
 		await createSupabaseAdminClient().storage.from(BREW_IMAGE_BUCKET).remove(removedPaths);

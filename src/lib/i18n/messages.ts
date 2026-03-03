@@ -329,7 +329,7 @@ const en = {
 
 	"compare.badge": "Brew Compare",
 	"compare.title": "Brew Comparison",
-	"compare.subtitle": "Side-by-side flavor profiles, recipe parameters, and grind references.",
+	"compare.subtitle": "Side-by-side flavor profiles and recipe parameters.",
 	"compare.emptyTitle": "Not enough brews selected",
 	"compare.emptyDescription": "Add 2-3 brews to the compare tray from the catalog page.",
 	"compare.backToCatalog": "Back to catalog",
@@ -680,7 +680,7 @@ const id: LocaleMessages = {
 
 	"compare.badge": "Bandingkan Brew",
 	"compare.title": "Perbandingan Brew",
-	"compare.subtitle": "Perbandingan flavor profile, parameter resep, dan referensi gilingan.",
+	"compare.subtitle": "Perbandingan flavor profile dan parameter resep.",
 	"compare.emptyTitle": "Belum cukup brew dipilih",
 	"compare.emptyDescription": "Tambahkan 2-3 brew ke compare tray di halaman katalog.",
 	"compare.backToCatalog": "Kembali ke katalog",

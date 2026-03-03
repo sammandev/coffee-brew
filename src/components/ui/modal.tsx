@@ -37,6 +37,11 @@ export function Modal({
 	const [mounted, setMounted] = React.useState(false);
 	const panelRef = React.useRef<HTMLDivElement>(null);
 	const previousFocusedRef = React.useRef<HTMLElement | null>(null);
+	const onCloseRef = React.useRef(onClose);
+
+	React.useEffect(() => {
+		onCloseRef.current = onClose;
+	}, [onClose]);
 
 	React.useEffect(() => {
 		setMounted(true);
@@ -54,7 +59,7 @@ export function Modal({
 
 		function onKeyDown(event: KeyboardEvent) {
 			if (event.key === "Escape") {
-				onClose();
+				onCloseRef.current();
 				return;
 			}
 
@@ -91,7 +96,7 @@ export function Modal({
 			document.body.style.overflow = previousOverflow;
 			previousFocusedRef.current?.focus();
 		};
-	}, [mounted, onClose, open]);
+	}, [mounted, open]);
 
 	if (!mounted || !open) {
 		return null;

@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AuthDiagnostics } from "@/components/auth/auth-diagnostics";
 import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { LoginForm } from "@/components/forms/login-form";
+import { getSessionContext } from "@/lib/auth";
 import { getServerI18n } from "@/lib/i18n/server";
 import { getSiteSettings } from "@/lib/site-settings";
 
@@ -15,7 +17,17 @@ export default async function LoginPage({
 }: {
 	searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-	const [{ locale, t }, settings, params] = await Promise.all([getServerI18n(), getSiteSettings(), searchParams]);
+	const [{ locale, t }, settings, params, session] = await Promise.all([
+		getServerI18n(),
+		getSiteSettings(),
+		searchParams,
+		getSessionContext(),
+	]);
+
+	if (session) {
+		redirect("/");
+	}
+
 	const nextPath = firstParam(params.next).trim();
 	const redirectPath = nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : undefined;
 	const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? process.env.GOOGLE_CLIENT_ID ?? null;

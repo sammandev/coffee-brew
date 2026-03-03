@@ -68,7 +68,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 	const { data: brews } = await supabase
 		.from("brews")
 		.select(
-			"id, name, brew_method, bean_process, coffee_beans, brand_roastery, brewer_name, image_url, image_alt, grind_reference_image_url, grind_reference_image_alt, recommended_methods, tags, status, created_at, updated_at, water_type, water_ppm, temperature, temperature_unit, grind_size, grind_clicks, brew_time_seconds",
+			"id, name, brew_method, bean_process, coffee_beans, brand_roastery, brewer_name, image_url, image_alt, recommended_methods, tags, status, created_at, updated_at, water_type, water_ppm, temperature, temperature_unit, grind_size, grind_clicks, brew_time_seconds",
 		)
 		.in("id", ids)
 		.eq("status", "published");
@@ -430,33 +430,6 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 							</Card>
 						);
 					})}
-				</div>
-			</section>
-
-			{/* Grind reference comparison */}
-			<section className="space-y-4">
-				<h2 className="font-heading text-2xl text-(--espresso)">{m("compare.grindReference")}</h2>
-				<div className={`grid gap-4 ${orderedBrews.length === 2 ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
-					{orderedBrews.map((brew) => (
-						<Card key={`grind-${brew.id}`} className="space-y-3 p-0">
-							<div className="relative aspect-4/3 w-full overflow-hidden rounded-t-xl">
-								<Image
-									src={resolveBrewImageUrl(brew.grind_reference_image_url)}
-									alt={brew.grind_reference_image_alt || `${brew.name} grind reference`}
-									fill
-									sizes="(max-width: 1280px) 50vw, 33vw"
-									className="object-cover"
-								/>
-							</div>
-							<div className="space-y-1 px-5 pb-5">
-								<p className="text-sm font-bold text-(--espresso)">{brew.name}</p>
-								<p className="text-xs text-(--muted)">
-									{brew.grind_size}
-									{typeof brew.grind_clicks === "number" ? ` · ${brew.grind_clicks} clicks` : ""}
-								</p>
-							</div>
-						</Card>
-					))}
 				</div>
 			</section>
 

@@ -38,12 +38,10 @@ export interface BrewInput {
 	grindSize: string;
 	grindClicks?: number | null;
 	brewTimeSeconds: number;
-	brewerName: string;
+	brewerName?: string;
 	notes?: string;
 	imageUrl?: string | null;
 	imageAlt?: string | null;
-	grindReferenceImageUrl?: string | null;
-	grindReferenceImageAlt?: string | null;
 	recommendedMethods?: BrewRecommendedMethod[];
 	tags?: string[];
 	status: BrewStatus;

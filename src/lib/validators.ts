@@ -14,12 +14,10 @@ export const brewSchema = z.object({
 	grindSize: z.string().trim().min(1).max(80),
 	grindClicks: z.number().int().min(0).max(200).nullable().optional(),
 	brewTimeSeconds: z.number().int().min(10).max(7200),
-	brewerName: z.string().trim().min(2).max(120),
+	brewerName: z.string().trim().min(2).max(120).optional(),
 	notes: z.string().trim().max(30000).optional(),
 	imageUrl: z.string().trim().url().max(2000).nullable().optional(),
 	imageAlt: z.string().trim().max(200).nullable().optional(),
-	grindReferenceImageUrl: z.string().trim().url().max(2000).nullable().optional(),
-	grindReferenceImageAlt: z.string().trim().max(200).nullable().optional(),
 	recommendedMethods: z
 		.array(z.enum(["espresso", "cold_brew", "pour_over"]))
 		.max(3)

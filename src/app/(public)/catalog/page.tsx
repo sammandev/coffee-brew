@@ -26,8 +26,6 @@ interface CatalogBrewRawRow {
 	recommended_methods: string[] | null;
 	status: string;
 	tags: string[] | null;
-	grind_reference_image_url: string | null;
-	grind_reference_image_alt: string | null;
 }
 
 interface CatalogBrewViewRow extends CatalogBrewRawRow {
@@ -112,7 +110,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 		let filtered = supabase
 			.from("brews")
 			.select(
-				"id, name, brew_method, status, created_at, coffee_beans, brand_roastery, brewer_name, tags, image_url, image_alt, recommended_methods, bean_process, grind_reference_image_url, grind_reference_image_alt",
+				"id, name, brew_method, status, created_at, coffee_beans, brand_roastery, brewer_name, tags, image_url, image_alt, recommended_methods, bean_process",
 			)
 			.eq("status", "published")
 			.order("created_at", { ascending: false })
@@ -177,10 +175,6 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 						image_alt: typeof brew.image_alt === "string" ? brew.image_alt : null,
 						recommended_methods: Array.isArray(brew.recommended_methods) ? brew.recommended_methods : [],
 						bean_process: typeof brew.bean_process === "string" ? brew.bean_process : null,
-						grind_reference_image_url:
-							typeof brew.grind_reference_image_url === "string" ? brew.grind_reference_image_url : null,
-						grind_reference_image_alt:
-							typeof brew.grind_reference_image_alt === "string" ? brew.grind_reference_image_alt : null,
 						wishlist_count: wishlistCountMap.get(String(brew.id)) ?? 0,
 					};
 				})
@@ -197,7 +191,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 		let pageQuery = supabase
 			.from("brews")
 			.select(
-				"id, name, brew_method, status, created_at, coffee_beans, brand_roastery, brewer_name, tags, image_url, image_alt, recommended_methods, bean_process, grind_reference_image_url, grind_reference_image_alt",
+				"id, name, brew_method, status, created_at, coffee_beans, brand_roastery, brewer_name, tags, image_url, image_alt, recommended_methods, bean_process",
 				{ count: "exact" },
 			)
 			.eq("status", "published")
@@ -265,10 +259,6 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 				image_alt: typeof brew.image_alt === "string" ? brew.image_alt : null,
 				recommended_methods: Array.isArray(brew.recommended_methods) ? brew.recommended_methods : [],
 				bean_process: typeof brew.bean_process === "string" ? brew.bean_process : null,
-				grind_reference_image_url:
-					typeof brew.grind_reference_image_url === "string" ? brew.grind_reference_image_url : null,
-				grind_reference_image_alt:
-					typeof brew.grind_reference_image_alt === "string" ? brew.grind_reference_image_alt : null,
 				wishlist_count: wishlistCountMap.get(String(brew.id)) ?? 0,
 			};
 		});
@@ -294,10 +284,27 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 	return (
 		<div className="space-y-8">
 			<header className="space-y-4">
-				<div className="space-y-2">
-					<Badge>{t("nav.catalog")}</Badge>
-					<h1 className="font-heading text-4xl text-(--espresso)">{t("catalog.title")}</h1>
-					<p className="max-w-2xl text-(--muted)">{t("catalog.subtitle")}</p>
+				<div className="flex flex-wrap items-start justify-between gap-4">
+					<div className="space-y-2">
+						<Badge>{t("nav.catalog")}</Badge>
+						<h1 className="font-heading text-4xl text-(--espresso)">{t("catalog.title")}</h1>
+						<p className="max-w-2xl text-(--muted)">{t("catalog.subtitle")}</p>
+					</div>
+					{session ? (
+						<Link
+							href="/me/brews/new"
+							className="inline-flex items-center gap-2 rounded-full bg-(--espresso) px-5 py-2.5 text-sm font-semibold text-(--oat) shadow-sm transition hover:opacity-90"
+						>
+							{locale === "id" ? "Buat Racikan" : "Create Brew"}
+						</Link>
+					) : (
+						<Link
+							href="/login?next=%2Fme%2Fbrews%2Fnew"
+							className="inline-flex items-center gap-2 rounded-full bg-(--espresso) px-5 py-2.5 text-sm font-semibold text-(--oat) shadow-sm transition hover:opacity-90"
+						>
+							{locale === "id" ? "Masuk untuk Buat Racikan" : "Login to Create Brew"}
+						</Link>
+					)}
 				</div>
 				<CatalogSearchControls
 					locale={locale}
