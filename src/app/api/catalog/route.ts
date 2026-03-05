@@ -6,13 +6,7 @@ import { isMissingColumnError } from "@/lib/supabase-errors";
 
 export const runtime = "edge";
 
-const BREW_OPTIONAL_COLUMNS = [
-	"image_url",
-	"image_alt",
-	"tags",
-	"bean_process",
-	"recommended_methods",
-] as const;
+const BREW_OPTIONAL_COLUMNS = ["image_url", "image_alt", "tags", "bean_process", "recommended_methods"] as const;
 
 function firstParam(value: string | null) {
 	return String(value ?? "").trim();

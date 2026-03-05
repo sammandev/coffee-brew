@@ -260,9 +260,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 										/>
 									</div>
 									<div className="space-y-3 p-6">
-										<p className="text-xs font-semibold uppercase tracking-[0.12em] text-(--accent)">
-											{t("blog.featuredStory")}
-										</p>
+										<p className="text-xs font-semibold uppercase tracking-[0.12em] text-(--accent)">{t("blog.featuredStory")}</p>
 										<h2 className="font-heading text-3xl text-(--espresso)">{featuredPost.title}</h2>
 										<RichTextContent html={featuredPost.excerpt} className="line-clamp-4 text-sm text-(--muted)" />
 										<div className="flex flex-wrap items-center gap-2 text-xs text-(--muted)">

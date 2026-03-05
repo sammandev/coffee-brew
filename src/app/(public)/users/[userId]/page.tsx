@@ -515,9 +515,7 @@ export default async function PublicProfilePage({ params, searchParams }: Public
 
 	const ratingReceivedCount = reviewsReceivedCount;
 	const ratingReceivedAverage =
-		starRatingsReceived.length > 0
-			? starRatingsReceived.reduce((sum, v) => sum + v, 0) / starRatingsReceived.length
-			: 0;
+		starRatingsReceived.length > 0 ? starRatingsReceived.reduce((sum, v) => sum + v, 0) / starRatingsReceived.length : 0;
 	const { data: targetBadgeRows } = await supabaseAdmin
 		.from("user_badges")
 		.select("user_id, badge_definitions(label_en, label_id, min_points)")

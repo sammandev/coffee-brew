@@ -8,7 +8,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getSessionContext } from "@/lib/auth";
 import { parseCompareIds } from "@/lib/brew-collections";
 import { resolveBrewImageUrl } from "@/lib/brew-images";
-import { getMessage, getDimensionLabels } from "@/lib/i18n/messages";
+import { getDimensionLabels, getMessage } from "@/lib/i18n/messages";
 import { getServerI18n } from "@/lib/i18n/server";
 import { aggregateRatings } from "@/lib/rating";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -98,7 +98,14 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 
 	const reviewMap = new Map<
 		string,
-		Array<{ acidity: number; sweetness: number; body: number; aroma: number; balance: number; star_rating: number | null }>
+		Array<{
+			acidity: number;
+			sweetness: number;
+			body: number;
+			aroma: number;
+			balance: number;
+			star_rating: number | null;
+		}>
 	>();
 	const myReviewMap = new Map<
 		string,
@@ -221,8 +228,8 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 												width="14"
 												height="14"
 												viewBox="0 0 24 24"
-								fill={starIndex < Math.round(agg.star_avg) ? "var(--crema)" : "none"}
-											stroke={starIndex < Math.round(agg.star_avg) ? "var(--crema)" : "var(--sand)"}
+												fill={starIndex < Math.round(agg.star_avg) ? "var(--crema)" : "none"}
+												stroke={starIndex < Math.round(agg.star_avg) ? "var(--crema)" : "var(--sand)"}
 												strokeWidth="2"
 												className="shrink-0"
 												aria-hidden="true"
@@ -232,9 +239,9 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 											</svg>
 										))}
 										<span className="ml-1 text-sm font-semibold text-(--espresso)">
-										{agg.total > 0 ? agg.star_avg.toFixed(1) : "—"}
-									</span>
-									<span className="text-xs text-(--muted)">({agg.total})</span>
+											{agg.total > 0 ? agg.star_avg.toFixed(1) : "—"}
+										</span>
+										<span className="text-xs text-(--muted)">({agg.total})</span>
 									</div>
 									<span className="inline-flex items-center gap-1 text-xs text-(--muted)">
 										<svg
