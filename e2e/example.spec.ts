@@ -1,18 +1,23 @@
 import { expect, test } from "@playwright/test";
 
-test("has title", async ({ page }) => {
-	await page.goto("https://playwright.dev/");
+test("public home page renders", async ({ page }) => {
+	await page.goto("/");
 
-	// Expect a title "to contain" a substring.
-	await expect(page).toHaveTitle(/Playwright/);
+	await expect(page).toHaveURL(/\/$/);
+	await expect(page.getByRole("link", { name: /catalog|katalog/i })).toBeVisible();
+	await expect(page.getByRole("link", { name: /forum/i })).toBeVisible();
 });
 
-test("get started link", async ({ page }) => {
-	await page.goto("https://playwright.dev/");
+test("catalog page renders", async ({ page }) => {
+	await page.goto("/catalog");
 
-	// Click the get started link.
-	await page.getByRole("link", { name: "Get started" }).click();
+	await expect(page).toHaveURL(/\/catalog/);
+	await expect(page.getByRole("heading", { name: /catalog|katalog/i })).toBeVisible();
+});
 
-	// Expects page to have a heading with the name of Installation.
-	await expect(page.getByRole("heading", { name: "Installation" })).toBeVisible();
+test("forum page renders", async ({ page }) => {
+	await page.goto("/forum");
+
+	await expect(page).toHaveURL(/\/forum/);
+	await expect(page.getByRole("heading", { name: /forum/i })).toBeVisible();
 });

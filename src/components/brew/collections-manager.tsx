@@ -62,7 +62,12 @@ export function CollectionsManager({ locale }: CollectionsManagerProps) {
 		const wishlistRows =
 			(
 				wishlistBody as {
-					items?: Array<{ brew?: WishlistCollectionItem["brew"]; brew_id?: string; created_at?: string }>;
+					items?: Array<{
+						brew?: WishlistCollectionItem["brew"];
+						brew_id?: string;
+						created_at?: string;
+						my_star_rating?: number | null;
+					}>;
 				}
 			).items ?? [];
 		const historyRows =
@@ -83,21 +88,32 @@ export function CollectionsManager({ locale }: CollectionsManagerProps) {
 				my_overall: Number(row.my_overall ?? 0),
 			}));
 
-		const hydratedWishlist: WishlistCollectionItem[] = wishlistRows
-			.map((row) =>
-				row.brew && row.created_at
-					? {
+		const hydratedWishlist: WishlistCollectionItem[] = wishlistRows.flatMap((row) =>
+			row.brew && row.created_at
+				? [
+						{
 							brew: row.brew,
 							saved_at: row.created_at,
-						}
-					: null,
-			)
-			.filter((value): value is WishlistCollectionItem => Boolean(value));
+							my_star_rating: row.my_star_rating ?? null,
+						} as WishlistCollectionItem,
+					]
+				: [],
+		);
 
+		const loadedShare = ((shareBody as { share?: SharePayload | null }).share ?? null) as SharePayload | null;
 		setWishlist(hydratedWishlist);
 		setHistory(historyItems);
-		setShare(((shareBody as { share?: SharePayload | null }).share ?? null) as SharePayload | null);
+		setShare(loadedShare);
 		setIsLoading(false);
+
+		// Auto-generate share token if the user doesn't have one yet
+		if (!loadedShare) {
+			const autoRotateRes = await fetch("/api/brews/collections/share/rotate", { method: "POST" }).catch(() => null);
+			if (autoRotateRes?.ok) {
+				const autoBody = (await autoRotateRes.json().catch(() => ({}))) as { share?: SharePayload };
+				if (autoBody.share) setShare(autoBody.share);
+			}
+		}
 	}, [locale]);
 
 	useEffect(() => {
@@ -172,11 +188,11 @@ export function CollectionsManager({ locale }: CollectionsManagerProps) {
 					</div>
 				</div>
 				<p className="break-all text-sm text-(--muted)">
-					{shareUrl
-						? shareUrl
-						: locale === "id"
-							? "Belum ada token share. Klik Putar Token untuk membuat URL publik."
-							: "No share token yet. Click Rotate Token to generate a public URL."}
+					{shareUrl ? (
+						shareUrl
+					) : (
+						<span className="italic text-(--muted)">{locale === "id" ? "Memuat URL share..." : "Loading share URL..."}</span>
+					)}
 				</p>
 			</Card>
 

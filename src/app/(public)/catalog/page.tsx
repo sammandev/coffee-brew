@@ -295,14 +295,14 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 							href="/me/brews/new"
 							className="inline-flex items-center gap-2 rounded-full bg-(--espresso) px-5 py-2.5 text-sm font-semibold text-(--oat) shadow-sm transition hover:opacity-90"
 						>
-							{locale === "id" ? "Buat Racikan" : "Create Brew"}
+							{m("catalog.createBrew")}
 						</Link>
 					) : (
 						<Link
 							href="/login?next=%2Fme%2Fbrews%2Fnew"
 							className="inline-flex items-center gap-2 rounded-full bg-(--espresso) px-5 py-2.5 text-sm font-semibold text-(--oat) shadow-sm transition hover:opacity-90"
 						>
-							{locale === "id" ? "Masuk untuk Buat Racikan" : "Login to Create Brew"}
+							{m("catalog.loginToCreate")}
 						</Link>
 					)}
 				</div>
@@ -391,18 +391,18 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
 									href={buildCatalogHref(page - 1, baseFilterParams)}
 									className="rounded-full border bg-(--surface-elevated) px-3.5 py-1.5 text-sm font-medium text-(--muted) transition hover:bg-(--sand)/20"
 								>
-									{locale === "id" ? "Sebelumnya" : "Previous"}
+									{m("common.previous")}
 								</Link>
 							) : null}
 							<span className="text-sm text-(--muted)">
-								{locale === "id" ? "Halaman" : "Page"} {page} / {totalPages}
+								{m("common.page")} {page} / {totalPages}
 							</span>
 							{page < totalPages ? (
 								<Link
 									href={buildCatalogHref(page + 1, baseFilterParams)}
 									className="rounded-full border bg-(--surface-elevated) px-3.5 py-1.5 text-sm font-medium text-(--muted) transition hover:bg-(--sand)/20"
 								>
-									{locale === "id" ? "Berikutnya" : "Next"}
+									{m("common.next")}
 								</Link>
 							) : null}
 						</div>

@@ -11,9 +11,10 @@ export async function GET() {
 	const { data, error } = await supabase
 		.from("brew_wishlist")
 		.select(
-			"brew_id, created_at, brews(id, name, brew_method, bean_process, coffee_beans, brand_roastery, brewer_name, image_url, image_alt, recommended_methods, tags, status, created_at)",
+			"brew_id, created_at, brews(id, name, brew_method, bean_process, coffee_beans, brand_roastery, brewer_name, image_url, image_alt, recommended_methods, tags, status, created_at), brew_reviews!left(star_rating)",
 		)
 		.eq("user_id", session.userId)
+		.eq("brew_reviews.reviewer_id", session.userId)
 		.order("created_at", { ascending: false });
 
 	if (error) {
@@ -24,10 +25,16 @@ export async function GET() {
 		.map((row) => {
 			const brew = Array.isArray(row.brews) ? row.brews[0] : row.brews;
 			if (!brew) return null;
+			const reviewRow = Array.isArray(row.brew_reviews) ? row.brew_reviews[0] : row.brew_reviews;
+			const my_star_rating =
+				reviewRow && typeof (reviewRow as { star_rating?: unknown }).star_rating === "number"
+					? (reviewRow as { star_rating: number }).star_rating
+					: null;
 			return {
 				brew_id: row.brew_id,
 				created_at: row.created_at,
 				brew,
+				my_star_rating,
 			};
 		})
 		.filter((value): value is NonNullable<typeof value> => Boolean(value));

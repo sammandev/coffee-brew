@@ -7,15 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Select } from "@/components/ui/select";
+import { getDimensionLabels } from "@/lib/i18n/messages";
 
 const scoreOptions = [1, 2, 3, 4, 5];
-const REVIEW_FIELDS = [
-	{ key: "acidity", labelEn: "Acidity", labelId: "Keasaman" },
-	{ key: "sweetness", labelEn: "Sweetness", labelId: "Kemanisan" },
-	{ key: "body", labelEn: "Body", labelId: "Body" },
-	{ key: "aroma", labelEn: "Aroma", labelId: "Aroma" },
-	{ key: "balance", labelEn: "Balance", labelId: "Keseimbangan" },
-] as const;
 
 interface InitialReview {
 	acidity: number;
@@ -35,6 +29,7 @@ export function ReviewForm({ brewId, initialReview }: { brewId: string; initialR
 	const [starRating, setStarRating] = useState<number | null>(initialReview?.star_rating ?? null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const isEditMode = Boolean(initialReview);
+	const [isExpanded, setIsExpanded] = useState(!isEditMode);
 
 	useEffect(() => {
 		setNotes(initialReview?.notes ?? "");
@@ -77,20 +72,57 @@ export function ReviewForm({ brewId, initialReview }: { brewId: string; initialR
 		}
 
 		setIsSubmitting(false);
+		if (isEditMode) setIsExpanded(false);
 		router.refresh();
+	}
+
+	// Collapsed summary card shown when user already has a review and hasn't clicked Edit
+	if (isEditMode && !isExpanded) {
+		const stars = initialReview?.star_rating ?? null;
+		return (
+			<div className="flex items-center justify-between rounded-3xl border bg-(--surface-elevated) px-5 py-4">
+				<div className="flex items-center gap-3">
+					<span className="font-heading text-base text-(--espresso)">{locale === "id" ? "Review Anda" : "Your Review"}</span>
+					{stars !== null ? (
+						<span className="flex items-center gap-1 rounded-full bg-(--crema) px-2 py-0.5 text-sm font-semibold text-(--espresso)">
+							{"★".repeat(stars)}
+							{"☆".repeat(5 - stars)}
+							<span className="ml-1">{stars}/5</span>
+						</span>
+					) : (
+						<span className="text-sm text-(--muted)">{locale === "id" ? "Belum dinilai" : "Not rated"}</span>
+					)}
+				</div>
+				<Button type="button" variant="outline" onClick={() => setIsExpanded(true)}>
+					{locale === "id" ? "Edit" : "Edit"}
+				</Button>
+			</div>
+		);
 	}
 
 	return (
 		<form onSubmit={onSubmit} className="grid gap-4 rounded-3xl border bg-(--surface-elevated) p-5">
-			<h3 className="font-heading text-xl text-(--espresso)">
-				{isEditMode
-					? locale === "id"
-						? "Perbarui Review Anda"
-						: "Update Your Review"
-					: locale === "id"
-						? "Nilai Racikan Ini"
-						: "Rate This Brew"}
-			</h3>
+			<div className="flex items-center justify-between">
+				<h3 className="font-heading text-xl text-(--espresso)">
+					{isEditMode
+						? locale === "id"
+							? "Perbarui Review Anda"
+							: "Update Your Review"
+						: locale === "id"
+							? "Nilai Racikan Ini"
+							: "Rate This Brew"}
+				</h3>
+				{isEditMode && (
+					<button
+						type="button"
+						onClick={() => setIsExpanded(false)}
+						className="text-sm text-(--muted) hover:text-(--espresso) transition-colors"
+						aria-label={locale === "id" ? "Tutup form" : "Collapse form"}
+					>
+						{locale === "id" ? "Tutup" : "Collapse"}
+					</button>
+				)}
+			</div>
 
 			{/* Star rating widget */}
 			<div>
@@ -127,9 +159,9 @@ export function ReviewForm({ brewId, initialReview }: { brewId: string; initialR
 			</div>
 
 			<div className="grid gap-4 md:grid-cols-5">
-				{REVIEW_FIELDS.map((field) => (
+				{getDimensionLabels(locale).map((field) => (
 					<div key={field.key}>
-						<Label htmlFor={field.key}>{locale === "id" ? field.labelId : field.labelEn}</Label>
+						<Label htmlFor={field.key}>{field.label}</Label>
 						<Select name={field.key} id={field.key} defaultValue={String(initialReview?.[field.key] ?? 4)}>
 							{scoreOptions.map((score) => (
 								<option value={score} key={score}>

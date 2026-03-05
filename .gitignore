@@ -24,7 +24,7 @@
 .DS_Store
 *.pem
 
-# debug
+# debugclear
 *-debug.log*
 *-error.log*
 .pnpm-debug.log*

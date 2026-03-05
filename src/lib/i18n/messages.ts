@@ -42,6 +42,9 @@ const en = {
 	"common.refresh": "Refresh",
 	"common.loading": "Loading...",
 	"common.none": "N/A",
+	"common.previous": "Previous",
+	"common.next": "Next",
+	"common.page": "Page",
 
 	"auth.welcomeBack": "Welcome Back",
 	"auth.loginDescription": "Sign in to create brews, post in the forum, and rate cups.",
@@ -141,6 +144,8 @@ const en = {
 	"blog.popularTags": "Popular Tags",
 	"blog.noResultsTitle": "No posts matched your filters",
 	"blog.noResultsDescription": "Try adjusting keywords or advanced filters to see other results.",
+	"blog.featuredStory": "Featured Story",
+	"blog.minRead": "min read",
 	"about.title": "About Coffee Brew",
 	"contact.title": "Contact",
 	"sitemap.title": "Sitemap",
@@ -299,6 +304,8 @@ const en = {
 	"catalog.wishlistFail": "Could not update wishlist.",
 	"catalog.goToDashboard": "Go to Dashboard",
 	"catalog.adjustFilters": "Try different keywords or adjust your filters.",
+	"catalog.createBrew": "Create Brew",
+	"catalog.loginToCreate": "Login to Create Brew",
 
 	"brew.backToCatalog": "Back to Catalog",
 	"brew.recipe": "Recipe",
@@ -327,6 +334,17 @@ const en = {
 	"brew.loginToReview": "Login to submit a review.",
 	"brew.communityAvg": "Community Average",
 
+	"dim.acidity": "Acidity",
+	"dim.sweetness": "Sweetness",
+	"dim.body": "Body",
+	"dim.aroma": "Aroma",
+	"dim.balance": "Balance",
+
+	"brew.status.published": "Published",
+	"brew.status.draft": "Draft",
+	"brew.status.hidden": "Hidden",
+	"brew.status.archived": "Archived",
+
 	"compare.badge": "Brew Compare",
 	"compare.title": "Brew Comparison",
 	"compare.subtitle": "Side-by-side flavor profiles and recipe parameters.",
@@ -345,6 +363,9 @@ const en = {
 	"compare.noReviews": "No reviews",
 	"compare.best": "Best",
 	"compare.brewer": "Brewer",
+	"compare.clicks": "clicks",
+	"compare.communityLabel": "Community",
+	"compare.myReviewLabel": "My Review",
 } as const;
 
 type LocaleMessages = Record<keyof typeof en, string>;
@@ -393,6 +414,9 @@ const id: LocaleMessages = {
 	"common.refresh": "Muat ulang",
 	"common.loading": "Memuat...",
 	"common.none": "N/A",
+	"common.previous": "Sebelumnya",
+	"common.next": "Berikutnya",
+	"common.page": "Halaman",
 
 	"auth.welcomeBack": "Selamat Datang Kembali",
 	"auth.loginDescription": "Masuk untuk membuat racikan, menulis di forum, dan memberi rating.",
@@ -493,6 +517,8 @@ const id: LocaleMessages = {
 	"blog.popularTags": "Tag Populer",
 	"blog.noResultsTitle": "Tidak ada artikel yang cocok",
 	"blog.noResultsDescription": "Coba ubah kata kunci atau filter lanjutan untuk melihat hasil lain.",
+	"blog.featuredStory": "Artikel Pilihan",
+	"blog.minRead": "menit baca",
 	"about.title": "Tentang Coffee Brew",
 	"contact.title": "Kontak",
 	"sitemap.title": "Peta Situs",
@@ -651,6 +677,8 @@ const id: LocaleMessages = {
 	"catalog.wishlistFail": "Gagal memperbarui wishlist.",
 	"catalog.goToDashboard": "Buka Dashboard",
 	"catalog.adjustFilters": "Coba kata kunci lain atau ubah filter Anda.",
+	"catalog.createBrew": "Buat Racikan",
+	"catalog.loginToCreate": "Masuk untuk Buat Racikan",
 	"brew.backToCatalog": "Kembali ke Katalog",
 	"brew.recipe": "Resep",
 	"brew.ratingSnapshot": "Ringkasan Rating",
@@ -678,6 +706,17 @@ const id: LocaleMessages = {
 	"brew.loginToReview": "Masuk untuk memberi review.",
 	"brew.communityAvg": "Rata-rata Komunitas",
 
+	"dim.acidity": "Asiditas",
+	"dim.sweetness": "Manis",
+	"dim.body": "Body",
+	"dim.aroma": "Aroma",
+	"dim.balance": "Balance",
+
+	"brew.status.published": "Publik",
+	"brew.status.draft": "Draft",
+	"brew.status.hidden": "Tersembunyi",
+	"brew.status.archived": "Diarsipkan",
+
 	"compare.badge": "Bandingkan Brew",
 	"compare.title": "Perbandingan Brew",
 	"compare.subtitle": "Perbandingan flavor profile dan parameter resep.",
@@ -696,6 +735,9 @@ const id: LocaleMessages = {
 	"compare.noReviews": "Belum ada review",
 	"compare.best": "Terbaik",
 	"compare.brewer": "Peracik",
+	"compare.clicks": "klik",
+	"compare.communityLabel": "Komunitas",
+	"compare.myReviewLabel": "Review Saya",
 };
 
 export const MESSAGES = {
@@ -707,4 +749,35 @@ export type MessageKey = keyof typeof MESSAGES.en;
 
 export function getMessage(locale: "en" | "id", key: MessageKey) {
 	return MESSAGES[locale][key] ?? MESSAGES.en[key];
+}
+
+export function getDimensionLabels(locale: "en" | "id") {
+	const m = (key: MessageKey) => getMessage(locale, key);
+	return [
+		{ key: "acidity" as const, label: m("dim.acidity") },
+		{ key: "sweetness" as const, label: m("dim.sweetness") },
+		{ key: "body" as const, label: m("dim.body") },
+		{ key: "aroma" as const, label: m("dim.aroma") },
+		{ key: "balance" as const, label: m("dim.balance") },
+	] as const;
+}
+
+/** Returns the localized label and a Tailwind className for a brew status badge. */
+export function getStatusBadgeProps(status: string, locale: "en" | "id"): { label: string; className: string } {
+	const statusKeyMap: Record<string, MessageKey> = {
+		published: "brew.status.published",
+		draft: "brew.status.draft",
+		hidden: "brew.status.hidden",
+		archived: "brew.status.archived",
+	};
+	const colorMap: Record<string, string> = {
+		published: "bg-green-100 text-green-800",
+		draft: "bg-yellow-100 text-yellow-800",
+		hidden: "bg-gray-200 text-gray-700",
+		archived: "bg-red-100 text-red-800",
+	};
+	const key = statusKeyMap[status];
+	const label = key ? getMessage(locale, key) : status;
+	const className = colorMap[status] ?? "";
+	return { label, className };
 }

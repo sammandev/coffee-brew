@@ -240,12 +240,13 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 								{Array.isArray(brew.tags) && brew.tags.length > 0 ? (
 									<div className="flex flex-wrap gap-1.5">
 										{brew.tags.slice(0, 4).map((tag) => (
-											<span
+											<Link
 												key={`${brew.id}-${tag}`}
-												className="rounded-full bg-(--sand)/15 px-2 py-0.5 text-[11px] font-medium text-(--muted)"
+												href={`/catalog?tag=${toNextParam(tag)}`}
+												className="rounded-full bg-(--sand)/15 px-2 py-0.5 text-[11px] font-medium text-(--muted) transition hover:bg-(--sand)/30"
 											>
 												#{tag}
-											</span>
+											</Link>
 										))}
 									</div>
 								) : null}

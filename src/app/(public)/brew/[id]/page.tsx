@@ -13,7 +13,7 @@ import { UserIdentitySummary } from "@/components/user/user-identity-summary";
 import { getSessionContext } from "@/lib/auth";
 import { canAccessBrew, canReadUnpublishedBrew } from "@/lib/brew-access";
 import { resolveBrewImageUrl } from "@/lib/brew-images";
-import { getMessage } from "@/lib/i18n/messages";
+import { getMessage, getDimensionLabels, getStatusBadgeProps } from "@/lib/i18n/messages";
 import { getServerI18n } from "@/lib/i18n/server";
 import { getBrewDetail } from "@/lib/queries";
 import { clampPlainText } from "@/lib/rich-text";
@@ -120,7 +120,7 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 		.slice(0, 10)
 		.map((review) => ({
 			reviewer_id: review.reviewer_id,
-			overall: review.star_rating ?? 0,
+			star_rating: review.star_rating ?? null,
 			updated_at: review.updated_at,
 			notes: review.notes,
 			display_name: reviewerMetaById.get(review.reviewer_id)?.displayName || "Unknown user",
@@ -141,13 +141,7 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 		{ label: m("brew.updated"), value: formatDate(brew.updated_at, locale) },
 	];
 
-	const DIMENSION_LABELS = [
-		{ key: "acidity", label: locale === "id" ? "Asiditas" : "Acidity" },
-		{ key: "sweetness", label: locale === "id" ? "Manis" : "Sweetness" },
-		{ key: "body", label: locale === "id" ? "Body" : "Body" },
-		{ key: "aroma", label: locale === "id" ? "Aroma" : "Aroma" },
-		{ key: "balance", label: locale === "id" ? "Balance" : "Balance" },
-	] as const;
+	const DIMENSION_LABELS = getDimensionLabels(locale);
 
 	return (
 		<div className="space-y-8">
@@ -190,7 +184,10 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 				{/* Header info */}
 				<div className="flex flex-col gap-4">
 					<div className="space-y-2">
-						<Badge>{brew.status}</Badge>
+						{(() => {
+							const { label, className } = getStatusBadgeProps(brew.status, locale);
+							return <Badge className={className}>{label}</Badge>;
+						})()}
 						<h1 className="font-heading text-3xl leading-tight text-(--espresso) lg:text-4xl">{brew.name}</h1>
 						<p className="text-(--muted)">
 							{m("brew.by")} <span className="font-medium text-(--espresso)">{brew.brewer_name}</span>
@@ -317,6 +314,29 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 						<h2 className="font-heading text-xl text-(--espresso)">{m("brew.ratingSnapshot")}</h2>
 					</div>
 					<div className="space-y-4 px-6 py-5">
+						{/* Star distribution histogram */}
+						{aggregate.total > 0 ? (
+							<div className="space-y-1.5">
+								{([5, 4, 3, 2, 1] as const).map((star) => {
+									const count = aggregate.star_histogram[star];
+									const starTotal = Object.values(aggregate.star_histogram).reduce((a, b) => a + b, 0);
+									const pct = starTotal > 0 ? Math.round((count / starTotal) * 100) : 0;
+									return (
+										<div key={star} className="flex items-center gap-2 text-xs">
+											<span className="w-4 shrink-0 text-right text-(--muted)">{star}</span>
+											<svg width="11" height="11" viewBox="0 0 24 24" fill="var(--crema)" stroke="var(--crema)" strokeWidth="2" aria-hidden="true" focusable="false" className="shrink-0">
+												<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+											</svg>
+											<div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-(--sand)/20">
+												<div className="h-full rounded-full bg-(--crema) transition-all" style={{ width: `${pct}%` }} />
+											</div>
+											<span className="w-5 shrink-0 text-right font-medium text-(--espresso)">{count}</span>
+										</div>
+									);
+								})}
+							</div>
+						) : null}
+
 						{/* Dimension bars */}
 						<div className="space-y-3">
 							{DIMENSION_LABELS.map(({ key, label }) => {
@@ -371,21 +391,23 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 									<Link href={`/users/${sighting.reviewer_id}`} className="font-semibold text-(--espresso) hover:underline">
 										{sighting.display_name}
 									</Link>
-									<span className="inline-flex items-center gap-1 rounded-full bg-(--crema)/15 px-2 py-0.5 text-xs font-semibold text-(--accent)">
-										<svg
-											width="12"
-											height="12"
-											viewBox="0 0 24 24"
-											fill="var(--crema)"
-											stroke="var(--crema)"
-											strokeWidth="2"
-											aria-hidden="true"
-											focusable="false"
-										>
-											<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-										</svg>
-										{sighting.overall.toFixed(1)}
-									</span>
+									{sighting.star_rating != null ? (
+										<span className="inline-flex items-center gap-1 rounded-full bg-(--crema)/15 px-2 py-0.5 text-xs font-semibold text-(--accent)">
+											<svg
+												width="12"
+												height="12"
+												viewBox="0 0 24 24"
+												fill="var(--crema)"
+												stroke="var(--crema)"
+												strokeWidth="2"
+												aria-hidden="true"
+												focusable="false"
+											>
+												<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+											</svg>
+											{sighting.star_rating.toFixed(1)}
+										</span>
+									) : null}
 								</div>
 								<p className="mt-1 text-xs text-(--muted)">
 									{m("brew.lastBrewed")}: {formatDate(sighting.updated_at, locale)}
@@ -399,10 +421,15 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 				)}
 			</section>
 
-			{/* Recent Reviews */}
-			<section className="space-y-4">
-				<h2 className="font-heading text-2xl text-(--espresso)">{m("brew.recentReviews")}</h2>
-				{reviews.map((review) => {
+		{/* Recent Reviews */}
+		<section className="space-y-4">
+			<h2 className="font-heading text-2xl text-(--espresso)">{m("brew.recentReviews")}</h2>
+			{reviews.length === 0 ? (
+				<Card>
+					<p className="text-sm text-(--muted)">{m("brew.noSightings")}</p>
+				</Card>
+			) : (
+				reviews.map((review) => {
 					const meta = reviewerMetaById.get(review.reviewer_id);
 					const reviewDimensions = [
 						{ label: DIMENSION_LABELS[0].label, value: review.acidity },
@@ -412,7 +439,8 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 						{ label: DIMENSION_LABELS[4].label, value: review.balance },
 					];
 					return (
-						<Card key={`${review.reviewer_id}-${review.updated_at}`} className="space-y-3">
+				<Card key={`${review.reviewer_id}-${review.updated_at}`} className="space-y-3">
+						<div className="flex items-start justify-between gap-3">
 							<UserIdentitySummary
 								userId={review.reviewer_id}
 								displayName={meta?.displayName || "Unknown user"}
@@ -425,6 +453,24 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 								badges={meta?.topBadge ? [String(meta.topBadge)] : []}
 								locale={locale}
 							/>
+							{review.star_rating != null ? (
+								<span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-(--crema)/15 px-2.5 py-1 text-sm font-semibold text-(--accent)">
+									<svg
+										width="13"
+										height="13"
+										viewBox="0 0 24 24"
+										fill="var(--crema)"
+										stroke="var(--crema)"
+										strokeWidth="2"
+										aria-hidden="true"
+										focusable="false"
+									>
+										<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+									</svg>
+									{review.star_rating}/5
+								</span>
+							) : null}
+						</div>
 							{/* Dimension pills */}
 							<div className="flex flex-wrap gap-2">
 								{reviewDimensions.map(({ label, value }) => (
@@ -440,8 +486,9 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 							</p>
 						</Card>
 					);
-				})}
-			</section>
+				})
+			)}
+		</section>
 
 			{/* Review form */}
 			{session ? (

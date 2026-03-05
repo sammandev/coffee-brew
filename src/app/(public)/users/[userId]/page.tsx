@@ -187,6 +187,7 @@ export default async function PublicProfilePage({ params, searchParams }: Public
 	let threadCount = 0;
 	let reviewsGivenCount = 0;
 	let reviewsReceivedCount = 0;
+	let starRatingsReceived: number[] = [];
 
 	if (!isPrivateForViewer) {
 		const brewCountQuery = supabaseAdmin
@@ -210,28 +211,45 @@ export default async function PublicProfilePage({ params, searchParams }: Public
 			.from("brew_reviews")
 			.select("id, brews!inner(owner_id)", { count: "exact", head: true })
 			.eq("brews.owner_id", targetProfile.id);
+		let starRatingReceivedQuery = supabaseAdmin
+			.from("brew_reviews")
+			.select("star_rating, brews!inner(owner_id)")
+			.eq("brews.owner_id", targetProfile.id)
+			.not("star_rating", "is", null)
+			.limit(500);
 
 		if (!canBypassPrivacy) {
 			brewCountQuery.eq("status", "published");
 			blogCountQuery.eq("status", "published");
 			threadCountQuery.eq("status", "visible");
 			reviewsReceivedCountQuery = reviewsReceivedCountQuery.eq("brews.status", "published");
+			starRatingReceivedQuery = starRatingReceivedQuery.eq("brews.status", "published");
 		}
 
-		const [brewCountResult, blogCountResult, threadCountResult, reviewsGivenCountResult, reviewsReceivedCountResult] =
-			await Promise.all([
-				brewCountQuery,
-				blogCountQuery,
-				threadCountQuery,
-				reviewsGivenCountQuery,
-				reviewsReceivedCountQuery,
-			]);
+		const [
+			brewCountResult,
+			blogCountResult,
+			threadCountResult,
+			reviewsGivenCountResult,
+			reviewsReceivedCountResult,
+			starRatingReceivedResult,
+		] = await Promise.all([
+			brewCountQuery,
+			blogCountQuery,
+			threadCountQuery,
+			reviewsGivenCountQuery,
+			reviewsReceivedCountQuery,
+			starRatingReceivedQuery,
+		]);
 
 		brewCount = brewCountResult.count ?? 0;
 		blogCount = blogCountResult.count ?? 0;
 		threadCount = threadCountResult.count ?? 0;
 		reviewsGivenCount = reviewsGivenCountResult.count ?? 0;
 		reviewsReceivedCount = reviewsReceivedCountResult.count ?? 0;
+		starRatingsReceived = (starRatingReceivedResult.data ?? [])
+			.map((row) => Number(row.star_rating))
+			.filter((v) => !isNaN(v) && v > 0);
 	}
 
 	if (!isPrivateForViewer && activeTab === "brews") {
@@ -496,7 +514,10 @@ export default async function PublicProfilePage({ params, searchParams }: Public
 	}
 
 	const ratingReceivedCount = reviewsReceivedCount;
-	const ratingReceivedAverage = 0;
+	const ratingReceivedAverage =
+		starRatingsReceived.length > 0
+			? starRatingsReceived.reduce((sum, v) => sum + v, 0) / starRatingsReceived.length
+			: 0;
 	const { data: targetBadgeRows } = await supabaseAdmin
 		.from("user_badges")
 		.select("user_id, badge_definitions(label_en, label_id, min_points)")
@@ -519,6 +540,14 @@ export default async function PublicProfilePage({ params, searchParams }: Public
 			label: locale === "id" ? "Review Diterima" : "Reviews Received",
 			value: String(ratingReceivedCount),
 		},
+		...(ratingReceivedAverage > 0
+			? [
+					{
+						label: locale === "id" ? "Rata-rata Bintang" : "Avg Star Received",
+						value: `★ ${ratingReceivedAverage.toFixed(1)}`,
+					},
+				]
+			: []),
 		{
 			label: locale === "id" ? "Review Diberikan" : "Reviews Given",
 			value: String(reviewsGivenCount),
@@ -528,7 +557,6 @@ export default async function PublicProfilePage({ params, searchParams }: Public
 			value: String(Number(targetProfile.karma_points ?? 0)),
 		},
 	];
-	void ratingReceivedAverage;
 
 	return (
 		<div className="space-y-6">

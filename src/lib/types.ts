@@ -147,6 +147,8 @@ export interface RatingAggregate {
 	flavor_avg: number;
 	/** Mean of submitted star_rating values — primary public score */
 	star_avg: number;
+	/** Per-star count histogram for 1–5 stars */
+	star_histogram: Record<1 | 2 | 3 | 4 | 5, number>;
 	acidity: number;
 	sweetness: number;
 	body: number;

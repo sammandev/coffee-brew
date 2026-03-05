@@ -23,6 +23,9 @@ describe("rating helpers", () => {
 		expect(aggregate.total).toBe(2);
 		expect(aggregate.acidity).toBe(4);
 		expect(aggregate.flavor_avg).toBeGreaterThan(0);
+		expect(aggregate.star_histogram[4]).toBe(1);
+		expect(aggregate.star_histogram[5]).toBe(1);
+		expect(aggregate.star_histogram[1]).toBe(0);
 	});
 
 	it("computes star_avg from non-null star_rating values", () => {

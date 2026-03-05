@@ -7,6 +7,7 @@ import { MethodRecommendationChips } from "@/components/brew/method-recommendati
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { resolveBrewImageUrl } from "@/lib/brew-images";
+import { getMessage } from "@/lib/i18n/messages";
 import { formatDate } from "@/lib/utils";
 
 interface CollectionBrewSummary {
@@ -27,13 +28,14 @@ interface CollectionBrewSummary {
 
 export interface WishlistCollectionItem {
 	brew: CollectionBrewSummary;
+	my_star_rating?: number | null;
 	saved_at: string;
 }
 
 export interface HistoryCollectionItem {
 	brew: CollectionBrewSummary;
 	last_brewed_at: string;
-	my_overall: number;
+	my_overall: number | null;
 }
 
 interface CollectionsTabsProps {
@@ -145,6 +147,11 @@ export function CollectionsTabs({ history, locale, onRemoveWishlist, wishlist }:
 										<span className="absolute top-3 left-3 z-10 rounded-full bg-(--surface-elevated)/90 px-2.5 py-1 text-xs font-semibold text-(--espresso) shadow-sm backdrop-blur-sm">
 											{item.brew.brew_method}
 										</span>
+										{item.my_star_rating != null ? (
+											<span className="absolute top-3 right-3 z-10 inline-flex items-center gap-1 rounded-full bg-(--surface-elevated)/90 px-2 py-1 text-xs font-semibold text-(--accent) shadow-sm backdrop-blur-sm">
+												★ {item.my_star_rating}/5
+											</span>
+										) : null}
 									</div>
 									<div className="flex flex-1 flex-col gap-2 p-4">
 										<Link href={`/brew/${item.brew.id}`} className="hover:underline">
@@ -208,9 +215,11 @@ export function CollectionsTabs({ history, locale, onRemoveWishlist, wishlist }:
 									<span className="absolute top-3 left-3 z-10 rounded-full bg-(--surface-elevated)/90 px-2.5 py-1 text-xs font-semibold text-(--espresso) shadow-sm backdrop-blur-sm">
 										{item.brew.brew_method}
 									</span>
-									<span className="absolute top-3 right-3 z-10 inline-flex items-center gap-1 rounded-full bg-(--surface-elevated)/90 px-2 py-1 text-xs font-semibold text-(--accent) shadow-sm backdrop-blur-sm">
-										★ {item.my_overall.toFixed(1)}
-									</span>
+									{item.my_overall != null ? (
+										<span className="absolute top-3 right-3 z-10 inline-flex items-center gap-1 rounded-full bg-(--surface-elevated)/90 px-2 py-1 text-xs font-semibold text-(--accent) shadow-sm backdrop-blur-sm">
+											★ {item.my_overall.toFixed(1)}
+										</span>
+									) : null}
 								</div>
 								<div className="flex flex-1 flex-col gap-2 p-4">
 									<Link href={`/brew/${item.brew.id}`} className="hover:underline">
@@ -218,7 +227,7 @@ export function CollectionsTabs({ history, locale, onRemoveWishlist, wishlist }:
 									</Link>
 									<MethodRecommendationChips locale={locale} methods={item.brew.recommended_methods ?? []} />
 									<p className="mt-auto text-xs text-(--muted)">
-										{locale === "id" ? "Terakhir diseduh" : "Last brewed"}: {formatDate(item.last_brewed_at, locale)}
+										{getMessage(locale, "brew.lastBrewed")}: {formatDate(item.last_brewed_at, locale)}
 									</p>
 								</div>
 							</Card>

@@ -8,7 +8,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getSessionContext } from "@/lib/auth";
 import { parseCompareIds } from "@/lib/brew-collections";
 import { resolveBrewImageUrl } from "@/lib/brew-images";
-import { getMessage } from "@/lib/i18n/messages";
+import { getMessage, getDimensionLabels } from "@/lib/i18n/messages";
 import { getServerI18n } from "@/lib/i18n/server";
 import { aggregateRatings } from "@/lib/rating";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -142,13 +142,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 	const aggregates = new Map(orderedBrews.map((brew) => [brew.id, aggregateRatings(reviewMap.get(brew.id) ?? [])]));
 	const getAggregate = (brewId: string) => aggregates.get(brewId) ?? aggregateRatings([]);
 
-	const DIMENSION_LABELS = [
-		{ key: "acidity", label: locale === "id" ? "Asiditas" : "Acidity" },
-		{ key: "sweetness", label: locale === "id" ? "Manis" : "Sweetness" },
-		{ key: "body", label: locale === "id" ? "Body" : "Body" },
-		{ key: "aroma", label: locale === "id" ? "Aroma" : "Aroma" },
-		{ key: "balance", label: locale === "id" ? "Balance" : "Balance" },
-	] as const;
+	const DIMENSION_LABELS = getDimensionLabels(locale);
 
 	// Determine "winner" for overall rating
 	let bestOverallId = "";
@@ -384,7 +378,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 							{orderedBrews.map((brew) => (
 								<div key={`grind-${brew.id}`} className="p-3 text-center text-sm text-(--espresso)">
 									{brew.grind_size}
-									{typeof brew.grind_clicks === "number" ? ` (${brew.grind_clicks} clicks)` : ""}
+									{typeof brew.grind_clicks === "number" ? ` (${brew.grind_clicks} ${m("compare.clicks")})` : ""}
 								</div>
 							))}
 						</CompareRow>
@@ -424,8 +418,8 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 									community={aggregate}
 									myReview={myReview}
 									labels={DIMENSION_LABELS.map(({ label }) => label) as [string, string, string, string, string]}
-									communityLabel={locale === "id" ? "Komunitas" : "Community"}
-									myReviewLabel={locale === "id" ? "Review Saya" : "My Review"}
+									communityLabel={m("compare.communityLabel")}
+									myReviewLabel={m("compare.myReviewLabel")}
 									size={200}
 								/>
 							</Card>

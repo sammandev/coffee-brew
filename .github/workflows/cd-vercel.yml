@@ -1,23 +1,44 @@
 name: CD (Vercel)
 
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: cd-vercel-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Only cancel in-progress runs for Pull Requests, not for pushes to main
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   deploy:
     name: Deploy to Vercel Production
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: ${{ github.ref == 'refs/heads/main' && secrets.VERCEL_TOKEN != '' && secrets.VERCEL_ORG_ID != '' && secrets.VERCEL_PROJECT_ID != '' }}
+    if: >-
+      ${{
+        (
+          (
+            github.event_name == 'workflow_run' &&
+            github.event.workflow_run.conclusion == 'success' &&
+            github.event.workflow_run.head_branch == 'main'
+          ) ||
+          (
+            github.event_name == 'workflow_dispatch' &&
+            github.ref == 'refs/heads/main'
+          )
+        ) &&
+        secrets.VERCEL_TOKEN != '' &&
+        secrets.VERCEL_ORG_ID != '' &&
+        secrets.VERCEL_PROJECT_ID != ''
+      }}
 
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

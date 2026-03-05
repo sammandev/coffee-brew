@@ -261,7 +261,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 									</div>
 									<div className="space-y-3 p-6">
 										<p className="text-xs font-semibold uppercase tracking-[0.12em] text-(--accent)">
-											{locale === "id" ? "Artikel Pilihan" : "Featured Story"}
+											{t("blog.featuredStory")}
 										</p>
 										<h2 className="font-heading text-3xl text-(--espresso)">{featuredPost.title}</h2>
 										<RichTextContent html={featuredPost.excerpt} className="line-clamp-4 text-sm text-(--muted)" />
@@ -271,7 +271,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 											<span>{formatDate(featuredPost.publishedAt, locale)}</span>
 											<span>•</span>
 											<span>
-												{featuredPost.readingTime} {locale === "id" ? "menit baca" : "min read"}
+												{featuredPost.readingTime} {t("blog.minRead")}
 											</span>
 										</div>
 										<div className="flex flex-wrap items-center gap-2">
@@ -318,7 +318,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 											<CardTitle>{post.title}</CardTitle>
 											<RichTextContent html={post.excerpt} className="line-clamp-3 text-sm text-(--muted)" />
 											<p className="text-xs text-(--muted)">
-												{post.authorName} · {post.readingTime} {locale === "id" ? "menit baca" : "min read"}
+												{post.authorName} · {post.readingTime} {t("blog.minRead")}
 											</p>
 											<div className="flex flex-wrap items-center gap-2 text-xs text-(--muted)">
 												{FORUM_REACTION_TYPES.map((reactionType) => (
@@ -357,18 +357,18 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 									href={buildBlogHref(page - 1, baseFilterParams)}
 									className="rounded-full border bg-(--surface-elevated) px-3.5 py-1.5 text-sm font-medium text-(--muted) transition hover:bg-(--sand)/20"
 								>
-									{locale === "id" ? "Sebelumnya" : "Previous"}
+									{t("common.previous")}
 								</Link>
 							) : null}
 							<span className="text-sm text-(--muted)">
-								{locale === "id" ? "Halaman" : "Page"} {page} / {totalPages}
+								{t("common.page")} {page} / {totalPages}
 							</span>
 							{page < totalPages ? (
 								<Link
 									href={buildBlogHref(page + 1, baseFilterParams)}
 									className="rounded-full border bg-(--surface-elevated) px-3.5 py-1.5 text-sm font-medium text-(--muted) transition hover:bg-(--sand)/20"
 								>
-									{locale === "id" ? "Berikutnya" : "Next"}
+									{t("common.next")}
 								</Link>
 							) : null}
 						</div>

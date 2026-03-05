@@ -37,7 +37,7 @@ export default async function SharedCollectionsPage({ params }: SharedCollection
 			.order("created_at", { ascending: false }),
 		supabase
 			.from("brew_reviews")
-			.select("brew_id, overall, updated_at")
+			.select("brew_id, star_rating, updated_at")
 			.eq("reviewer_id", share.owner_id)
 			.order("updated_at", { ascending: false })
 			.limit(200),
@@ -77,10 +77,10 @@ export default async function SharedCollectionsPage({ params }: SharedCollection
 			return {
 				brew,
 				last_brewed_at: row.updated_at,
-				my_overall: Number(row.overall),
-			};
+				my_overall: row.star_rating != null ? Number(row.star_rating) : null,
+			} satisfies HistoryCollectionItem;
 		})
-		.filter((value): value is HistoryCollectionItem => Boolean(value));
+		.filter((value): value is HistoryCollectionItem => value != null);
 
 	const ownerLabel = ownerProfile?.display_name?.trim() || ownerProfile?.email || "Unknown User";
 
