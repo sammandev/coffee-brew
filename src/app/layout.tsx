@@ -1,3 +1,4 @@
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import { Fraunces, Manrope } from "next/font/google";
 import Script from "next/script";
@@ -69,6 +70,7 @@ export default async function RootLayout({
 				<AppPreferencesProvider initialLocale={locale} initialThemePreference={themePreference}>
 					{children}
 				</AppPreferencesProvider>
+				<SpeedInsights />
 			</body>
 		</html>
 	);

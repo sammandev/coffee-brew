@@ -18,7 +18,11 @@ export default async function DashboardProfilePage() {
 			.select("display_name, avatar_url, status, is_profile_private, show_online_status, dm_privacy")
 			.eq("id", session.userId)
 			.maybeSingle(),
-		supabase.from("newsletter_subscriptions").select("consent").eq("email", session.email ?? "").maybeSingle(),
+		supabase
+			.from("newsletter_subscriptions")
+			.select("consent")
+			.eq("email", session.email ?? "")
+			.maybeSingle(),
 	]);
 
 	const displayName = profile?.display_name?.trim() || session.email?.split("@")[0] || "User";
