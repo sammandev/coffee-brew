@@ -259,6 +259,94 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 		const counts = buildReactionCountMap(reactionRowsByThread.get(id) ?? []);
 		return FORUM_REACTION_TYPES.reduce((sum, rt) => sum + (counts[rt] ?? 0), 0);
 	};
+	const pinnedThreads = threadRows.filter((thread) => thread.is_pinned);
+	const regularThreads = threadRows.filter((thread) => !thread.is_pinned);
+	const renderThreadCards = (threads: ThreadRow[]) =>
+		threads.map((thread) => {
+			const reactionCounts = buildReactionCountMap(reactionRowsByThread.get(thread.id) ?? []);
+			const threadAuthor = authorById.get(thread.author_id) ?? {
+				avatarUrl: null,
+				name: "Unknown User",
+			};
+			const commentCount = commentCountByThread.get(thread.id) ?? 0;
+			const reactionTotal = totalReactionsForThread(thread.id);
+			return (
+				<Link key={thread.id} href={`/forum/${thread.id}`} className="group block">
+					<div className="rounded-2xl border bg-(--surface-elevated) p-4 transition group-hover:shadow-md group-hover:border-(--accent)/30 sm:p-5">
+						<div className="flex gap-4">
+							<div className="hidden shrink-0 sm:block">
+								{threadAuthor.avatarUrl ? (
+									<Image
+										src={threadAuthor.avatarUrl}
+										alt=""
+										width={40}
+										height={40}
+										sizes="40px"
+										className="h-10 w-10 rounded-full object-cover"
+									/>
+								) : (
+									<div className="flex h-10 w-10 items-center justify-center rounded-full bg-(--accent)/10 text-sm font-bold text-(--accent)">
+										{threadAuthor.name.charAt(0).toUpperCase()}
+									</div>
+								)}
+							</div>
+
+							<div className="min-w-0 flex-1">
+								<div className="flex flex-wrap items-center gap-2">
+									<h3 className="font-semibold text-(--espresso) transition group-hover:text-(--accent) line-clamp-1">
+										{thread.title}
+									</h3>
+									{thread.is_pinned ? (
+										<span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+											{t("forum.pinned")}
+										</span>
+									) : null}
+								</div>
+
+								{Array.isArray(thread.tags) && thread.tags.length > 0 ? (
+									<div className="mt-1.5 flex flex-wrap gap-1.5">
+										{thread.tags.slice(0, 4).map((threadTag) => (
+											<span
+												key={`${thread.id}-${threadTag}`}
+												className="rounded-full bg-(--sand)/25 px-2 py-0.5 text-[11px] font-medium text-(--muted)"
+											>
+												#{threadTag}
+											</span>
+										))}
+										{thread.tags.length > 4 ? (
+											<span className="text-[11px] text-(--muted)">+{thread.tags.length - 4}</span>
+										) : null}
+									</div>
+								) : null}
+
+								<p className="mt-1.5 text-sm text-(--muted) line-clamp-2">{clampPlainText(thread.content, 160)}</p>
+
+								<div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-(--muted)">
+									<span className="font-medium text-(--espresso)">{threadAuthor.name}</span>
+									<span className="inline-flex items-center gap-1">
+										<MessageSquare size={12} />
+										{commentCount} {t("forum.repliesCount")}
+									</span>
+									{reactionTotal > 0 ? (
+										<span className="inline-flex items-center gap-1">
+											{FORUM_REACTION_TYPES.filter((rt) => (reactionCounts[rt] ?? 0) > 0)
+												.slice(0, 3)
+												.map((rt) => (
+													<span key={`${thread.id}-e-${rt}`}>{REACTION_EMOJI[rt]}</span>
+												))}
+											{reactionTotal}
+										</span>
+									) : null}
+									<span>
+										{t("forum.updated")} {formatDate(thread.updated_at, locale)}
+									</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</Link>
+			);
+		});
 
 	return (
 		<div className="space-y-6">
@@ -270,7 +358,6 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 				]}
 			/>
 
-			{/* Header */}
 			<header className="space-y-4">
 				<ForumBreadcrumbs
 					items={[
@@ -309,7 +396,6 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 				</div>
 			</header>
 
-			{/* Search */}
 			<ForumSearchControls
 				basePath={`/forum/f/${subforum.slug}`}
 				initialQuery={q}
@@ -323,7 +409,6 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 				popularTags={popularTags}
 			/>
 
-			{/* Threads */}
 			<section className="space-y-4">
 				<div className="flex items-center justify-between">
 					<div>
@@ -336,108 +421,36 @@ export default async function SubforumPage({ params, searchParams }: SubforumPag
 					) : null}
 				</div>
 
-				<div className="space-y-3">
-					{threadRows.map((thread) => {
-						const reactionCounts = buildReactionCountMap(reactionRowsByThread.get(thread.id) ?? []);
-						const threadAuthor = authorById.get(thread.author_id) ?? {
-							avatarUrl: null,
-							name: "Unknown User",
-						};
-						const commentCount = commentCountByThread.get(thread.id) ?? 0;
-						const reactionTotal = totalReactionsForThread(thread.id);
-						return (
-							<Link key={thread.id} href={`/forum/${thread.id}`} className="group block">
-								<div className="rounded-2xl border bg-(--surface-elevated) p-4 transition group-hover:shadow-md group-hover:border-(--accent)/30 sm:p-5">
-									<div className="flex gap-4">
-										{/* Avatar */}
-										<div className="hidden shrink-0 sm:block">
-											{threadAuthor.avatarUrl ? (
-												<Image
-													src={threadAuthor.avatarUrl}
-													alt=""
-													width={40}
-													height={40}
-													sizes="40px"
-													className="h-10 w-10 rounded-full object-cover"
-												/>
-											) : (
-												<div className="flex h-10 w-10 items-center justify-center rounded-full bg-(--accent)/10 text-sm font-bold text-(--accent)">
-													{threadAuthor.name.charAt(0).toUpperCase()}
-												</div>
-											)}
-										</div>
+				<div className="space-y-5">
+					{pinnedThreads.length > 0 ? (
+						<div className="space-y-3">
+							<div className="flex items-center justify-between">
+								<h3 className="font-heading text-lg text-(--espresso)">{t("forum.pinnedThreads")}</h3>
+								<span className="rounded-full bg-(--sand)/25 px-2.5 py-0.5 text-xs text-(--muted)">{pinnedThreads.length}</span>
+							</div>
+							<div className="space-y-3">{renderThreadCards(pinnedThreads)}</div>
+						</div>
+					) : null}
 
-										{/* Content */}
-										<div className="min-w-0 flex-1">
-											<div className="flex flex-wrap items-center gap-2">
-												<h3 className="font-semibold text-(--espresso) transition group-hover:text-(--accent) line-clamp-1">
-													{thread.title}
-												</h3>
-												{thread.is_pinned ? (
-													<span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-														📌 {t("forum.pinned")}
-													</span>
-												) : null}
-											</div>
-
-											{/* Tags */}
-											{Array.isArray(thread.tags) && thread.tags.length > 0 ? (
-												<div className="mt-1.5 flex flex-wrap gap-1.5">
-													{thread.tags.slice(0, 4).map((threadTag) => (
-														<span
-															key={`${thread.id}-${threadTag}`}
-															className="rounded-full bg-(--sand)/25 px-2 py-0.5 text-[11px] font-medium text-(--muted)"
-														>
-															#{threadTag}
-														</span>
-													))}
-													{thread.tags.length > 4 ? (
-														<span className="text-[11px] text-(--muted)">+{thread.tags.length - 4}</span>
-													) : null}
-												</div>
-											) : null}
-
-											{/* Preview */}
-											<p className="mt-1.5 text-sm text-(--muted) line-clamp-2">{clampPlainText(thread.content, 160)}</p>
-
-											{/* Footer */}
-											<div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-(--muted)">
-												<span className="font-medium text-(--espresso)">{threadAuthor.name}</span>
-												<span className="inline-flex items-center gap-1">
-													<MessageSquare size={12} />
-													{commentCount} {t("forum.repliesCount")}
-												</span>
-												{reactionTotal > 0 ? (
-													<span className="inline-flex items-center gap-1">
-														{FORUM_REACTION_TYPES.filter((rt) => (reactionCounts[rt] ?? 0) > 0)
-															.slice(0, 3)
-															.map((rt) => (
-																<span key={`${thread.id}-e-${rt}`}>{REACTION_EMOJI[rt]}</span>
-															))}
-														{reactionTotal}
-													</span>
-												) : null}
-												<span>
-													{t("forum.updated")} {formatDate(thread.updated_at, locale)}
-												</span>
-											</div>
-										</div>
-									</div>
-								</div>
-							</Link>
-						);
-					})}
+					<div className="space-y-3">
+						<div className="flex items-center justify-between">
+							<h3 className="font-heading text-lg text-(--espresso)">{t("forum.allThreads")}</h3>
+							<span className="rounded-full bg-(--sand)/25 px-2.5 py-0.5 text-xs text-(--muted)">{regularThreads.length}</span>
+						</div>
+						<div className="space-y-3">{renderThreadCards(regularThreads)}</div>
+					</div>
 
 					{threadRows.length === 0 ? (
 						<div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed bg-(--surface-elevated) py-12 text-center">
-							<div className="flex h-14 w-14 items-center justify-center rounded-full bg-(--sand)/20 text-2xl">💬</div>
+							<div className="flex h-14 w-14 items-center justify-center rounded-full bg-(--sand)/20">
+								<MessageSquare size={26} />
+							</div>
 							<p className="text-sm font-medium text-(--muted)">{t("forum.noThreads")}</p>
 						</div>
 					) : null}
 				</div>
 			</section>
 
-			{/* Pagination */}
 			{totalPages > 1 ? (
 				<div className="flex items-center justify-center gap-2">
 					{Array.from({ length: totalPages }).map((_, index) => {

@@ -47,35 +47,31 @@ export function CollectionsManager({ locale }: CollectionsManagerProps) {
 			fetch("/api/brews/collections/share", { method: "GET" }).catch(() => null),
 		]);
 
-		if (!wishlistRes?.ok || !historyRes?.ok || !shareRes?.ok) {
-			setError(locale === "id" ? "Gagal memuat koleksi brew." : "Could not load brew collections.");
-			setIsLoading(false);
-			return;
-		}
-
 		const [wishlistBody, historyBody, shareBody] = await Promise.all([
-			wishlistRes.json().catch(() => ({})),
-			historyRes.json().catch(() => ({})),
-			shareRes.json().catch(() => ({})),
+			wishlistRes ? wishlistRes.json().catch(() => ({})) : Promise.resolve({}),
+			historyRes ? historyRes.json().catch(() => ({})) : Promise.resolve({}),
+			shareRes ? shareRes.json().catch(() => ({})) : Promise.resolve({}),
 		]);
 
-		const wishlistRows =
-			(
-				wishlistBody as {
-					items?: Array<{
-						brew?: WishlistCollectionItem["brew"];
-						brew_id?: string;
-						created_at?: string;
-						my_star_rating?: number | null;
-					}>;
-				}
-			).items ?? [];
-		const historyRows =
-			(
-				historyBody as {
-					items?: Array<{ brew?: HistoryCollectionItem["brew"]; last_brewed_at?: string; my_overall?: number }>;
-				}
-			).items ?? [];
+		const wishlistRows = wishlistRes?.ok
+			? ((
+					wishlistBody as {
+						items?: Array<{
+							brew?: WishlistCollectionItem["brew"];
+							brew_id?: string;
+							created_at?: string;
+							my_star_rating?: number | null;
+						}>;
+					}
+				).items ?? [])
+			: [];
+		const historyRows = historyRes?.ok
+			? ((
+					historyBody as {
+						items?: Array<{ brew?: HistoryCollectionItem["brew"]; last_brewed_at?: string; my_overall?: number }>;
+					}
+				).items ?? [])
+			: [];
 
 		// Build list projections from endpoints that already include brew payload (history)
 		const historyItems: HistoryCollectionItem[] = historyRows
@@ -100,10 +96,26 @@ export function CollectionsManager({ locale }: CollectionsManagerProps) {
 				: [],
 		);
 
-		const loadedShare = ((shareBody as { share?: SharePayload | null }).share ?? null) as SharePayload | null;
+		const loadedShare = shareRes?.ok
+			? (((shareBody as { share?: SharePayload | null }).share ?? null) as SharePayload | null)
+			: null;
 		setWishlist(hydratedWishlist);
 		setHistory(historyItems);
 		setShare(loadedShare);
+
+		if (!wishlistRes?.ok || !historyRes?.ok || !shareRes?.ok) {
+			const firstErrorBody = [wishlistBody, historyBody, shareBody].find((body) => {
+				const payload = body as { error?: unknown };
+				return typeof payload.error === "string" && payload.error.length > 0;
+			}) as { error?: string; details?: string } | undefined;
+			const details = firstErrorBody?.details ? ` (${firstErrorBody.details})` : "";
+			setError(
+				locale === "id"
+					? `Gagal memuat sebagian koleksi brew${details}.`
+					: `Could not load part of brew collections${details}.`,
+			);
+		}
+
 		setIsLoading(false);
 
 		// Auto-generate share token if the user doesn't have one yet

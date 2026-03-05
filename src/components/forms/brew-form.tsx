@@ -261,33 +261,64 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 
 	return (
 		<>
-			<form onSubmit={onSubmit} className="grid gap-4 rounded-3xl border bg-(--surface-elevated) p-6">
-				<div className="grid gap-2">
-					<Label htmlFor="name">{locale === "id" ? "Nama Racikan" : "Brew Name"}</Label>
-					<Input id="name" name="name" defaultValue={defaults.name} required />
-				</div>
-
-				<div className="grid gap-4 md:grid-cols-2">
+			<form onSubmit={onSubmit} className="space-y-5 rounded-3xl border bg-(--surface-elevated) p-4 sm:p-6">
+				<section className="space-y-4 rounded-2xl border bg-(--surface) p-4 sm:p-5">
 					<div>
-						<Label htmlFor="brewMethod">{locale === "id" ? "Metode Seduh" : "Brew Method"}</Label>
-						<Input id="brewMethod" name="brewMethod" defaultValue={defaults.brewMethod} required />
+						<h3 className="font-heading text-xl text-(--espresso)">
+							{locale === "id" ? "Info Dasar Brew" : "Basic Brew Info"}
+						</h3>
+						<p className="text-xs text-(--muted)">
+							{locale === "id" ? "Isi nama brew dan informasi kopi utama." : "Set the brew name and core coffee details."}
+						</p>
 					</div>
-				</div>
+					<div className="grid gap-4">
+						<div className="grid gap-2">
+							<Label htmlFor="name">{locale === "id" ? "Nama Racikan" : "Brew Name"}</Label>
+							<Input id="name" name="name" defaultValue={defaults.name} required />
+						</div>
+						<div className="grid gap-4 md:grid-cols-2">
+							<div className="grid gap-2">
+								<Label htmlFor="coffeeBeans">{locale === "id" ? "Biji Kopi" : "Coffee Beans"}</Label>
+								<Input id="coffeeBeans" name="coffeeBeans" defaultValue={defaults.coffeeBeans} required />
+							</div>
+							<div className="grid gap-2">
+								<Label htmlFor="brandRoastery">{locale === "id" ? "Merek / Roastery" : "Brand / Roastery"}</Label>
+								<Input id="brandRoastery" name="brandRoastery" defaultValue={defaults.brandRoastery} required />
+							</div>
+						</div>
+					</div>
+				</section>
 
-				<div className="grid gap-4 md:grid-cols-2">
+				<section className="space-y-4 rounded-2xl border bg-(--surface) p-4 sm:p-5">
 					<div>
-						<Label htmlFor="beanProcess">{locale === "id" ? "Proses Bean (Opsional)" : "Bean Process (Optional)"}</Label>
-						<Input
-							id="beanProcess"
-							name="beanProcess"
-							value={beanProcess}
-							onChange={(event) => setBeanProcess(event.currentTarget.value)}
-							placeholder={locale === "id" ? "washed, natural, honey, anaerobic..." : "washed, natural, honey, anaerobic..."}
-							maxLength={120}
-						/>
+						<h3 className="font-heading text-xl text-(--espresso)">
+							{locale === "id" ? "Metadata Bean dan Metode" : "Bean/Method Metadata"}
+						</h3>
+						<p className="text-xs text-(--muted)">
+							{locale === "id"
+								? "Atur metode seduh, proses bean, dan rekomendasi metode terbaik."
+								: "Set brew method, bean process, and recommended serving methods."}
+						</p>
 					</div>
-					<div className="space-y-2">
-						<Label>{locale === "id" ? "Rekomendasi Metode" : "Method Recommendations"}</Label>
+					<div className="grid gap-4 md:grid-cols-2">
+						<div className="grid gap-2">
+							<Label htmlFor="brewMethod">{locale === "id" ? "Metode Seduh" : "Brew Method"}</Label>
+							<Input id="brewMethod" name="brewMethod" defaultValue={defaults.brewMethod} required />
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor="beanProcess">{locale === "id" ? "Proses Bean (Opsional)" : "Bean Process (Optional)"}</Label>
+							<Input
+								id="beanProcess"
+								name="beanProcess"
+								value={beanProcess}
+								onChange={(event) => setBeanProcess(event.currentTarget.value)}
+								placeholder={locale === "id" ? "washed, natural, honey, anaerobic..." : "washed, natural, honey, anaerobic..."}
+								maxLength={120}
+							/>
+						</div>
+					</div>
+					<div className="grid gap-2">
+						<Label htmlFor="recommendedMethods">{locale === "id" ? "Rekomendasi Metode" : "Method Recommendations"}</Label>
 						<select
 							id="recommendedMethods"
 							multiple
@@ -298,7 +329,7 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 									.filter((value) => RECOMMENDED_METHOD_VALUES.includes(value));
 								setRecommendedMethods(Array.from(new Set(values)));
 							}}
-							className="min-h-28 w-full rounded-xl border bg-(--surface) px-3 py-2 text-sm text-foreground transition hover:border-(--accent)/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--accent)/25"
+							className="min-h-28 w-full rounded-xl border bg-(--surface-elevated) px-3 py-2 text-sm text-foreground transition hover:border-(--accent)/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--accent)/25"
 						>
 							<option value="espresso">{locale === "id" ? "Espresso" : "Espresso"}</option>
 							<option value="cold_brew">{locale === "id" ? "Cold Brew" : "Cold Brew"}</option>
@@ -310,76 +341,77 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 								: "Pick one or more methods (Ctrl/Cmd + click)."}
 						</p>
 					</div>
-				</div>
+				</section>
 
-				<div className="grid gap-4 md:grid-cols-2">
+				<section className="space-y-4 rounded-2xl border bg-(--surface) p-4 sm:p-5">
 					<div>
-						<Label htmlFor="coffeeBeans">{locale === "id" ? "Biji Kopi" : "Coffee Beans"}</Label>
-						<Input id="coffeeBeans" name="coffeeBeans" defaultValue={defaults.coffeeBeans} required />
+						<h3 className="font-heading text-xl text-(--espresso)">
+							{locale === "id" ? "Parameter Seduh" : "Brew Parameters"}
+						</h3>
+						<p className="text-xs text-(--muted)">
+							{locale === "id"
+								? "Detail air, suhu, gilingan, dan durasi untuk resep yang konsisten."
+								: "Configure water, temperature, grind, and timing for a consistent recipe."}
+						</p>
 					</div>
-					<div>
-						<Label htmlFor="brandRoastery">{locale === "id" ? "Merek / Roastery" : "Brand / Roastery"}</Label>
-						<Input id="brandRoastery" name="brandRoastery" defaultValue={defaults.brandRoastery} required />
+					<div className="grid gap-4 md:grid-cols-3">
+						<div className="grid gap-2">
+							<Label htmlFor="waterType">{locale === "id" ? "Jenis Air" : "Water Type"}</Label>
+							<Input id="waterType" name="waterType" defaultValue={defaults.waterType} required />
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor="waterPpm">Water PPM</Label>
+							<Input id="waterPpm" name="waterPpm" type="number" defaultValue={defaults.waterPpm} required />
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor="temperature">{locale === "id" ? "Suhu" : "Temperature"}</Label>
+							<Input
+								id="temperature"
+								name="temperature"
+								type="number"
+								step="0.1"
+								defaultValue={defaults.temperature}
+								required
+							/>
+						</div>
 					</div>
-				</div>
+					<div className="grid gap-4 md:grid-cols-3">
+						<div className="grid gap-2">
+							<Label htmlFor="temperatureUnit">{locale === "id" ? "Unit Suhu" : "Temp Unit"}</Label>
+							<Select id="temperatureUnit" name="temperatureUnit" defaultValue={defaults.temperatureUnit}>
+								<option value="C">Celsius</option>
+								<option value="F">Fahrenheit</option>
+							</Select>
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor="grindSize">{locale === "id" ? "Ukuran Giling" : "Grind Size"}</Label>
+							<Input id="grindSize" name="grindSize" defaultValue={defaults.grindSize} required />
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor="grindClicks">{locale === "id" ? "Klik Grinder (Opsional)" : "Grind Clicks (Optional)"}</Label>
+							<Input id="grindClicks" name="grindClicks" type="number" defaultValue={defaults.grindClicks || ""} />
+						</div>
+					</div>
+					<div className="grid gap-4 md:grid-cols-2">
+						<div className="grid gap-2">
+							<Label htmlFor="brewTimeSeconds">{locale === "id" ? "Waktu Seduh (Detik)" : "Brew Time (Seconds)"}</Label>
+							<Input
+								id="brewTimeSeconds"
+								name="brewTimeSeconds"
+								type="number"
+								defaultValue={defaults.brewTimeSeconds}
+								required
+							/>
+						</div>
+					</div>
+				</section>
 
-				<div className="grid gap-4 md:grid-cols-3">
-					<div>
-						<Label htmlFor="waterType">{locale === "id" ? "Jenis Air" : "Water Type"}</Label>
-						<Input id="waterType" name="waterType" defaultValue={defaults.waterType} required />
-					</div>
-					<div>
-						<Label htmlFor="waterPpm">Water PPM</Label>
-						<Input id="waterPpm" name="waterPpm" type="number" defaultValue={defaults.waterPpm} required />
-					</div>
-					<div>
-						<Label htmlFor="temperature">{locale === "id" ? "Suhu" : "Temperature"}</Label>
-						<Input
-							id="temperature"
-							name="temperature"
-							type="number"
-							step="0.1"
-							defaultValue={defaults.temperature}
-							required
-						/>
-					</div>
-				</div>
-
-				<div className="grid gap-4 md:grid-cols-3">
-					<div>
-						<Label htmlFor="temperatureUnit">{locale === "id" ? "Unit Suhu" : "Temp Unit"}</Label>
-						<Select id="temperatureUnit" name="temperatureUnit" defaultValue={defaults.temperatureUnit}>
-							<option value="C">Celsius</option>
-							<option value="F">Fahrenheit</option>
-						</Select>
-					</div>
-					<div>
-						<Label htmlFor="grindSize">{locale === "id" ? "Ukuran Giling" : "Grind Size"}</Label>
-						<Input id="grindSize" name="grindSize" defaultValue={defaults.grindSize} required />
-					</div>
-					<div>
-						<Label htmlFor="grindClicks">{locale === "id" ? "Klik Grinder (Opsional)" : "Grind Clicks (Optional)"}</Label>
-						<Input id="grindClicks" name="grindClicks" type="number" defaultValue={defaults.grindClicks || ""} />
-					</div>
-				</div>
-
-				<div className="grid gap-4 md:grid-cols-2">
-					<div>
-						<Label htmlFor="brewTimeSeconds">{locale === "id" ? "Waktu Seduh (Detik)" : "Brew Time (Seconds)"}</Label>
-						<Input
-							id="brewTimeSeconds"
-							name="brewTimeSeconds"
-							type="number"
-							defaultValue={defaults.brewTimeSeconds}
-							required
-						/>
-					</div>
-				</div>
-
-				<section className="space-y-3 rounded-2xl border bg-(--surface) p-4">
+				<section className="space-y-4 rounded-2xl border bg-(--surface) p-4 sm:p-5">
 					<div className="flex flex-wrap items-center justify-between gap-3">
 						<div>
-							<h3 className="font-heading text-xl text-(--espresso)">{locale === "id" ? "Gambar Brew" : "Brew Image"}</h3>
+							<h3 className="font-heading text-xl text-(--espresso)">
+								{locale === "id" ? "Gambar dan Media" : "Image/Media"}
+							</h3>
 							<p className="text-xs text-(--muted)">
 								{locale === "id"
 									? "Pilih tepat satu sumber: unggah gambar atau masukkan URL (contoh: Unsplash)."
@@ -444,37 +476,18 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 						</div>
 					)}
 
-					<div className="space-y-2">
-						<Label htmlFor="imageAlt">{locale === "id" ? "Alt Gambar (Opsional)" : "Image Alt (Optional)"}</Label>
-						<Input
-							id="imageAlt"
-							value={imageAlt}
-							onChange={(event) => setImageAlt(event.currentTarget.value)}
-							disabled={!hasCustomImage}
-							placeholder={locale === "id" ? "Contoh: V60 di meja kayu." : "Example: V60 setup on a wooden table."}
-						/>
-					</div>
-
-					<div className="space-y-2">
-						<div className="relative aspect-video overflow-hidden rounded-2xl border bg-(--surface-elevated)">
-							<Image
-								src={imagePreviewUrl}
-								alt={imageAlt || defaults.name || "Brew image"}
-								fill
-								sizes="(max-width: 768px) 100vw, 800px"
-								className="object-cover"
+					<div className="grid gap-4 lg:grid-cols-[1fr_220px]">
+						<div className="space-y-2">
+							<Label htmlFor="imageAlt">{locale === "id" ? "Alt Gambar (Opsional)" : "Image Alt (Optional)"}</Label>
+							<Input
+								id="imageAlt"
+								value={imageAlt}
+								onChange={(event) => setImageAlt(event.currentTarget.value)}
+								disabled={!hasCustomImage}
+								placeholder={locale === "id" ? "Contoh: V60 di meja kayu." : "Example: V60 setup on a wooden table."}
 							/>
 						</div>
-						<div className="flex flex-wrap items-center justify-between gap-2">
-							<p className="text-xs text-(--muted)">
-								{hasCustomImage
-									? locale === "id"
-										? "Pratinjau gambar brew."
-										: "Brew image preview."
-									: locale === "id"
-										? "Belum ada gambar khusus, memakai fallback Unsplash."
-										: "No custom image yet, using Unsplash fallback."}
-							</p>
+						<div className="flex items-end justify-start lg:justify-end">
 							{hasCustomImage ? (
 								<Button
 									type="button"
@@ -488,35 +501,62 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 						</div>
 					</div>
 
+					<div className="space-y-2">
+						<div className="relative aspect-video overflow-hidden rounded-2xl border bg-(--surface-elevated)">
+							<Image
+								src={imagePreviewUrl}
+								alt={imageAlt || defaults.name || "Brew image"}
+								fill
+								sizes="(max-width: 768px) 100vw, 800px"
+								className="object-cover"
+							/>
+						</div>
+						<p className="text-xs text-(--muted)">
+							{hasCustomImage
+								? locale === "id"
+									? "Pratinjau gambar brew."
+									: "Brew image preview."
+								: locale === "id"
+									? "Belum ada gambar khusus, memakai fallback Unsplash."
+									: "No custom image yet, using Unsplash fallback."}
+						</p>
+					</div>
+
 					{imageError ? <p className="text-sm text-(--danger)">{imageError}</p> : null}
 				</section>
 
-				<div className="grid gap-4 md:grid-cols-[1fr_220px]">
-					<div className="grid gap-2">
-						<Label htmlFor="tags">{locale === "id" ? "Tag (pisahkan dengan koma)" : "Tags (comma-separated)"}</Label>
-						<Input
-							id="tags"
-							name="tags"
-							value={tagsInput}
-							onChange={(event) => setTagsInput(event.currentTarget.value)}
-							placeholder={locale === "id" ? "v60, fruity, light-roast" : "v60, fruity, light-roast"}
-							maxLength={320}
-						/>
+				<section className="space-y-4 rounded-2xl border bg-(--surface) p-4 sm:p-5">
+					<div>
+						<h3 className="font-heading text-xl text-(--espresso)">
+							{locale === "id" ? "Catatan, Status, dan Tag" : "Notes + Status + Tags"}
+						</h3>
+					</div>
+					<div className="grid gap-4 md:grid-cols-[1fr_220px]">
+						<div className="grid gap-2">
+							<Label htmlFor="tags">{locale === "id" ? "Tag (pisahkan dengan koma)" : "Tags (comma-separated)"}</Label>
+							<Input
+								id="tags"
+								name="tags"
+								value={tagsInput}
+								onChange={(event) => setTagsInput(event.currentTarget.value)}
+								placeholder={locale === "id" ? "v60, fruity, light-roast" : "v60, fruity, light-roast"}
+								maxLength={320}
+							/>
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor="status">Status</Label>
+							<Select id="status" name="status" defaultValue={defaults.status}>
+								<option value="draft">{locale === "id" ? "Draft" : "Draft"}</option>
+								<option value="published">{locale === "id" ? "Publik" : "Published"}</option>
+								<option value="hidden">{locale === "id" ? "Disembunyikan" : "Hidden"}</option>
+							</Select>
+						</div>
 					</div>
 					<div className="grid gap-2">
-						<Label htmlFor="status">Status</Label>
-						<Select id="status" name="status" defaultValue={defaults.status}>
-							<option value="draft">{locale === "id" ? "Draft" : "Draft"}</option>
-							<option value="published">{locale === "id" ? "Publik" : "Published"}</option>
-							<option value="hidden">{locale === "id" ? "Disembunyikan" : "Hidden"}</option>
-						</Select>
+						<Label htmlFor="notes">{locale === "id" ? "Catatan" : "Notes"}</Label>
+						<RichTextEditor id="notes" name="notes" value={notes} onChange={setNotes} maxPlainTextLength={5000} />
 					</div>
-				</div>
-
-				<div className="grid gap-2">
-					<Label htmlFor="notes">{locale === "id" ? "Catatan" : "Notes"}</Label>
-					<RichTextEditor id="notes" name="notes" value={notes} onChange={setNotes} maxPlainTextLength={5000} />
-				</div>
+				</section>
 
 				{error ? <p className="text-sm text-(--danger)">{error}</p> : null}
 

@@ -19,23 +19,29 @@ interface ForumSubforumOption {
 }
 
 interface ThreadComposerProps {
+	formId?: string;
 	hideTitle?: boolean;
 	initialContent?: string;
 	initialTags?: string[];
 	initialTitle?: string;
+	onStateChange?: (state: { isSubmitting: boolean; canSubmit: boolean }) => void;
 	initialSubforumId?: string;
 	onSubmitted?: () => void;
+	showSubmitButton?: boolean;
 	subforums?: ForumSubforumOption[];
 	variant?: "embedded" | "standalone";
 }
 
 export function ThreadComposer({
+	formId,
 	hideTitle = false,
 	initialContent = "",
 	initialTags = [],
 	initialTitle = "",
+	onStateChange,
 	initialSubforumId,
 	onSubmitted,
+	showSubmitButton = true,
 	subforums = [],
 	variant = "standalone",
 }: ThreadComposerProps) {
@@ -57,6 +63,13 @@ export function ThreadComposer({
 		() => initialTitle.trim().length > 0 || initialContent.trim().length > 0 || initialTags.length > 0,
 		[initialContent, initialTags, initialTitle],
 	);
+	const canSubmit = useMemo(() => {
+		const plainContent = content
+			.replace(/<[^>]*>/g, " ")
+			.replace(/&nbsp;/g, " ")
+			.trim();
+		return !isSubmitting && subforumId.trim().length > 0 && title.trim().length > 0 && plainContent.length > 0;
+	}, [content, isSubmitting, subforumId, title]);
 
 	useEffect(() => {
 		setSubforumId(initialSubforumId ?? subforums[0]?.id ?? "");
@@ -156,6 +169,13 @@ export function ThreadComposer({
 		return () => clearTimeout(timeout);
 	}, [title, content, tagsInput, enablePoll, pollQuestion, pollOptionsInput, pollClosesAt, subforumId, draftLoaded]);
 
+	useEffect(() => {
+		onStateChange?.({
+			isSubmitting,
+			canSubmit,
+		});
+	}, [canSubmit, isSubmitting, onStateChange]);
+
 	async function clearDraft() {
 		if (!draftId) return;
 		await fetch(`/api/forum/drafts/${draftId}`, { method: "DELETE" }).catch(() => null);
@@ -235,6 +255,7 @@ export function ThreadComposer({
 
 	return (
 		<form
+			id={formId}
 			onSubmit={onSubmit}
 			className={cn(
 				"grid gap-3",
@@ -339,9 +360,11 @@ export function ThreadComposer({
 				) : null}
 			</div>
 			{error && <p className="text-sm text-(--danger)">{error}</p>}
-			<Button type="submit" disabled={isSubmitting || !subforumId}>
-				{isSubmitting ? t("forum.posting") : t("forum.postThread")}
-			</Button>
+			{showSubmitButton ? (
+				<Button type="submit" disabled={!canSubmit}>
+					{isSubmitting ? t("forum.posting") : t("forum.postThread")}
+				</Button>
+			) : null}
 		</form>
 	);
 }

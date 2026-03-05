@@ -44,22 +44,11 @@ function toNextParam(value: string) {
 }
 
 function StarRating({ rating, count, locale }: { rating: number; count: number; locale: "en" | "id" }) {
-	const fullStars = Math.round(rating);
 	return (
-		<div className="flex items-center gap-1.5">
-			<div className="flex items-center gap-px">
-				{[0, 1, 2, 3, 4].map((starIndex) => (
-					<Star
-						key={`star-${starIndex}`}
-						size={14}
-						className={starIndex < fullStars ? "fill-(--crema) text-(--crema)" : "text-(--sand)"}
-					/>
-				))}
-			</div>
-			<span className="text-xs font-medium text-(--muted)">
-				{count > 0 ? `${rating.toFixed(1)} (${count})` : getMessage(locale, "catalog.noReviews")}
-			</span>
-		</div>
+		<span className="inline-flex items-center gap-1 text-xs text-(--muted)">
+			<Star size={12} className="fill-(--crema) text-(--crema)" />
+			{count > 0 ? `${rating.toFixed(1)} (${count})` : getMessage(locale, "catalog.noReviews")}
+		</span>
 	);
 }
 
@@ -212,17 +201,6 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 
 							{/* Content */}
 							<div className="flex flex-1 flex-col gap-2.5 p-5">
-								<div className="flex items-center justify-between">
-									<StarRating rating={brew.rating_avg} count={brew.review_total} locale={locale} />
-									<span
-										className="inline-flex items-center gap-1 text-xs text-(--muted)"
-										title={`${brew.wishlist_count} ${m("catalog.favorites")}`}
-									>
-										<Heart size={12} className={brew.wishlist_count > 0 ? "fill-(--danger) text-(--danger)" : "text-(--sand)"} />
-										{brew.wishlist_count}
-									</span>
-								</div>
-
 								<Link href={`/brew/${brew.id}`} className="hover:underline">
 									<CardTitle className="line-clamp-2 text-lg">{brew.name}</CardTitle>
 								</Link>
@@ -233,6 +211,17 @@ export function CatalogBrewGrid({ brews, isAuthenticated, locale }: CatalogBrewG
 										{brew.brand_roastery}
 										{brew.bean_process ? ` · ${brew.bean_process}` : ""}
 									</p>
+								</div>
+
+								<div className="flex flex-wrap items-center gap-2">
+									<StarRating rating={brew.rating_avg} count={brew.review_total} locale={locale} />
+									<span
+										className="inline-flex items-center gap-1 text-xs text-(--muted)"
+										title={`${brew.wishlist_count} ${m("catalog.favorites")}`}
+									>
+										<Heart size={12} className={brew.wishlist_count > 0 ? "fill-(--danger) text-(--danger)" : "text-(--sand)"} />
+										{brew.wishlist_count}
+									</span>
 								</div>
 
 								<MethodRecommendationChips locale={locale} methods={brew.recommended_methods ?? []} />

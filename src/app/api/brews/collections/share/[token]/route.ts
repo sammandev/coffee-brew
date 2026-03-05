@@ -46,7 +46,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
 			.order("created_at", { ascending: false }),
 		supabase
 			.from("brew_reviews")
-			.select("brew_id, overall, updated_at")
+			.select("brew_id, star_rating, updated_at")
 			.eq("reviewer_id", share.owner_id)
 			.order("updated_at", { ascending: false })
 			.limit(200),
@@ -74,7 +74,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
 			if (!brew) return null;
 			return {
 				brew,
-				my_overall: Number(row.overall),
+				my_overall: row.star_rating != null ? Number(row.star_rating) : null,
 				last_brewed_at: row.updated_at,
 			};
 		})

@@ -8,36 +8,23 @@ import { getServerI18n } from "@/lib/i18n/server";
 import { getHomeShowcase, getLandingStats, getVisibleFaqItems, getVisibleLandingSections } from "@/lib/queries";
 import { getSiteSettings } from "@/lib/site-settings";
 
-/* ─── Star rating helper ─── */
-function StarRating({ value, max = 5 }: { value: number; max?: number }) {
-	const stars = Array.from({ length: max }, (_, number) => number + 1);
-
+/* Star Rating Helper */
+function RatingMeta({ rating, reviews, reviewLabel }: { rating: number; reviews: number; reviewLabel: string }) {
 	return (
-		<span className="inline-flex gap-px" role="img" aria-label={`${value.toFixed(1)} out of ${max}`}>
-			{stars.map((star) => {
-				const fill = Math.min(1, Math.max(0, value - (star - 1)));
-				return (
-					<svg
-						key={`home-star-${star}`}
-						xmlns="http://www.w3.org/2000/svg"
-						width="14"
-						height="14"
-						viewBox="0 0 24 24"
-						aria-hidden="true"
-					>
-						<defs>
-							<linearGradient id={`star-fill-home-${star}-${value.toFixed(1)}`}>
-								<stop offset={`${fill * 100}%`} stopColor="var(--crema)" />
-								<stop offset={`${fill * 100}%`} stopColor="var(--sand)" stopOpacity="0.35" />
-							</linearGradient>
-						</defs>
-						<path
-							d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-							fill={`url(#star-fill-home-${star}-${value.toFixed(1)})`}
-						/>
-					</svg>
-				);
-			})}
+		<span className="inline-flex items-center gap-1 text-xs text-(--muted)">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="12"
+				height="12"
+				viewBox="0 0 24 24"
+				aria-hidden="true"
+				fill="var(--crema)"
+				stroke="var(--crema)"
+				strokeWidth="2"
+			>
+				<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+			</svg>
+			{rating.toFixed(1)} ({reviews} {reviewLabel})
 		</span>
 	);
 }
@@ -202,7 +189,7 @@ export default async function LandingPage() {
 
 	return (
 		<div className="space-y-10">
-			{/* ─── Optional Site Title ─── */}
+			{/* Optional Site Title */}
 			{(settings.home_title_en || settings.home_title_id || settings.home_subtitle_en || settings.home_subtitle_id) && (
 				<section className="rounded-3xl border border-(--sand)/30 bg-(--surface-elevated) p-6 sm:p-8">
 					<h1 className="font-heading text-4xl tracking-tight text-(--espresso)">
@@ -220,7 +207,7 @@ export default async function LandingPage() {
 				</section>
 			)}
 
-			{/* ─── Dynamic Landing Sections ─── */}
+			{/* Dynamic Landing Sections */}
 			<div className="space-y-8">
 				{landingSections.map((section, index) => (
 					<div className="fade-up" style={{ animationDelay: `${index * 80}ms` }} key={section.id}>
@@ -233,7 +220,7 @@ export default async function LandingPage() {
 				))}
 			</div>
 
-			{/* ─── Why Coffee Brew Lab ─── */}
+			{/* Why Coffee Brew Lab */}
 			<section
 				className="fade-up rounded-3xl border border-(--sand)/30 bg-(--surface-elevated) p-6 sm:p-10"
 				style={{ animationDelay: "200ms" }}
@@ -315,7 +302,7 @@ export default async function LandingPage() {
 				</div>
 			</section>
 
-			{/* ─── Featured Brew Catalog ─── */}
+			{/* Featured Brew Catalog */}
 			<section
 				className="fade-up overflow-hidden rounded-3xl border border-(--sand)/30 bg-(--surface-elevated)"
 				style={{ animationDelay: "280ms" }}
@@ -389,16 +376,11 @@ export default async function LandingPage() {
 											{brew.name}
 										</p>
 										<p className="mt-0.5 text-sm text-(--muted)">
-											{brew.brew_method} · {brew.brand_roastery}
+											{brew.brew_method} - {brew.brand_roastery}
 										</p>
 										<div className="mt-2 flex items-center gap-2">
 											{brew.review_total > 0 ? (
-												<>
-													<StarRating value={brew.rating_avg} />
-													<span className="text-xs text-(--muted)">
-														{brew.rating_avg.toFixed(1)} · {brew.review_total} {t("landing.reviews")}
-													</span>
-												</>
+												<RatingMeta rating={brew.rating_avg} reviews={brew.review_total} reviewLabel={t("landing.reviews")} />
 											) : (
 												<span className="text-xs text-(--muted)">{t("landing.noReviews")}</span>
 											)}
@@ -443,16 +425,11 @@ export default async function LandingPage() {
 											{brew.name}
 										</p>
 										<p className="text-xs text-(--muted)">
-											{brew.brew_method} · {brew.brand_roastery}
+											{brew.brew_method} - {brew.brand_roastery}
 										</p>
 										<div className="mt-1.5 flex items-center gap-2">
 											{brew.review_total > 0 ? (
-												<>
-													<StarRating value={brew.rating_avg} />
-													<span className="text-xs text-(--muted)">
-														{brew.rating_avg.toFixed(1)} · {brew.review_total} {t("landing.reviews")}
-													</span>
-												</>
+												<RatingMeta rating={brew.rating_avg} reviews={brew.review_total} reviewLabel={t("landing.reviews")} />
 											) : (
 												<span className="text-xs text-(--muted)">{t("landing.noReviews")}</span>
 											)}
@@ -470,7 +447,7 @@ export default async function LandingPage() {
 				</div>
 			</section>
 
-			{/* ─── FAQ Section ─── */}
+			{/* FAQ Section */}
 			<section
 				className="fade-up rounded-3xl border border-(--sand)/30 bg-(--surface-elevated) p-6 sm:p-10"
 				style={{ animationDelay: "360ms" }}
@@ -519,7 +496,7 @@ export default async function LandingPage() {
 				</div>
 			</section>
 
-			{/* ─── Join Community CTA ─── */}
+			{/* Join Community CTA */}
 			<section
 				className="fade-up relative overflow-hidden rounded-3xl border border-(--sand)/30 bg-linear-to-br from-[color-mix(in_oklab,var(--moss)_15%,var(--surface-elevated))] to-[color-mix(in_oklab,var(--crema)_12%,var(--surface-elevated))] p-8 text-center sm:p-12"
 				style={{ animationDelay: "440ms" }}
@@ -555,7 +532,7 @@ export default async function LandingPage() {
 				</div>
 			</section>
 
-			{/* ─── Newsletter ─── */}
+			{/* Newsletter */}
 			<section
 				className="fade-up rounded-3xl border border-(--sand)/30 bg-(--surface-elevated) p-6 sm:p-10"
 				style={{ animationDelay: "520ms" }}

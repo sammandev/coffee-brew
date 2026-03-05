@@ -8,7 +8,7 @@ import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { getSessionContext } from "@/lib/auth";
 import { parseCompareIds } from "@/lib/brew-collections";
 import { resolveBrewImageUrl } from "@/lib/brew-images";
-import { getMessage, getDimensionLabels } from "@/lib/i18n/messages";
+import { getDimensionLabels, getMessage } from "@/lib/i18n/messages";
 import { getServerI18n } from "@/lib/i18n/server";
 import { aggregateRatings } from "@/lib/rating";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -98,7 +98,14 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 
 	const reviewMap = new Map<
 		string,
-		Array<{ acidity: number; sweetness: number; body: number; aroma: number; balance: number; star_rating: number | null }>
+		Array<{
+			acidity: number;
+			sweetness: number;
+			body: number;
+			aroma: number;
+			balance: number;
+			star_rating: number | null;
+		}>
 	>();
 	const myReviewMap = new Map<
 		string,
@@ -144,17 +151,6 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 
 	const DIMENSION_LABELS = getDimensionLabels(locale);
 
-	// Determine "winner" for overall rating
-	let bestOverallId = "";
-	let bestOverall = -1;
-	for (const brew of orderedBrews) {
-		const agg = aggregates.get(brew.id);
-		if (agg && agg.star_avg > bestOverall && agg.total > 0) {
-			bestOverall = agg.star_avg;
-			bestOverallId = brew.id;
-		}
-	}
-
 	const gridCols = orderedBrews.length === 2 ? "grid-cols-[180px_1fr_1fr]" : "grid-cols-[180px_1fr_1fr_1fr]";
 
 	return (
@@ -181,19 +177,13 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 				</div>
 			</header>
 
-			{/* Hero cards: image + name + rating per brew */}
+			{/* Hero cards: image + name + compact metadata per brew */}
 			<div className={`grid gap-4 ${orderedBrews.length === 2 ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
 				{orderedBrews.map((brew) => {
 					const agg = getAggregate(brew.id);
 					const wishCount = wishlistMap.get(brew.id) ?? 0;
-					const isBest = brew.id === bestOverallId;
 					return (
 						<Card key={brew.id} className="group relative overflow-hidden p-0 transition-shadow hover:shadow-lg">
-							{isBest && agg.total > 0 ? (
-								<span className="absolute top-3 right-3 z-10 rounded-full bg-(--crema) px-2.5 py-0.5 text-[11px] font-bold text-white shadow-sm">
-									{m("compare.best")}
-								</span>
-							) : null}
 							<div className="relative aspect-16/10 w-full overflow-hidden">
 								<Image
 									src={resolveBrewImageUrl(brew.image_url)}
@@ -213,16 +203,16 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 								<p className="text-sm text-(--muted)">
 									{m("compare.brewer")}: {brew.brewer_name}
 								</p>
-								<div className="flex items-center gap-3">
+								<div className="flex flex-wrap items-center gap-2 text-xs text-(--muted)">
 									<div className="flex items-center gap-1">
 										{[0, 1, 2, 3, 4].map((starIndex) => (
 											<svg
 												key={`${brew.id}-star-${starIndex}`}
-												width="14"
-												height="14"
+												width="12"
+												height="12"
 												viewBox="0 0 24 24"
-								fill={starIndex < Math.round(agg.star_avg) ? "var(--crema)" : "none"}
-											stroke={starIndex < Math.round(agg.star_avg) ? "var(--crema)" : "var(--sand)"}
+												fill={starIndex < Math.round(agg.star_avg) ? "var(--crema)" : "none"}
+												stroke={starIndex < Math.round(agg.star_avg) ? "var(--crema)" : "var(--sand)"}
 												strokeWidth="2"
 												className="shrink-0"
 												aria-hidden="true"
@@ -231,12 +221,10 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 												<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
 											</svg>
 										))}
-										<span className="ml-1 text-sm font-semibold text-(--espresso)">
-										{agg.total > 0 ? agg.star_avg.toFixed(1) : "—"}
-									</span>
-									<span className="text-xs text-(--muted)">({agg.total})</span>
+										<span className="ml-1 font-medium text-(--espresso)">{agg.total > 0 ? agg.star_avg.toFixed(1) : "-"}</span>
+										<span>{agg.total}</span>
 									</div>
-									<span className="inline-flex items-center gap-1 text-xs text-(--muted)">
+									<span className="inline-flex items-center gap-1">
 										<svg
 											width="12"
 											height="12"
@@ -250,7 +238,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 										>
 											<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
 										</svg>
-										{wishCount}
+										<span>{wishCount}</span>
 									</span>
 								</div>
 								<MethodRecommendationChips locale={locale} methods={brew.recommended_methods ?? []} />
@@ -278,8 +266,10 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 							{orderedBrews.map((brew) => {
 								const agg = getAggregate(brew.id);
 								return (
-									<div key={`overall-${brew.id}`} className="flex flex-col items-center gap-1 p-3">
-										<span className="text-2xl font-bold text-(--espresso)">{agg.total > 0 ? agg.star_avg.toFixed(1) : "—"}</span>
+									<div key={`overall-${brew.id}`} className="flex flex-col items-center gap-1 p-3 text-center">
+										<span className="text-sm font-semibold text-(--espresso)">
+											{agg.total > 0 ? agg.star_avg.toFixed(1) : "-"}
+										</span>
 										<span className="text-xs text-(--muted)">
 											{agg.total > 0 ? `${agg.total} ${m("compare.reviews")}` : m("compare.noReviews")}
 										</span>
@@ -437,7 +427,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 						className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold text-(--espresso) transition hover:bg-(--sand)/15"
 					>
 						{brew.name}
-						<span aria-hidden="true">→</span>
+						<span aria-hidden="true">{"->"}</span>
 					</Link>
 				))}
 			</section>

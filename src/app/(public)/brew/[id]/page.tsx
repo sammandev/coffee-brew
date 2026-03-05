@@ -4,16 +4,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BrewReviewsLiveRefresh } from "@/components/brew/brew-reviews-live-refresh";
 import { MethodRecommendationChips } from "@/components/brew/method-recommendation-chips";
+import { RecentReviewsSection } from "@/components/brew/recent-reviews-section";
 import { WishlistToggleButton } from "@/components/brew/wishlist-toggle-button";
 import { ReviewForm } from "@/components/forms/review-form";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { RichTextContent } from "@/components/ui/rich-text-content";
-import { UserIdentitySummary } from "@/components/user/user-identity-summary";
 import { getSessionContext } from "@/lib/auth";
 import { canAccessBrew, canReadUnpublishedBrew } from "@/lib/brew-access";
 import { resolveBrewImageUrl } from "@/lib/brew-images";
-import { getMessage, getDimensionLabels, getStatusBadgeProps } from "@/lib/i18n/messages";
+import { getDimensionLabels, getMessage, getStatusBadgeProps } from "@/lib/i18n/messages";
 import { getServerI18n } from "@/lib/i18n/server";
 import { getBrewDetail } from "@/lib/queries";
 import { clampPlainText } from "@/lib/rich-text";
@@ -142,6 +142,30 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 	];
 
 	const DIMENSION_LABELS = getDimensionLabels(locale);
+	const reviewCards = reviews.map((review) => {
+		const meta = reviewerMetaById.get(review.reviewer_id);
+		return {
+			acidity: review.acidity,
+			aroma: review.aroma,
+			balance: review.balance,
+			body: review.body,
+			notes: review.notes,
+			reviewer: {
+				avatarUrl: meta?.avatarUrl ?? null,
+				badge: meta?.topBadge ? String(meta.topBadge) : null,
+				displayName: meta?.displayName || "Unknown user",
+				joinedAt: meta?.joinedAt ?? review.updated_at,
+				karma: meta?.karma ?? 0,
+				mentionHandle: meta?.mentionHandle ?? null,
+				totalReviews: meta?.totalReviews ?? 0,
+				userId: review.reviewer_id,
+			},
+			reviewer_id: review.reviewer_id,
+			star_rating: review.star_rating,
+			sweetness: review.sweetness,
+			updated_at: review.updated_at,
+		};
+	});
 
 	return (
 		<div className="space-y-8">
@@ -194,50 +218,22 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 						</p>
 					</div>
 
-				{/* Rating summary inline */}
-				<div className="flex items-center gap-4">
-					<span className="text-3xl font-bold text-(--accent)">{aggregate.star_avg.toFixed(1)}</span>
-					<div>
-						<div className="flex items-center gap-px">
-							{[0, 1, 2, 3, 4].map((starIndex) => (
-								<svg
-									key={`${brew.id}-star-${starIndex}`}
-									width="16"
-									height="16"
-									viewBox="0 0 24 24"
-									fill={starIndex < Math.round(aggregate.star_avg) ? "var(--crema)" : "none"}
-									stroke={starIndex < Math.round(aggregate.star_avg) ? "var(--crema)" : "var(--sand)"}
-									strokeWidth="2"
-									className="shrink-0"
-									aria-hidden="true"
-									focusable="false"
-								>
-									<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-								</svg>
-							))}
-						</div>
-							<p className="text-xs text-(--muted)">
-								{aggregate.total} {m("brew.totalReviews")}
-							</p>
-						</div>
-						<span
-							className="ml-auto inline-flex items-center gap-1.5 text-sm text-(--muted)"
-							title={`${wishlistCount} ${m("catalog.favorites")}`}
+					<div className="inline-flex items-center gap-1.5 text-sm text-(--muted)">
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill={wishlistCount > 0 ? "var(--danger)" : "none"}
+							stroke={wishlistCount > 0 ? "var(--danger)" : "var(--sand)"}
+							strokeWidth="2"
+							className="shrink-0"
+							aria-hidden="true"
+							focusable="false"
 						>
-							<svg
-								width="14"
-								height="14"
-								viewBox="0 0 24 24"
-								fill={wishlistCount > 0 ? "var(--danger)" : "none"}
-								stroke={wishlistCount > 0 ? "var(--danger)" : "var(--sand)"}
-								strokeWidth="2"
-								className="shrink-0"
-								aria-hidden="true"
-								focusable="false"
-							>
-								<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-							</svg>
-							{wishlistCount}
+							<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+						</svg>
+						<span title={`${wishlistCount} ${m("catalog.favorites")}`}>
+							{wishlistCount} {m("catalog.favorites")}
 						</span>
 					</div>
 
@@ -311,32 +307,9 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 				{/* Rating snapshot card */}
 				<Card className="p-0">
 					<div className="border-b px-6 py-4">
-						<h2 className="font-heading text-xl text-(--espresso)">{m("brew.ratingSnapshot")}</h2>
+						<h2 className="font-heading text-xl text-(--espresso)">{m("brew.flavorSnapshot")}</h2>
 					</div>
 					<div className="space-y-4 px-6 py-5">
-						{/* Star distribution histogram */}
-						{aggregate.total > 0 ? (
-							<div className="space-y-1.5">
-								{([5, 4, 3, 2, 1] as const).map((star) => {
-									const count = aggregate.star_histogram[star];
-									const starTotal = Object.values(aggregate.star_histogram).reduce((a, b) => a + b, 0);
-									const pct = starTotal > 0 ? Math.round((count / starTotal) * 100) : 0;
-									return (
-										<div key={star} className="flex items-center gap-2 text-xs">
-											<span className="w-4 shrink-0 text-right text-(--muted)">{star}</span>
-											<svg width="11" height="11" viewBox="0 0 24 24" fill="var(--crema)" stroke="var(--crema)" strokeWidth="2" aria-hidden="true" focusable="false" className="shrink-0">
-												<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-											</svg>
-											<div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-(--sand)/20">
-												<div className="h-full rounded-full bg-(--crema) transition-all" style={{ width: `${pct}%` }} />
-											</div>
-											<span className="w-5 shrink-0 text-right font-medium text-(--espresso)">{count}</span>
-										</div>
-									);
-								})}
-							</div>
-						) : null}
-
 						{/* Dimension bars */}
 						<div className="space-y-3">
 							{DIMENSION_LABELS.map(({ key, label }) => {
@@ -421,74 +394,7 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 				)}
 			</section>
 
-		{/* Recent Reviews */}
-		<section className="space-y-4">
-			<h2 className="font-heading text-2xl text-(--espresso)">{m("brew.recentReviews")}</h2>
-			{reviews.length === 0 ? (
-				<Card>
-					<p className="text-sm text-(--muted)">{m("brew.noSightings")}</p>
-				</Card>
-			) : (
-				reviews.map((review) => {
-					const meta = reviewerMetaById.get(review.reviewer_id);
-					const reviewDimensions = [
-						{ label: DIMENSION_LABELS[0].label, value: review.acidity },
-						{ label: DIMENSION_LABELS[1].label, value: review.sweetness },
-						{ label: DIMENSION_LABELS[2].label, value: review.body },
-						{ label: DIMENSION_LABELS[3].label, value: review.aroma },
-						{ label: DIMENSION_LABELS[4].label, value: review.balance },
-					];
-					return (
-				<Card key={`${review.reviewer_id}-${review.updated_at}`} className="space-y-3">
-						<div className="flex items-start justify-between gap-3">
-							<UserIdentitySummary
-								userId={review.reviewer_id}
-								displayName={meta?.displayName || "Unknown user"}
-								avatarUrl={meta?.avatarUrl ?? null}
-								joinedAt={meta?.joinedAt ?? review.updated_at}
-								karma={meta?.karma ?? 0}
-								totalReviews={meta?.totalReviews ?? 0}
-								isVerified={meta?.isVerified ?? false}
-								mentionHandle={meta?.mentionHandle ?? null}
-								badges={meta?.topBadge ? [String(meta.topBadge)] : []}
-								locale={locale}
-							/>
-							{review.star_rating != null ? (
-								<span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-(--crema)/15 px-2.5 py-1 text-sm font-semibold text-(--accent)">
-									<svg
-										width="13"
-										height="13"
-										viewBox="0 0 24 24"
-										fill="var(--crema)"
-										stroke="var(--crema)"
-										strokeWidth="2"
-										aria-hidden="true"
-										focusable="false"
-									>
-										<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-									</svg>
-									{review.star_rating}/5
-								</span>
-							) : null}
-						</div>
-							{/* Dimension pills */}
-							<div className="flex flex-wrap gap-2">
-								{reviewDimensions.map(({ label, value }) => (
-									<span key={label} className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs">
-										<span className="text-(--muted)">{label}</span>
-										<span className="font-semibold text-(--espresso)">{value}/5</span>
-									</span>
-								))}
-							</div>
-							{review.notes ? <RichTextContent html={review.notes} className="text-sm" /> : null}
-							<p className="text-xs text-(--muted)">
-								{m("brew.updated")} {formatDate(review.updated_at, locale)}
-							</p>
-						</Card>
-					);
-				})
-			)}
-		</section>
+			<RecentReviewsSection aggregate={aggregate} locale={locale} reviews={reviewCards} />
 
 			{/* Review form */}
 			{session ? (
