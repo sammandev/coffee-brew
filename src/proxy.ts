@@ -1,6 +1,5 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { consumeEdgeRateLimit } from "@/lib/rate-limit";
 import { emitRateLimitConsoleLog } from "@/lib/rate-limit-audit";
 import { getRequestIp } from "@/lib/request-ip";
@@ -29,8 +28,20 @@ const EDGE_RATE_LIMIT_RULES_BY_KEY = new Map<string, EdgeRateLimitRule>(
 	EDGE_RATE_LIMIT_RULES.map((rule) => [`${rule.method}:${rule.path}`, rule]),
 );
 
-/** Coerce APP_MAINTENANCE_MODE env var ("true"/"1"/true) to boolean. Defaults to false. */
-const isMaintenanceMode = z.coerce.boolean().default(false).parse(process.env.APP_MAINTENANCE_MODE);
+/**
+ * Parse feature-flag style env var safely.
+ * Important: strings like "false" must stay false (Boolean("false") === true in JS).
+ */
+function parseBooleanFlag(value: string | undefined) {
+	if (!value) return false;
+	const normalized = value.trim().toLowerCase();
+	if (["1", "true", "yes", "on"].includes(normalized)) return true;
+	if (["0", "false", "no", "off"].includes(normalized)) return false;
+	return false;
+}
+
+const isMaintenanceMode = parseBooleanFlag(process.env.APP_MAINTENANCE_MODE);
+let hasLoggedMaintenanceState = false;
 
 function hasSupabaseAuthCookies(request: NextRequest) {
 	return request.cookies.getAll().some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"));
@@ -55,6 +66,14 @@ function isMaintenanceBypassPath(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
+	if (!hasLoggedMaintenanceState) {
+		hasLoggedMaintenanceState = true;
+		console.info("[proxy] maintenance mode", {
+			enabled: isMaintenanceMode,
+			envConfigured: typeof process.env.APP_MAINTENANCE_MODE === "string",
+		});
+	}
+
 	const { pathname } = request.nextUrl;
 	if (!isStaticPath(pathname)) {
 		const rule = EDGE_RATE_LIMIT_RULES_BY_KEY.get(`${request.method}:${pathname}`);
