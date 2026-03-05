@@ -90,6 +90,10 @@ export function MessagesWorkspace({
 	const workspaceChannelRef = useRef<RealtimeChannel | null>(null);
 	const workspaceSubscriptionGenerationRef = useRef(0);
 	const selectedConversationIdRef = useRef<string | null>(initialConversationId);
+	// viewRef mirrors `view` so Realtime callbacks can read the current view
+	// without capturing it as a closure dependency (which would cause the
+	// subscription to tear down and rebuild on every tab toggle — M-12).
+	const viewRef = useRef<InboxView>(initialView);
 
 	useEffect(() => {
 		selectedConversationIdRef.current = selectedConversationId;
@@ -98,6 +102,10 @@ export function MessagesWorkspace({
 	useEffect(() => {
 		conversationsRef.current = conversations;
 	}, [conversations]);
+
+	useEffect(() => {
+		viewRef.current = view;
+	}, [view]);
 
 	const copy = useMemo(
 		() => ({
@@ -233,7 +241,9 @@ export function MessagesWorkspace({
 
 				let foundConversation = false;
 				const incrementUnread =
-					senderId !== currentUserId && selectedConversationIdRef.current !== conversationIdRaw && view === "active";
+					senderId !== currentUserId &&
+					selectedConversationIdRef.current !== conversationIdRaw &&
+					viewRef.current === "active";
 
 				setConversations((current) => {
 					const patched = current.map((conversation) => {
@@ -260,7 +270,14 @@ export function MessagesWorkspace({
 				});
 
 				if (!foundConversation) {
-					void loadConversations({ reset: true, silent: true });
+					// Only reload if this is our own message in a conversation we don't
+					// have cached (e.g. we just created it). For messages from others in
+					// a conversation we don't know about yet, the dm_participants INSERT
+					// subscription is the authoritative trigger — reloading here would
+					// race with that subscription and cause a double-reload.
+					if (senderId === currentUserId) {
+						void loadConversations({ reset: true, silent: true });
+					}
 					return;
 				}
 
@@ -294,7 +311,7 @@ export function MessagesWorkspace({
 				);
 			}
 		},
-		[currentUserId, loadConversations, moveConversationToTop, view],
+		[currentUserId, loadConversations, moveConversationToTop],
 	);
 
 	const patchConversationByParticipant = useCallback(
@@ -400,19 +417,18 @@ export function MessagesWorkspace({
 		const currentView = searchParams.get("view");
 		const currentQuery = searchParams.get("q") ?? "";
 		const currentConversationId = searchParams.get("c");
-		if (currentView === "archived" && view !== "archived") {
+		if (currentView === "archived") {
 			setView("archived");
-		}
-		if (currentView !== "archived" && view !== "active") {
+		} else {
 			setView("active");
 		}
-		if (currentQuery !== query) {
-			setQuery(currentQuery);
-		}
-		if ((currentConversationId ?? null) !== selectedConversationId) {
-			setSelectedConversationId(currentConversationId);
-		}
-	}, [query, searchParams, selectedConversationId, view]);
+		setQuery(currentQuery);
+		setSelectedConversationId(currentConversationId);
+		// Intentionally depends only on searchParams — this effect is the URL→state
+		// direction. Including the state variables in deps would create a two-way loop
+		// (state→URL→state) via the companion URL-sync effect above.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [searchParams]);
 
 	async function archiveConversation(conversationId: string, archived: boolean) {
 		setWorkingId(conversationId);

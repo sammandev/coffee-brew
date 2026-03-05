@@ -38,10 +38,19 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, Array<{ resource: ResourceKe
 		{ resource: "brews", action: "delete" },
 		{ resource: "brews", action: "moderate" },
 		{ resource: "catalog", action: "read" },
+		{ resource: "forum", action: "create" },
 		{ resource: "forum", action: "read" },
+		{ resource: "forum", action: "update" },
+		{ resource: "forum", action: "delete" },
 		{ resource: "forum", action: "moderate" },
 		{ resource: "reviews", action: "read" },
 	],
+	/**
+	 * IMPORTANT: Superuser permissions are auto-generated from `RESOURCES` and
+	 * `ACTIONS`. When adding a new resource or action, update both arrays above to
+	 * ensure it is included in the superuser matrix. Omitting it here will silently
+	 * deny superusers from performing that operation.
+	 */
 	superuser: RESOURCES.flatMap((resource) =>
 		ACTIONS.filter((action) => {
 			if (resource !== "users" && action === "manage_users") return false;

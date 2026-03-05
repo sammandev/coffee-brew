@@ -7,13 +7,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isMissingColumnError } from "@/lib/supabase-errors";
 import { brewSchema } from "@/lib/validators";
 
-const BREW_OPTIONAL_COLUMNS = [
-	"image_url",
-	"image_alt",
-	"tags",
-	"bean_process",
-	"recommended_methods",
-] as const;
+const BREW_OPTIONAL_COLUMNS = ["image_url", "image_alt", "tags", "bean_process", "recommended_methods"] as const;
 
 function normalizeTags(raw: unknown) {
 	if (!Array.isArray(raw)) return [];
@@ -33,15 +27,18 @@ export async function GET() {
 	const supabase = await createSupabaseServerClient();
 	const session = await getSessionContext();
 
+	const BREW_COLUMNS =
+		"id, owner_id, name, brew_method, bean_process, coffee_beans, brand_roastery, water_type, water_ppm, temperature, temperature_unit, grind_size, grind_clicks, brew_time_seconds, brewer_name, notes, status, image_url, image_alt, tags, recommended_methods, grind_reference_image_url, grind_reference_image_alt, created_at, updated_at";
+
 	if (!session) {
 		const { data, error } = await supabase
 			.from("brews")
-			.select("*")
+			.select(BREW_COLUMNS)
 			.eq("status", "published")
 			.order("created_at", { ascending: false });
 
 		if (error) {
-			return apiError("Could not load brews", 400, error.message);
+			return apiError("Could not load brews", 500, error.message);
 		}
 
 		return apiOk({ brews: data });
@@ -49,12 +46,12 @@ export async function GET() {
 
 	const { data, error } = await supabase
 		.from("brews")
-		.select("*")
+		.select(BREW_COLUMNS)
 		.eq("owner_id", session.userId)
 		.order("updated_at", { ascending: false });
 
 	if (error) {
-		return apiError("Could not load brews", 400, error.message);
+		return apiError("Could not load brews", 500, error.message);
 	}
 
 	return apiOk({ brews: data });
@@ -104,7 +101,8 @@ export async function POST(request: Request) {
 		.select("display_name, email")
 		.eq("id", permission.context.userId)
 		.maybeSingle<{ display_name: string | null; email: string | null }>();
-	const ownerName = ownerProfile?.display_name?.trim() || ownerProfile?.email || permission.context.email.split("@")[0] || "Unknown";
+	const ownerName =
+		ownerProfile?.display_name?.trim() || ownerProfile?.email || permission.context.email?.split("@")[0] || "Unknown";
 	const insertPayload = {
 		owner_id: permission.context.userId,
 		name: parsed.data.name,
@@ -161,7 +159,7 @@ export async function POST(request: Request) {
 	}
 
 	if (error) {
-		return apiError("Could not create brew", 400, error.message);
+		return apiError("Could not create brew", 500, error.message);
 	}
 
 	return apiOk({ brew: data }, 201);

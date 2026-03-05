@@ -61,6 +61,11 @@ export async function PATCH(request: Request) {
 		.single();
 
 	if (error) {
+		// Postgres unique violation — mention_handle already taken (handles the TOCTOU
+		// window between the pre-check SELECT above and this UPDATE).
+		if (error.code === "23505") {
+			return apiError("Could not update profile", 400, "Mention handle is already in use.");
+		}
 		return apiError("Could not update profile", 400, error.message);
 	}
 

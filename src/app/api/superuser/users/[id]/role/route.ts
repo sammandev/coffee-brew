@@ -1,10 +1,10 @@
 import { apiError, apiOk } from "@/lib/api";
-import { requireSessionContext } from "@/lib/auth";
+import { requireSessionContextOrNull } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { superuserUpdateUserRoleSchema } from "@/lib/validators";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-	const session = await requireSessionContext().catch(() => null);
+	const session = await requireSessionContextOrNull();
 	if (!session) {
 		return apiError("Unauthorized", 401);
 	}

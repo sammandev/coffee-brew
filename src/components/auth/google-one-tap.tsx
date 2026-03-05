@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getPreparedOneTapNonce } from "@/lib/auth-callback-client";
 import { ONE_TAP_ERROR_KEY, ONE_TAP_STATUS_KEY } from "@/lib/auth-diagnostics";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
@@ -12,15 +11,6 @@ const ONE_TAP_PROMPT_THROTTLE_MS = 30_000;
 
 interface GoogleCredentialResponse {
 	credential?: string;
-}
-
-interface GooglePromptMomentNotification {
-	isNotDisplayed?: () => boolean;
-	isSkippedMoment?: () => boolean;
-	isDismissedMoment?: () => boolean;
-	getNotDisplayedReason?: () => string;
-	getSkippedReason?: () => string;
-	getDismissedReason?: () => string;
 }
 
 interface GoogleOneTapProps {
@@ -43,9 +33,9 @@ declare global {
 						callback: (response: GoogleCredentialResponse) => void;
 						auto_select?: boolean;
 						cancel_on_tap_outside?: boolean;
-						nonce?: string;
+						use_fedcm_for_prompt?: boolean;
 					}) => void;
-					prompt: (listener?: (notification: GooglePromptMomentNotification) => void) => void;
+					prompt: () => void;
 					cancel: () => void;
 				};
 			};
@@ -150,15 +140,13 @@ export function GoogleOneTap({
 
 			await loadGoogleOneTapScript();
 			if (!active || !window.google?.accounts?.id || !resolvedClientId) return;
-			const oneTapNonce = await getPreparedOneTapNonce(resolveSessionPath(redirectPath));
-			if (!active || !oneTapNonce) return;
 			setOneTapStatus("ready");
 
 			window.google.accounts.id.initialize({
 				client_id: resolvedClientId,
-				nonce: oneTapNonce,
 				auto_select: false,
 				cancel_on_tap_outside: true,
+				use_fedcm_for_prompt: true,
 				callback: async (response) => {
 					if (!response.credential) {
 						setError(
@@ -178,26 +166,15 @@ export function GoogleOneTap({
 					const { error: signInError } = await supabase.auth.signInWithIdToken({
 						provider: "google",
 						token: response.credential,
-						nonce: oneTapNonce,
 					});
 
 					if (signInError) {
 						setError(signInError.message);
 						setOneTapStatus("error");
-						const nonceMismatch = signInError.message.toLowerCase().includes("nonce");
-						if (nonceMismatch) {
-							setOneTapError("nonce_mismatch");
-							setHint(
-								locale === "id"
-									? "One Tap nonce tidak cocok. Lanjutkan dengan Continue with Google untuk menyelesaikan login."
-									: "One Tap nonce did not match. Continue with Google to complete sign-in.",
-							);
-						} else {
-							setOneTapError("generic_error");
-							setHint(
-								locale === "id" ? "Silakan coba tombol Continue with Google." : "Please try the Continue with Google button.",
-							);
-						}
+						setOneTapError("generic_error");
+						setHint(
+							locale === "id" ? "Silakan coba tombol Continue with Google." : "Please try the Continue with Google button.",
+						);
 						return;
 					}
 					setOneTapError(null);
@@ -207,36 +184,8 @@ export function GoogleOneTap({
 				},
 			});
 
-			window.google.accounts.id.prompt((notification) => {
-				if (notification.isNotDisplayed?.()) {
-					setOneTapStatus("unavailable");
-					setHint(
-						locale === "id"
-							? "Google One Tap tidak dapat ditampilkan pada sesi/browser ini. Gunakan Continue with Google."
-							: "Google One Tap could not be shown in this browser session. Use Continue with Google.",
-					);
-					return;
-				}
-				if (notification.isSkippedMoment?.()) {
-					setOneTapStatus("unavailable");
-					setHint(
-						locale === "id"
-							? "Google One Tap dilewati oleh browser/akun. Gunakan Continue with Google."
-							: "Google One Tap was skipped by browser/account state. Use Continue with Google.",
-					);
-					return;
-				}
-				if (notification.isDismissedMoment?.()) {
-					setOneTapStatus("ready");
-					setHint(
-						locale === "id"
-							? "Google One Tap ditutup. Anda tetap bisa memakai Continue with Google."
-							: "Google One Tap was dismissed. You can still use Continue with Google.",
-					);
-					return;
-				}
-				setOneTapStatus("prompted");
-			});
+			window.google.accounts.id.prompt();
+			setOneTapStatus("prompted");
 			window.sessionStorage.setItem(ONE_TAP_PROMPT_KEY, String(Date.now()));
 		}
 

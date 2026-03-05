@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Select } from "@/components/ui/select";
+import { normalizeRecommendedMethods } from "@/lib/brew-catalog";
 import { DEFAULT_BREW_IMAGE_URL, isManagedBrewImageUrl, resolveBrewImageUrl } from "@/lib/brew-images";
 import type { BrewRecommendedMethod, BrewStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -60,18 +61,6 @@ function isValidImageUrl(value: string) {
 	} catch {
 		return false;
 	}
-}
-
-function normalizeRecommendedMethods(raw: string[] | null | undefined): BrewRecommendedMethod[] {
-	if (!Array.isArray(raw)) return [];
-	const normalized: BrewRecommendedMethod[] = [];
-	for (const entry of raw) {
-		const value = String(entry).trim().toLowerCase() as BrewRecommendedMethod;
-		if (!RECOMMENDED_METHOD_VALUES.includes(value)) continue;
-		if (normalized.includes(value)) continue;
-		normalized.push(value);
-	}
-	return normalized;
 }
 
 export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: BrewFormProps) {
@@ -131,14 +120,7 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 		setImageUrlInput(nextMode === "url" ? defaults.imageUrl : "");
 		setUploadedImageUrl(nextMode === "upload" ? defaults.imageUrl : "");
 		setTagsInput(defaults.tags);
-	}, [
-		defaults.beanProcess,
-		defaults.imageAlt,
-		defaults.imageUrl,
-		defaults.notes,
-		defaults.recommendedMethods,
-		defaults.tags,
-	]);
+	}, [defaults]);
 
 	const selectedImageUrl = imageMode === "upload" ? uploadedImageUrl.trim() : imageUrlInput.trim();
 	const imagePreviewUrl = resolveBrewImageUrl(selectedImageUrl || null);
@@ -231,7 +213,7 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 			grindSize: String(formData.get("grindSize") ?? ""),
 			grindClicks: formData.get("grindClicks") ? Number(formData.get("grindClicks")) : null,
 			brewTimeSeconds: Number(formData.get("brewTimeSeconds") ?? 0),
-			notes: String(formData.get("notes") ?? ""),
+			notes: notes,
 			imageUrl: normalizedImageUrl.length > 0 ? normalizedImageUrl : null,
 			imageAlt: normalizedImageUrl.length > 0 && normalizedImageAlt.length > 0 ? normalizedImageAlt : null,
 			recommendedMethods,
@@ -323,7 +305,9 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 							<option value="pour_over">{locale === "id" ? "Pour Over" : "Pour Over"}</option>
 						</select>
 						<p className="text-xs text-(--muted)">
-							{locale === "id" ? "Pilih satu atau lebih metode (Ctrl/Cmd + klik)." : "Pick one or more methods (Ctrl/Cmd + click)."}
+							{locale === "id"
+								? "Pilih satu atau lebih metode (Ctrl/Cmd + klik)."
+								: "Pick one or more methods (Ctrl/Cmd + click)."}
 						</p>
 					</div>
 				</div>
@@ -509,15 +493,15 @@ export function BrewForm({ mode, brewId, redirectPath = "/me", initialValues }: 
 
 				<div className="grid gap-4 md:grid-cols-[1fr_220px]">
 					<div className="grid gap-2">
-					<Label htmlFor="tags">{locale === "id" ? "Tag (pisahkan dengan koma)" : "Tags (comma-separated)"}</Label>
-					<Input
-						id="tags"
-						name="tags"
-						value={tagsInput}
-						onChange={(event) => setTagsInput(event.currentTarget.value)}
-						placeholder={locale === "id" ? "v60, fruity, light-roast" : "v60, fruity, light-roast"}
-						maxLength={320}
-					/>
+						<Label htmlFor="tags">{locale === "id" ? "Tag (pisahkan dengan koma)" : "Tags (comma-separated)"}</Label>
+						<Input
+							id="tags"
+							name="tags"
+							value={tagsInput}
+							onChange={(event) => setTagsInput(event.currentTarget.value)}
+							placeholder={locale === "id" ? "v60, fruity, light-roast" : "v60, fruity, light-roast"}
+							maxLength={320}
+						/>
 					</div>
 					<div className="grid gap-2">
 						<Label htmlFor="status">Status</Label>

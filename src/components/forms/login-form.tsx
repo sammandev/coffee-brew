@@ -112,6 +112,22 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 		return issues;
 	}
 
+	function sanitizePasswordAuthError(message: string): string {
+		const lower = message.toLowerCase();
+		if (lower.includes("invalid login credentials") || lower.includes("invalid credentials")) {
+			return locale === "id" ? "Email atau kata sandi salah." : "Incorrect email or password.";
+		}
+		if (lower.includes("email not confirmed")) {
+			return locale === "id"
+				? "Email belum diverifikasi. Periksa inbox Anda."
+				: "Email not yet verified. Please check your inbox.";
+		}
+		// Do not expose raw Supabase messages to the UI.
+		return locale === "id"
+			? "Login gagal. Periksa email dan kata sandi Anda."
+			: "Sign-in failed. Please check your email and password.";
+	}
+
 	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setError(null);
@@ -135,7 +151,7 @@ export function LoginForm({ enableGoogleLogin = true, enableMagicLinkLogin = tru
 			const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
 			if (authError) {
-				setError(authError.message);
+				setError(sanitizePasswordAuthError(authError.message));
 				setIsLoading(false);
 				return;
 			}

@@ -120,15 +120,7 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 		.slice(0, 10)
 		.map((review) => ({
 			reviewer_id: review.reviewer_id,
-			overall: Number(
-				[
-					Number(review.acidity),
-					Number(review.sweetness),
-					Number(review.body),
-					Number(review.aroma),
-					Number(review.balance),
-				].reduce((acc, value) => acc + value, 0) / 5,
-			),
+			overall: review.star_rating ?? 0,
 			updated_at: review.updated_at,
 			notes: review.notes,
 			display_name: reviewerMetaById.get(review.reviewer_id)?.displayName || "Unknown user",
@@ -205,28 +197,28 @@ export default async function BrewDetailPage({ params }: { params: Promise<{ id:
 						</p>
 					</div>
 
-					{/* Rating summary inline */}
-					<div className="flex items-center gap-4">
-						<span className="text-3xl font-bold text-(--accent)">{aggregate.overall.toFixed(1)}</span>
-						<div>
-							<div className="flex items-center gap-px">
-								{[0, 1, 2, 3, 4].map((starIndex) => (
-									<svg
-										key={`${brew.id}-star-${starIndex}`}
-										width="16"
-										height="16"
-										viewBox="0 0 24 24"
-										fill={starIndex < Math.round(aggregate.overall) ? "var(--crema)" : "none"}
-										stroke={starIndex < Math.round(aggregate.overall) ? "var(--crema)" : "var(--sand)"}
-										strokeWidth="2"
-										className="shrink-0"
-										aria-hidden="true"
-										focusable="false"
-									>
-										<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-									</svg>
-								))}
-							</div>
+				{/* Rating summary inline */}
+				<div className="flex items-center gap-4">
+					<span className="text-3xl font-bold text-(--accent)">{aggregate.star_avg.toFixed(1)}</span>
+					<div>
+						<div className="flex items-center gap-px">
+							{[0, 1, 2, 3, 4].map((starIndex) => (
+								<svg
+									key={`${brew.id}-star-${starIndex}`}
+									width="16"
+									height="16"
+									viewBox="0 0 24 24"
+									fill={starIndex < Math.round(aggregate.star_avg) ? "var(--crema)" : "none"}
+									stroke={starIndex < Math.round(aggregate.star_avg) ? "var(--crema)" : "var(--sand)"}
+									strokeWidth="2"
+									className="shrink-0"
+									aria-hidden="true"
+									focusable="false"
+								>
+									<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+								</svg>
+							))}
+						</div>
 							<p className="text-xs text-(--muted)">
 								{aggregate.total} {m("brew.totalReviews")}
 							</p>

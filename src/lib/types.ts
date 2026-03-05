@@ -1,3 +1,4 @@
+import type { ForumReactionType } from "@/lib/constants";
 import type { Locale, ThemePreference } from "@/lib/i18n/types";
 
 export type Role = "user" | "admin" | "superuser";
@@ -53,6 +54,7 @@ export interface ReviewInput {
 	body: number;
 	aroma: number;
 	balance: number;
+	star_rating: number | null;
 	notes?: string;
 }
 
@@ -88,7 +90,7 @@ export interface LandingSection {
 	body: string | null;
 	body_id: string | null;
 	config: Record<string, unknown>;
-	config_id: Record<string, unknown>;
+	config_id: Record<string, unknown> | undefined;
 	order_index: number;
 	is_visible: boolean;
 	status: ContentLifecycleStatus;
@@ -141,7 +143,10 @@ export interface BrewReview extends ReviewInput {
 }
 
 export interface RatingAggregate {
-	overall: number;
+	/** Mean of the 5 flavor dimensions — used only in Rating Snapshot / Flavor Radar */
+	flavor_avg: number;
+	/** Mean of submitted star_rating values — primary public score */
+	star_avg: number;
 	acidity: number;
 	sweetness: number;
 	body: number;
@@ -216,7 +221,7 @@ export interface BlogReactionRecord {
 	id: string;
 	post_id: string;
 	user_id: string;
-	reaction: "like" | "coffee" | "fire" | "mindblown" | "dislike";
+	reaction: ForumReactionType;
 	created_at: string;
 	updated_at: string;
 }

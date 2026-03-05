@@ -1,6 +1,6 @@
 import { apiError, apiOk } from "@/lib/api";
 import { logAuditEvent } from "@/lib/audit";
-import { requireSessionContext } from "@/lib/auth";
+import { requireSessionContextOrNull } from "@/lib/auth";
 import { DEFAULT_ROLE_PERMISSIONS } from "@/lib/constants";
 import { assertPermission } from "@/lib/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -8,7 +8,7 @@ import type { PermissionAction, ResourceKey } from "@/lib/types";
 import { rbacUpdateSchema } from "@/lib/validators";
 
 export async function GET() {
-	const session = await requireSessionContext().catch(() => null);
+	const session = await requireSessionContextOrNull();
 	if (!session) return apiError("Unauthorized", 401);
 
 	try {
@@ -29,7 +29,7 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-	const session = await requireSessionContext().catch(() => null);
+	const session = await requireSessionContextOrNull();
 	if (!session) return apiError("Unauthorized", 401);
 
 	try {

@@ -48,6 +48,7 @@ package-lock.json
 /developer-config.json
 /development-docs
 /docs
+/scripts
 .github/prompts
 
 # Playwright

@@ -20,31 +20,33 @@ export async function getRolePermissions(role: Role) {
 
 	const supabase = await createSupabaseServerClient();
 
-	const { data: roleRow } = await supabase.from("roles").select("id").eq("name", role).maybeSingle();
+	// Single query: join roles → role_permissions → permissions in one round-trip.
+	const { data: roleRow } = await supabase
+		.from("roles")
+		.select("id, role_permissions(permission_id, permissions(resource_key, action_key))")
+		.eq("name", role)
+		.maybeSingle();
 
 	if (!roleRow) {
 		return DEFAULT_ROLE_PERMISSIONS[role];
 	}
 
-	const { data: rolePermissions } = await supabase
-		.from("role_permissions")
-		.select("permission_id")
-		.eq("role_id", roleRow.id);
+	type PermissionJoin = {
+		permission_id: string;
+		permissions: Array<{ resource_key: string; action_key: string }> | null;
+	};
 
-	const permissionIds = (rolePermissions ?? []).map((entry) => entry.permission_id);
-	if (permissionIds.length === 0) {
+	const entries = (roleRow.role_permissions as unknown as PermissionJoin[]) ?? [];
+	if (entries.length === 0) {
 		return [];
 	}
 
-	const { data: permissions } = await supabase
-		.from("permissions")
-		.select("resource_key, action_key")
-		.in("id", permissionIds);
-
-	return (permissions ?? []).map((permission) => ({
-		resource: permission.resource_key as ResourceKey,
-		action: permission.action_key as PermissionAction,
-	}));
+	return entries
+		.flatMap((entry) => entry.permissions ?? [])
+		.map((perm) => ({
+			resource: perm.resource_key as ResourceKey,
+			action: perm.action_key as PermissionAction,
+		}));
 }
 
 export async function assertPermission(role: Role, resource: ResourceKey, action: PermissionAction) {

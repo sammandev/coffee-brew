@@ -32,6 +32,7 @@ export const reviewSchema = z.object({
 	body: z.number().int().min(1).max(5),
 	aroma: z.number().int().min(1).max(5),
 	balance: z.number().int().min(1).max(5),
+	star_rating: z.number().int().min(1).max(5),
 	notes: z.string().trim().max(15000).optional(),
 });
 
@@ -108,7 +109,7 @@ export const forumPollCreateSchema = z.object({
 });
 
 export const forumPollVoteSchema = z.object({
-	optionIndex: z.number().int().min(0).max(100),
+	optionIndex: z.number().int().min(0).max(9),
 });
 
 export const forumReportCreateSchema = z.object({

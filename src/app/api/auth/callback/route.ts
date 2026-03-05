@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 			name: AUTH_CALLBACK_NONCE_COOKIE,
 			value: "",
 			httpOnly: true,
-			secure: process.env.NODE_ENV === "production",
+			secure: true,
 			sameSite: "lax",
 			path: "/api/auth/callback",
 			maxAge: 0,
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 		name: AUTH_CALLBACK_NONCE_COOKIE,
 		value: "",
 		httpOnly: true,
-		secure: process.env.NODE_ENV === "production",
+		secure: true,
 		sameSite: "lax",
 		path: "/api/auth/callback",
 		maxAge: 0,
@@ -61,6 +61,9 @@ export async function GET(request: Request) {
 		if (!error) {
 			return NextResponse.redirect(`${origin}${safePath}`);
 		}
+		// Code was present but exchange failed (expired, replayed, etc.).
+		// Do NOT fall through to the OTP path — fail immediately.
+		return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`);
 	}
 
 	// Implicit flow: verify OTP token hash (email confirmation, recovery)

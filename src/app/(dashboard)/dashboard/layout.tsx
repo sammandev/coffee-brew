@@ -18,14 +18,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
 		.eq("id", session.userId)
 		.maybeSingle<{ avatar_url: string | null; display_name: string | null }>();
 
-	const displayName = profile?.display_name?.trim() || session.email.split("@")[0] || "User";
+	const displayName = profile?.display_name?.trim() || session.email?.split("@")[0] || "User";
 
 	return (
 		<DashboardShell
 			appName={settings.app_name}
 			avatarUrl={profile?.avatar_url ?? null}
 			displayName={displayName}
-			email={session.email}
+			email={session.email ?? ""}
 			locale={locale}
 			role={session.role}
 			title={locale === "id" ? "Dashboard Operasional" : "Operations Dashboard"}

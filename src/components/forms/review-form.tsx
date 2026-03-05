@@ -23,6 +23,7 @@ interface InitialReview {
 	balance: number;
 	body: number;
 	notes?: string | null;
+	star_rating?: number | null;
 	sweetness: number;
 }
 
@@ -31,6 +32,7 @@ export function ReviewForm({ brewId, initialReview }: { brewId: string; initialR
 	const router = useRouter();
 	const [error, setError] = useState<string | null>(null);
 	const [notes, setNotes] = useState(initialReview?.notes ?? "");
+	const [starRating, setStarRating] = useState<number | null>(initialReview?.star_rating ?? null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const isEditMode = Boolean(initialReview);
 
@@ -38,8 +40,13 @@ export function ReviewForm({ brewId, initialReview }: { brewId: string; initialR
 		setNotes(initialReview?.notes ?? "");
 	}, [initialReview?.notes]);
 
+	useEffect(() => {
+		setStarRating(initialReview?.star_rating ?? null);
+	}, [initialReview?.star_rating]);
+
 	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
+		if (starRating === null) return;
 		setError(null);
 		setIsSubmitting(true);
 		const formData = new FormData(event.currentTarget);
@@ -50,6 +57,7 @@ export function ReviewForm({ brewId, initialReview }: { brewId: string; initialR
 			body: Number(formData.get("body")),
 			aroma: Number(formData.get("aroma")),
 			balance: Number(formData.get("balance")),
+			star_rating: starRating,
 			notes: String(formData.get("notes") ?? ""),
 		};
 
@@ -84,6 +92,40 @@ export function ReviewForm({ brewId, initialReview }: { brewId: string; initialR
 						: "Rate This Brew"}
 			</h3>
 
+			{/* Star rating widget */}
+			<div>
+				<Label>{locale === "id" ? "Penilaian Anda" : "Your Rating"}</Label>
+				<div className="mt-2 flex items-center gap-1">
+					{[1, 2, 3, 4, 5].map((star) => (
+						<button
+							key={star}
+							type="button"
+							onClick={() => setStarRating(star)}
+							className="transition-transform hover:scale-110 focus:outline-none"
+							aria-label={`${star} ${star === 1 ? (locale === "id" ? "bintang" : "star") : locale === "id" ? "bintang" : "stars"}`}
+						>
+							<svg
+								width="32"
+								height="32"
+								viewBox="0 0 24 24"
+								fill={starRating !== null && star <= starRating ? "var(--crema)" : "none"}
+								stroke={starRating !== null && star <= starRating ? "var(--crema)" : "var(--sand)"}
+								strokeWidth="2"
+								aria-hidden="true"
+								focusable="false"
+							>
+								<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+							</svg>
+						</button>
+					))}
+					{starRating !== null ? (
+						<span className="ml-2 text-sm font-semibold text-(--espresso)">{starRating}/5</span>
+					) : (
+						<span className="ml-2 text-sm text-(--muted)">{locale === "id" ? "Pilih bintang" : "Select a rating"}</span>
+					)}
+				</div>
+			</div>
+
 			<div className="grid gap-4 md:grid-cols-5">
 				{REVIEW_FIELDS.map((field) => (
 					<div key={field.key}>
@@ -111,7 +153,7 @@ export function ReviewForm({ brewId, initialReview }: { brewId: string; initialR
 
 			{error && <p className="text-sm text-(--danger)">{error}</p>}
 			<div className="flex justify-end">
-				<Button type="submit" disabled={isSubmitting}>
+				<Button type="submit" disabled={isSubmitting || starRating === null}>
 					{isSubmitting
 						? locale === "id"
 							? "Mengirim..."

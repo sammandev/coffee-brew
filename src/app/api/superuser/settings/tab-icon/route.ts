@@ -1,5 +1,5 @@
 import { apiError, apiOk } from "@/lib/api";
-import { requireSessionContext } from "@/lib/auth";
+import { requireSessionContextOrNull } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { TAB_ICON_BUCKET } from "@/lib/tab-icons";
 
@@ -25,7 +25,7 @@ function resolveExtension(fileName: string, mimeType: string) {
 }
 
 export async function POST(request: Request) {
-	const session = await requireSessionContext().catch(() => null);
+	const session = await requireSessionContextOrNull();
 	if (!session) {
 		return apiError("Unauthorized", 401);
 	}

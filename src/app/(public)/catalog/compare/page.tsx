@@ -83,7 +83,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 		brewIds.length > 0
 			? supabase
 					.from("brew_reviews")
-					.select("brew_id, reviewer_id, acidity, sweetness, body, aroma, balance, overall, updated_at")
+					.select("brew_id, reviewer_id, acidity, sweetness, body, aroma, balance, star_rating, updated_at")
 					.in("brew_id", brewIds)
 			: Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
 		brewIds.length > 0
@@ -98,7 +98,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 
 	const reviewMap = new Map<
 		string,
-		Array<{ acidity: number; sweetness: number; body: number; aroma: number; balance: number }>
+		Array<{ acidity: number; sweetness: number; body: number; aroma: number; balance: number; star_rating: number | null }>
 	>();
 	const myReviewMap = new Map<
 		string,
@@ -107,7 +107,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 			aroma: number;
 			balance: number;
 			body: number;
-			overall: number;
+			star_rating: number | null;
 			sweetness: number;
 			updated_at: string;
 		}
@@ -122,6 +122,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 			body: Number(review.body ?? 0),
 			aroma: Number(review.aroma ?? 0),
 			balance: Number(review.balance ?? 0),
+			star_rating: review.star_rating != null ? Number(review.star_rating) : null,
 		});
 		reviewMap.set(brewId, current);
 
@@ -132,7 +133,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 				body: Number(review.body ?? 0),
 				aroma: Number(review.aroma ?? 0),
 				balance: Number(review.balance ?? 0),
-				overall: Number(review.overall ?? 0),
+				star_rating: review.star_rating != null ? Number(review.star_rating) : null,
 				updated_at: String(review.updated_at ?? ""),
 			});
 		}
@@ -154,8 +155,8 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 	let bestOverall = -1;
 	for (const brew of orderedBrews) {
 		const agg = aggregates.get(brew.id);
-		if (agg && agg.overall > bestOverall && agg.total > 0) {
-			bestOverall = agg.overall;
+		if (agg && agg.star_avg > bestOverall && agg.total > 0) {
+			bestOverall = agg.star_avg;
 			bestOverallId = brew.id;
 		}
 	}
@@ -226,8 +227,8 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 												width="14"
 												height="14"
 												viewBox="0 0 24 24"
-												fill={starIndex < Math.round(agg.overall) ? "var(--crema)" : "none"}
-												stroke={starIndex < Math.round(agg.overall) ? "var(--crema)" : "var(--sand)"}
+								fill={starIndex < Math.round(agg.star_avg) ? "var(--crema)" : "none"}
+											stroke={starIndex < Math.round(agg.star_avg) ? "var(--crema)" : "var(--sand)"}
 												strokeWidth="2"
 												className="shrink-0"
 												aria-hidden="true"
@@ -237,9 +238,9 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 											</svg>
 										))}
 										<span className="ml-1 text-sm font-semibold text-(--espresso)">
-											{agg.total > 0 ? agg.overall.toFixed(1) : "—"}
-										</span>
-										<span className="text-xs text-(--muted)">({agg.total})</span>
+										{agg.total > 0 ? agg.star_avg.toFixed(1) : "—"}
+									</span>
+									<span className="text-xs text-(--muted)">({agg.total})</span>
 									</div>
 									<span className="inline-flex items-center gap-1 text-xs text-(--muted)">
 										<svg
@@ -284,7 +285,7 @@ export default async function CatalogComparePage({ searchParams }: ComparePagePr
 								const agg = getAggregate(brew.id);
 								return (
 									<div key={`overall-${brew.id}`} className="flex flex-col items-center gap-1 p-3">
-										<span className="text-2xl font-bold text-(--espresso)">{agg.total > 0 ? agg.overall.toFixed(1) : "—"}</span>
+										<span className="text-2xl font-bold text-(--espresso)">{agg.total > 0 ? agg.star_avg.toFixed(1) : "—"}</span>
 										<span className="text-xs text-(--muted)">
 											{agg.total > 0 ? `${agg.total} ${m("compare.reviews")}` : m("compare.noReviews")}
 										</span>

@@ -1,6 +1,6 @@
 import { apiError, apiOk } from "@/lib/api";
 import { logAuditEvent } from "@/lib/audit";
-import { requireSessionContext } from "@/lib/auth";
+import { requireSessionContextOrNull } from "@/lib/auth";
 import { revalidatePublicCache } from "@/lib/cache-invalidation";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { applyForumReputation } from "@/lib/forum-reputation";
@@ -9,7 +9,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { moderationSchema } from "@/lib/validators";
 
 export async function POST(request: Request) {
-	const session = await requireSessionContext().catch(() => null);
+	const session = await requireSessionContextOrNull();
 	if (!session) {
 		return apiError("Unauthorized", 401);
 	}

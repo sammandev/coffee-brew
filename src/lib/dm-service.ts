@@ -1,6 +1,5 @@
 import { apiError } from "@/lib/api";
 import { getSessionContext, type SessionContext } from "@/lib/auth";
-import { buildDirectMessageKey } from "@/lib/direct-messages";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function requireActiveDmSession(): Promise<
@@ -47,10 +46,6 @@ export async function canCreateDirectConversation(
 	return Boolean(data);
 }
 
-export function resolveDirectKey(userA: string, userB: string) {
-	return buildDirectMessageKey(userA, userB);
-}
-
 export async function enforceDmRateLimits(
 	supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
 	userId: string,
@@ -84,7 +79,7 @@ export async function refreshConversationLatestMessage(
 	supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
 	conversationId: string,
 ) {
-	const { data: latest } = await supabase
+	const { data: latest, error: selectError } = await supabase
 		.from("dm_messages")
 		.select("id, created_at")
 		.eq("conversation_id", conversationId)
@@ -92,11 +87,20 @@ export async function refreshConversationLatestMessage(
 		.limit(1)
 		.maybeSingle();
 
-	await supabase
+	if (selectError) {
+		console.error("[dm] refreshConversationLatestMessage: failed to fetch latest message:", selectError.message);
+		return;
+	}
+
+	const { error: updateError } = await supabase
 		.from("dm_conversations")
 		.update({
 			last_message_id: latest?.id ?? null,
 			last_message_at: latest?.created_at ?? new Date().toISOString(),
 		})
 		.eq("id", conversationId);
+
+	if (updateError) {
+		console.error("[dm] refreshConversationLatestMessage: failed to update conversation:", updateError.message);
+	}
 }

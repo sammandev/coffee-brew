@@ -59,6 +59,8 @@ async function readErrorPayload(response: Response): Promise<BrevoErrorPayload> 
 }
 
 export class BrevoProvider implements NewsletterProvider {
+	readonly name = "brevo";
+
 	private headers() {
 		if (!serverEnv.BREVO_API_KEY) {
 			throw new Error("BREVO_API_KEY is missing");

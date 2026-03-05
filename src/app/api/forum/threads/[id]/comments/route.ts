@@ -1,5 +1,4 @@
 import { apiError, apiOk } from "@/lib/api";
-import { getSessionContext } from "@/lib/auth";
 import { revalidatePublicCache } from "@/lib/cache-invalidation";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { notifyMentions } from "@/lib/forum-mentions";
@@ -17,13 +16,13 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 
 	const { data, error } = await supabase
 		.from("forum_comments")
-		.select("*")
+		.select("id, thread_id, author_id, content, status, parent_comment_id, created_at, updated_at")
 		.eq("thread_id", id)
 		.eq("status", "visible")
 		.order("created_at", { ascending: true });
 
 	if (error) {
-		return apiError("Could not load comments", 400, error.message);
+		return apiError("Could not load comments", 500, error.message);
 	}
 
 	return apiOk({ comments: data });
@@ -33,10 +32,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 	const { id } = await params;
 	const permission = await requirePermission("forum", "create");
 	if (permission.response) return permission.response;
-	const session = await getSessionContext();
-	if (!session) {
-		return apiError("Unauthorized", 401);
-	}
 
 	const body = await request.json();
 	const turnstileToken: string | null =
@@ -75,7 +70,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 	if (!thread) {
 		return apiError("Thread not found", 404);
 	}
-	const isModerator = session.role === "admin" || session.role === "superuser";
+	const isModerator = permission.context.role === "admin" || permission.context.role === "superuser";
 	if (thread.is_locked && !isModerator) {
 		return apiError("Thread is locked", 403);
 	}
@@ -142,11 +137,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 			parent_comment_id: parentCommentId,
 			status: "visible",
 		})
-		.select("*")
+		.select("id, thread_id, author_id, content, status, parent_comment_id, created_at, updated_at")
 		.single();
 
 	if (error) {
-		return apiError("Could not create comment", 400, error.message);
+		return apiError("Could not create comment", 500, error.message);
 	}
 
 	const { data: actorProfile } = await supabase

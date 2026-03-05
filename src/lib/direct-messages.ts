@@ -10,8 +10,10 @@ export type DmConversationView = "active" | "archived";
 export type DmReportStatus = "open" | "resolved" | "dismissed";
 
 export function buildDirectMessageKey(userA: string, userB: string) {
-	if (userA === userB) return userA;
-	return userA < userB ? `${userA}:${userB}` : `${userB}:${userA}`;
+	// Always produce a colon-delimited key so the result can never collide with a
+	// bare user ID. Callers must still prevent self-to-self conversations at the
+	// application level; this function only guarantees a stable, unambiguous key.
+	return userA <= userB ? `${userA}:${userB}` : `${userB}:${userA}`;
 }
 
 export function sanitizeDmBody(value: string) {

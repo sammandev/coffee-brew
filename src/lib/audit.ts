@@ -9,13 +9,17 @@ export async function logAuditEvent(params: {
 }) {
 	const supabase = await createSupabaseServerClient();
 
-	await supabase.from("audit_logs").insert({
+	const { error } = await supabase.from("audit_logs").insert({
 		actor_id: params.actorId,
 		action: params.action,
 		target_type: params.targetType,
 		target_id: params.targetId,
 		metadata: params.metadata ?? {},
 	});
+
+	if (error) {
+		console.error("[audit] Failed to write audit log:", error.message, { action: params.action });
+	}
 }
 
 export async function logTransactionalEmailEvent(params: {
@@ -28,7 +32,7 @@ export async function logTransactionalEmailEvent(params: {
 }) {
 	const supabase = await createSupabaseServerClient();
 
-	await supabase.from("transactional_email_events").insert({
+	const { error } = await supabase.from("transactional_email_events").insert({
 		to_email: params.toEmail,
 		event_type: params.eventType,
 		payload: params.payload,
@@ -36,4 +40,10 @@ export async function logTransactionalEmailEvent(params: {
 		delivery_status: params.status,
 		failure_reason: params.failureReason ?? null,
 	});
+
+	if (error) {
+		console.error("[audit] Failed to write transactional email event:", error.message, {
+			eventType: params.eventType,
+		});
+	}
 }

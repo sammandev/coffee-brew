@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { consumeEdgeRateLimit } from "@/lib/rate-limit";
 import { emitRateLimitConsoleLog } from "@/lib/rate-limit-audit";
 import { getRequestIp } from "@/lib/request-ip";
@@ -28,28 +29,29 @@ const EDGE_RATE_LIMIT_RULES_BY_KEY = new Map<string, EdgeRateLimitRule>(
 	EDGE_RATE_LIMIT_RULES.map((rule) => [`${rule.method}:${rule.path}`, rule]),
 );
 
+/** Coerce APP_MAINTENANCE_MODE env var ("true"/"1"/true) to boolean. Defaults to false. */
+const isMaintenanceMode = z.coerce.boolean().default(false).parse(process.env.APP_MAINTENANCE_MODE);
+
 function hasSupabaseAuthCookies(request: NextRequest) {
 	return request.cookies.getAll().some(({ name }) => name.startsWith("sb-") && name.includes("-auth-token"));
 }
 
-function isMaintenanceBypassPath(pathname: string) {
-	if (pathname === "/503") return true;
-	if (pathname.startsWith("/_next")) return true;
-	if (pathname.startsWith("/api")) return true;
-	if (pathname.startsWith("/health")) return true;
-	if (pathname.startsWith("/status")) return true;
-	if (pathname === "/favicon.ico") return true;
-	if (pathname === "/robots.txt") return true;
-	if (pathname === "/sitemap.xml") return true;
-	return PUBLIC_FILE_PATTERN.test(pathname);
-}
-
+/** Paths that are always served regardless of maintenance mode or rate limiting. */
 function isStaticPath(pathname: string) {
 	if (pathname.startsWith("/_next")) return true;
 	if (pathname === "/favicon.ico") return true;
 	if (pathname === "/robots.txt") return true;
 	if (pathname === "/sitemap.xml") return true;
 	return PUBLIC_FILE_PATTERN.test(pathname);
+}
+
+function isMaintenanceBypassPath(pathname: string) {
+	if (isStaticPath(pathname)) return true;
+	if (pathname === "/503") return true;
+	if (pathname.startsWith("/api")) return true;
+	if (pathname.startsWith("/health")) return true;
+	if (pathname.startsWith("/status")) return true;
+	return false;
 }
 
 export async function proxy(request: NextRequest) {
@@ -91,7 +93,7 @@ export async function proxy(request: NextRequest) {
 		}
 	}
 
-	if (process.env.APP_MAINTENANCE_MODE === "true") {
+	if (isMaintenanceMode) {
 		if (!isMaintenanceBypassPath(pathname)) {
 			const redirectUrl = request.nextUrl.clone();
 			redirectUrl.pathname = "/503";

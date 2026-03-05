@@ -3,18 +3,13 @@ import { unstable_cache } from "next/cache";
 import { sortCatalogRows } from "@/lib/brew-catalog";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { clientEnv } from "@/lib/config/client";
-import { FORUM_REACTION_TYPES, type ForumReactionType } from "@/lib/constants";
+import type { ForumReactionType } from "@/lib/constants";
+import { buildReactionCountMap } from "@/lib/forum";
 import { aggregateRatings } from "@/lib/rating";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isMissingColumnError } from "@/lib/supabase-errors";
 
-const BREW_OPTIONAL_COLUMNS = [
-	"image_url",
-	"image_alt",
-	"tags",
-	"bean_process",
-	"recommended_methods",
-] as const;
+const BREW_OPTIONAL_COLUMNS = ["image_url", "image_alt", "tags", "bean_process", "recommended_methods"] as const;
 
 function createSupabasePublicClient() {
 	return createClient(clientEnv.NEXT_PUBLIC_SUPABASE_URL, clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
@@ -160,25 +155,28 @@ const getHomeShowcaseCached = unstable_cache(
 	async (limitFeaturedBrews: number, limitTopRatedBrews: number) => {
 		const supabase = createSupabasePublicClient();
 
-		const { data: brewRows, error: brewError } = await supabase
+		const BREW_SELECT =
+			"id, name, brew_method, bean_process, brand_roastery, coffee_beans, brewer_name, image_url, image_alt, recommended_methods, tags, created_at";
+		const BREW_SELECT_COMPAT = "id, name, brew_method, brand_roastery, coffee_beans, brewer_name, created_at";
+
+		// Fetch newest brews for the featured section — no rating needed, small limit.
+		const { data: newestRows, error: newestError } = await supabase
 			.from("brews")
-			.select(
-				"id, name, brew_method, bean_process, brand_roastery, coffee_beans, brewer_name, image_url, image_alt, recommended_methods, tags, created_at",
-			)
+			.select(BREW_SELECT)
 			.eq("status", "published")
 			.order("created_at", { ascending: false })
-			.limit(220);
-		let brews = brewRows ?? [];
+			.limit(limitFeaturedBrews);
+		let featuredRows = newestRows ?? [];
 
-		if (brewError && isMissingColumnError(brewError, [...BREW_OPTIONAL_COLUMNS])) {
+		if (newestError && isMissingColumnError(newestError, [...BREW_OPTIONAL_COLUMNS])) {
 			console.warn("[queries:getHomeShowcase] optional brew columns missing; retrying with compatibility query");
 			const fallback = await supabase
 				.from("brews")
-				.select("id, name, brew_method, brand_roastery, coffee_beans, brewer_name, created_at")
+				.select(BREW_SELECT_COMPAT)
 				.eq("status", "published")
 				.order("created_at", { ascending: false })
-				.limit(220);
-			brews = (fallback.data ?? []).map((brew) => ({
+				.limit(limitFeaturedBrews);
+			featuredRows = (fallback.data ?? []).map((brew) => ({
 				...brew,
 				image_url: null,
 				image_alt: null,
@@ -188,31 +186,70 @@ const getHomeShowcaseCached = unstable_cache(
 			}));
 		}
 
-		const brewIds = brews.map((brew) => brew.id);
-		const { data: reviewAggregates } =
-			brewIds.length > 0
-				? await supabase.from("brew_reviews").select("brew_id, overall").in("brew_id", brewIds)
-				: { data: [] as Array<{ brew_id: string; overall: number }> };
+		// For top-rated we need review aggregates. Fetch a reasonable candidate pool
+		// (60 most recently published brews) instead of 220.
+		const CANDIDATE_POOL = Math.max(60, limitTopRatedBrews * 10);
+		const { data: candidateRows, error: candidateError } = await supabase
+			.from("brews")
+			.select(BREW_SELECT)
+			.eq("status", "published")
+			.order("created_at", { ascending: false })
+			.limit(CANDIDATE_POOL);
+		let candidates = candidateRows ?? [];
 
-		const aggregateMap = new Map<string, { total: number; score: number }>();
+		if (candidateError && isMissingColumnError(candidateError, [...BREW_OPTIONAL_COLUMNS])) {
+			const fallback = await supabase
+				.from("brews")
+				.select(BREW_SELECT_COMPAT)
+				.eq("status", "published")
+				.order("created_at", { ascending: false })
+				.limit(CANDIDATE_POOL);
+			candidates = (fallback.data ?? []).map((brew) => ({
+				...brew,
+				image_url: null,
+				image_alt: null,
+				bean_process: null,
+				recommended_methods: [],
+				tags: [],
+			}));
+		}
+
+		const candidateIds = candidates.map((brew) => brew.id);
+		const { data: reviewAggregates } =
+			candidateIds.length > 0
+				? await supabase.from("brew_reviews").select("brew_id, star_rating").in("brew_id", candidateIds)
+				: { data: [] as Array<{ brew_id: string; star_rating: number | null }> };
+
+		const aggregateMap = new Map<string, { total: number; starSum: number; starCount: number }>();
 		for (const row of reviewAggregates ?? []) {
-			const existing = aggregateMap.get(row.brew_id) ?? { total: 0, score: 0 };
+			const existing = aggregateMap.get(row.brew_id) ?? { total: 0, starSum: 0, starCount: 0 };
 			existing.total += 1;
-			existing.score += Number(row.overall);
+			if (row.star_rating != null) {
+				existing.starSum += Number(row.star_rating);
+				existing.starCount += 1;
+			}
 			aggregateMap.set(row.brew_id, existing);
 		}
 
-		const preparedBrews = brews.map((brew) => {
+		const preparedCandidates = candidates.map((brew) => {
 			const aggregate = aggregateMap.get(brew.id);
 			return {
 				...brew,
 				review_total: aggregate?.total ?? 0,
-				rating_avg: aggregate && aggregate.total > 0 ? aggregate.score / aggregate.total : 0,
+				rating_avg: aggregate && aggregate.starCount > 0 ? aggregate.starSum / aggregate.starCount : 0,
 			};
 		});
 
-		const featuredBrews = sortCatalogRows(preparedBrews, "newest").slice(0, limitFeaturedBrews);
-		const topRatedBrews = sortCatalogRows(preparedBrews, "highest_stars").slice(0, limitTopRatedBrews);
+		const featuredBrews = featuredRows.map((brew) => {
+			const aggregate = aggregateMap.get(brew.id);
+			return {
+				...brew,
+				review_total: aggregate?.total ?? 0,
+				rating_avg: aggregate && aggregate.starCount > 0 ? aggregate.starSum / aggregate.starCount : 0,
+			};
+		});
+
+		const topRatedBrews = sortCatalogRows(preparedCandidates, "highest_stars").slice(0, limitTopRatedBrews);
 
 		return {
 			featuredBrews,
@@ -232,7 +269,7 @@ const getForumThreadsCached = unstable_cache(
 		const supabase = createSupabasePublicClient();
 		const { data } = await supabase
 			.from("forum_threads")
-			.select("id, title, content, tags, author_id, created_at, updated_at")
+			.select("id, title, tags, author_id, created_at, updated_at")
 			.eq("status", "visible")
 			.order("updated_at", { ascending: false })
 			.limit(limit);
@@ -246,14 +283,17 @@ export async function getForumThreads(limit = 50) {
 	return getForumThreadsCached(limit);
 }
 
+const BREW_COLUMNS =
+	"id, owner_id, name, brew_method, bean_process, coffee_beans, brand_roastery, water_type, water_ppm, temperature, temperature_unit, grind_size, grind_clicks, brew_time_seconds, brewer_name, notes, status, image_url, image_alt, tags, recommended_methods, grind_reference_image_url, grind_reference_image_alt, created_at, updated_at";
+
 const getPublishedBrewDetailCached = unstable_cache(
 	async (id: string) => {
 		const supabase = createSupabasePublicClient();
 		const [{ data: brew }, { data: reviews }] = await Promise.all([
-			supabase.from("brews").select("*").eq("id", id).eq("status", "published").maybeSingle(),
+			supabase.from("brews").select(BREW_COLUMNS).eq("id", id).eq("status", "published").maybeSingle(),
 			supabase
 				.from("brew_reviews")
-				.select("acidity, sweetness, body, aroma, balance, notes, reviewer_id, updated_at")
+				.select("acidity, sweetness, body, aroma, balance, star_rating, notes, reviewer_id, updated_at")
 				.eq("brew_id", id),
 		]);
 
@@ -274,10 +314,10 @@ export async function getBrewDetail(id: string, options?: { includeUnpublished?:
 
 	const supabase = await createSupabaseServerClient();
 	const [{ data: brew }, { data: reviews }] = await Promise.all([
-		supabase.from("brews").select("*").eq("id", id).maybeSingle(),
+		supabase.from("brews").select(BREW_COLUMNS).eq("id", id).maybeSingle(),
 		supabase
 			.from("brew_reviews")
-			.select("acidity, sweetness, body, aroma, balance, notes, reviewer_id, updated_at")
+			.select("acidity, sweetness, body, aroma, balance, star_rating, notes, reviewer_id, updated_at")
 			.eq("brew_id", id),
 	]);
 
@@ -299,21 +339,6 @@ async function getProfileNameMap(profileIds: string[]) {
 	return new Map(
 		(data ?? []).map((profile) => [profile.id, profile.display_name || profile.mention_handle || "Unknown author"]),
 	);
-}
-
-function buildReactionCountMap(
-	rows: Array<{ post_id: string; reaction: ForumReactionType }> | Array<{ reaction: ForumReactionType }>,
-) {
-	const counts = Object.fromEntries(FORUM_REACTION_TYPES.map((reactionType) => [reactionType, 0])) as Record<
-		ForumReactionType,
-		number
-	>;
-	for (const row of rows) {
-		if (!FORUM_REACTION_TYPES.includes(row.reaction as ForumReactionType)) continue;
-		const reactionType = row.reaction as ForumReactionType;
-		counts[reactionType] = (counts[reactionType] ?? 0) + 1;
-	}
-	return counts;
 }
 
 export async function getPublishedBlogPosts(limit = 24) {
@@ -374,7 +399,9 @@ const getPublishedBlogPostBySlugCached = unstable_cache(
 		const supabase = createSupabasePublicClient();
 		const { data, error } = await supabase
 			.from("blog_posts")
-			.select("*")
+			.select(
+				"id, slug, title_en, title_id, excerpt_en, excerpt_id, body_en, body_id, hero_image_url, hero_image_alt_en, hero_image_alt_id, tags, reading_time_minutes, status, author_id, editor_id, published_at, created_at, updated_at",
+			)
 			.eq("slug", slug)
 			.eq("status", "published")
 			.maybeSingle();
@@ -416,14 +443,17 @@ const getCatalogBrewsCached = unstable_cache(
 		const brewIds = brews.map((brew) => brew.id);
 		const { data: reviewRows } =
 			brewIds.length > 0
-				? await supabase.from("brew_reviews").select("brew_id, overall").in("brew_id", brewIds)
-				: { data: [] as Array<{ brew_id: string; overall: number }> };
+				? await supabase.from("brew_reviews").select("brew_id, star_rating").in("brew_id", brewIds)
+				: { data: [] as Array<{ brew_id: string; star_rating: number | null }> };
 
-		const aggregateMap = new Map<string, { count: number; score: number }>();
+		const aggregateMap = new Map<string, { count: number; starSum: number; starCount: number }>();
 		for (const reviewRow of reviewRows ?? []) {
-			const aggregate = aggregateMap.get(reviewRow.brew_id) ?? { count: 0, score: 0 };
+			const aggregate = aggregateMap.get(reviewRow.brew_id) ?? { count: 0, starSum: 0, starCount: 0 };
 			aggregate.count += 1;
-			aggregate.score += Number(reviewRow.overall);
+			if (reviewRow.star_rating != null) {
+				aggregate.starSum += Number(reviewRow.star_rating);
+				aggregate.starCount += 1;
+			}
 			aggregateMap.set(reviewRow.brew_id, aggregate);
 		}
 
@@ -439,7 +469,7 @@ const getCatalogBrewsCached = unstable_cache(
 		return brews.map((brew) => {
 			const aggregate = aggregateMap.get(brew.id);
 			const reviewTotal = aggregate?.count ?? 0;
-			const ratingAverage = reviewTotal > 0 ? (aggregate?.score ?? 0) / reviewTotal : 0;
+			const ratingAverage = aggregate && aggregate.starCount > 0 ? aggregate.starSum / aggregate.starCount : 0;
 			return {
 				...brew,
 				rating_avg: ratingAverage,
@@ -449,46 +479,63 @@ const getCatalogBrewsCached = unstable_cache(
 		});
 	},
 	["queries", "catalog-brews"],
-	{ revalidate: 60, tags: [CACHE_TAGS.BREWS, CACHE_TAGS.BREW_DETAIL] },
+	{ revalidate: CACHE_WINDOW_SECONDS, tags: [CACHE_TAGS.BREWS, CACHE_TAGS.BREW_DETAIL] },
 );
 
 export async function getCatalogBrews(limit = 160) {
 	return getCatalogBrewsCached(limit);
 }
 
+const getAdminBlogPostsCached = unstable_cache(
+	async (limit: number) => {
+		// Use the public (anon-key) client so the result can be shared across admin
+		// sessions. Access control is enforced at the route/guard layer before this
+		// function is called; all published/draft/hidden posts are returned.
+		const supabase = createSupabasePublicClient();
+		const { data, error } = await supabase
+			.from("blog_posts")
+			.select(
+				"id, slug, title_en, title_id, status, tags, reading_time_minutes, published_at, updated_at, author_id, editor_id",
+			)
+			.order("updated_at", { ascending: false })
+			.limit(limit);
+
+		if (error || !data) {
+			return [];
+		}
+
+		const profileIds = Array.from(
+			new Set(
+				data
+					.flatMap((post) => [post.author_id, post.editor_id])
+					.filter((id): id is string => typeof id === "string" && id.length > 0),
+			),
+		);
+		const nameMap = await getProfileNameMap(profileIds);
+
+		return data.map((post) => ({
+			...post,
+			author_name: post.author_id ? (nameMap.get(post.author_id) ?? "Unknown author") : "System",
+			editor_name: post.editor_id ? (nameMap.get(post.editor_id) ?? "Unknown editor") : null,
+		}));
+	},
+	["queries", "admin-blog-posts"],
+	{ revalidate: 30, tags: [CACHE_TAGS.BLOG] },
+);
+
 export async function getAdminBlogPosts(limit = 120) {
-	const supabase = await createSupabaseServerClient();
-	const { data, error } = await supabase
-		.from("blog_posts")
-		.select(
-			"id, slug, title_en, title_id, status, tags, reading_time_minutes, published_at, updated_at, author_id, editor_id",
-		)
-		.order("updated_at", { ascending: false })
-		.limit(limit);
-
-	if (error || !data) {
-		return [];
-	}
-
-	const profileIds = Array.from(
-		new Set(
-			data
-				.flatMap((post) => [post.author_id, post.editor_id])
-				.filter((id): id is string => typeof id === "string" && id.length > 0),
-		),
-	);
-	const nameMap = await getProfileNameMap(profileIds);
-
-	return data.map((post) => ({
-		...post,
-		author_name: post.author_id ? (nameMap.get(post.author_id) ?? "Unknown author") : "System",
-		editor_name: post.editor_id ? (nameMap.get(post.editor_id) ?? "Unknown editor") : null,
-	}));
+	return getAdminBlogPostsCached(limit);
 }
 
 export async function getAdminBlogPostById(id: string) {
 	const supabase = await createSupabaseServerClient();
-	const { data, error } = await supabase.from("blog_posts").select("*").eq("id", id).maybeSingle();
+	const { data, error } = await supabase
+		.from("blog_posts")
+		.select(
+			"id, slug, title_en, title_id, excerpt_en, excerpt_id, body_en, body_id, hero_image_url, hero_image_alt_en, hero_image_alt_id, tags, reading_time_minutes, status, author_id, editor_id, published_at, created_at, updated_at",
+		)
+		.eq("id", id)
+		.maybeSingle();
 
 	if (error || !data) {
 		return null;

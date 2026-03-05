@@ -427,7 +427,7 @@ export default async function ThreadDetailPage({ params, searchParams }: ThreadD
 										threadId={threadId}
 										parentCommentId={comment.id}
 										currentUserId={session.userId}
-										authorName={session.email}
+										authorName={session.email ?? undefined}
 										hideLabel={t("forum.hideReply")}
 										placeholder={t("forum.writeReply")}
 										submitLabel={t("forum.replyToComment")}

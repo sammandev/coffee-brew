@@ -91,7 +91,7 @@ export async function DELETE(request: Request) {
 		return apiError("Invalid payload", 400, parsed.error.message);
 	}
 
-	if (parsed.data.confirmEmail.toLowerCase() !== session.email.toLowerCase()) {
+	if (parsed.data.confirmEmail.toLowerCase() !== (session.email ?? "").toLowerCase()) {
 		return apiError("Email confirmation does not match", 400);
 	}
 

@@ -33,7 +33,7 @@ export async function GET(request: Request) {
 		orderedBrews.length > 0
 			? await supabase
 					.from("brew_reviews")
-					.select("brew_id, reviewer_id, acidity, sweetness, body, aroma, balance, overall, notes, updated_at")
+					.select("brew_id, reviewer_id, acidity, sweetness, body, aroma, balance, star_rating, notes, updated_at")
 					.in(
 						"brew_id",
 						orderedBrews.map((row) => row.id),
@@ -46,7 +46,14 @@ export async function GET(request: Request) {
 
 	const reviewsByBrew = new Map<
 		string,
-		Array<{ acidity: number; sweetness: number; body: number; aroma: number; balance: number }>
+		Array<{
+			acidity: number;
+			sweetness: number;
+			body: number;
+			aroma: number;
+			balance: number;
+			star_rating: number | null;
+		}>
 	>();
 	const myReviewByBrew = new Map<
 		string,
@@ -56,7 +63,7 @@ export async function GET(request: Request) {
 			body: number;
 			aroma: number;
 			balance: number;
-			overall: number;
+			star_rating: number | null;
 			updated_at: string;
 		}
 	>();
@@ -71,6 +78,7 @@ export async function GET(request: Request) {
 			body: Number(row.body ?? 0),
 			aroma: Number(row.aroma ?? 0),
 			balance: Number(row.balance ?? 0),
+			star_rating: row.star_rating != null ? Number(row.star_rating) : null,
 		});
 		reviewsByBrew.set(brewId, list);
 
@@ -81,7 +89,7 @@ export async function GET(request: Request) {
 				body: Number(row.body ?? 0),
 				aroma: Number(row.aroma ?? 0),
 				balance: Number(row.balance ?? 0),
-				overall: Number(row.overall ?? 0),
+				star_rating: row.star_rating != null ? Number(row.star_rating) : null,
 				updated_at: String(row.updated_at ?? ""),
 			});
 		}

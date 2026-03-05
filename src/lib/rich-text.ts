@@ -84,6 +84,9 @@ function sanitizeRichHtml(value: string) {
 	});
 }
 
+// YouTube video IDs are exactly 11 characters: alphanumeric, hyphen, or underscore.
+const YOUTUBE_VIDEO_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
+
 function toYouTubeEmbedUrl(rawUrl: string) {
 	try {
 		const url = new URL(rawUrl);
@@ -91,17 +94,18 @@ function toYouTubeEmbedUrl(rawUrl: string) {
 
 		if (url.hostname === "youtu.be") {
 			const id = url.pathname.replaceAll("/", "").trim();
-			if (!id) return null;
+			if (!id || !YOUTUBE_VIDEO_ID_PATTERN.test(id)) return null;
 			return `https://www.youtube-nocookie.com/embed/${id}`;
 		}
 
 		if (url.pathname.startsWith("/embed/")) {
 			const id = url.pathname.split("/").filter(Boolean).at(-1);
-			return id ? `https://www.youtube-nocookie.com/embed/${id}` : null;
+			if (!id || !YOUTUBE_VIDEO_ID_PATTERN.test(id)) return null;
+			return `https://www.youtube-nocookie.com/embed/${id}`;
 		}
 
 		const id = url.searchParams.get("v");
-		if (!id) return null;
+		if (!id || !YOUTUBE_VIDEO_ID_PATTERN.test(id)) return null;
 		return `https://www.youtube-nocookie.com/embed/${id}`;
 	} catch {
 		return null;
@@ -142,33 +146,47 @@ export function toPlainText(value: string | null | undefined) {
 	return stripped.replace(/\s+/g, " ").trim();
 }
 
-export function sanitizeForStorage(value: string | null | undefined) {
-	if (!value) return "";
+/**
+ * Shared entry point for both storage and render pipelines.
+ * Returns `null` if the input is empty/whitespace so callers can short-circuit.
+ * Returns `{ trimmed, isHtml }` otherwise.
+ */
+function prepareInput(value: string | null | undefined): { trimmed: string; isHtml: boolean } | null {
+	if (!value) return null;
 	const trimmed = value.trim();
-	if (!trimmed) return "";
+	if (!trimmed) return null;
+	return { trimmed, isHtml: HAS_HTML_TAG_PATTERN.test(trimmed) };
+}
 
-	if (!HAS_HTML_TAG_PATTERN.test(trimmed)) {
-		const normalized = normalizeParagraphsFromText(trimmed);
+export function sanitizeForStorage(value: string | null | undefined) {
+	const prepared = prepareInput(value);
+	if (!prepared) return "";
+
+	if (!prepared.isHtml) {
+		const normalized = normalizeParagraphsFromText(prepared.trimmed);
 		return toPlainText(normalized).length === 0 ? "" : normalized;
 	}
 
-	const sanitized = sanitizeRichHtml(trimmed);
+	const sanitized = sanitizeRichHtml(prepared.trimmed);
 	return toPlainText(sanitized).length === 0 ? "" : sanitized;
 }
 
 export function sanitizeForRender(value: string | null | undefined) {
-	if (!value) return "";
-	const trimmed = value.trim();
-	if (!trimmed) return "";
+	const prepared = prepareInput(value);
+	if (!prepared) return "";
 
-	if (!HAS_HTML_TAG_PATTERN.test(trimmed)) {
-		const normalized = normalizeParagraphsFromText(trimmed);
+	if (!prepared.isHtml) {
+		const normalized = normalizeParagraphsFromText(prepared.trimmed);
 		return toPlainText(normalized).length === 0 ? "" : normalized;
 	}
 
-	const withEmbeds = enhanceEmbeds(trimmed);
-	const sanitized = sanitizeRichHtml(withEmbeds);
-	return toPlainText(sanitized).length === 0 ? "" : sanitized;
+	// Sanitize first so enhanceEmbeds only sees safe, allowlisted content.
+	// A second sanitization pass cleans the HTML that enhanceEmbeds generates
+	// (iframes, blockquotes) before it reaches the DOM.
+	const sanitized = sanitizeRichHtml(prepared.trimmed);
+	const withEmbeds = enhanceEmbeds(sanitized);
+	const finalSanitized = sanitizeRichHtml(withEmbeds);
+	return toPlainText(finalSanitized).length === 0 ? "" : finalSanitized;
 }
 
 export function clampPlainText(value: string | null | undefined, length: number) {

@@ -7,11 +7,12 @@ export function toOverallScore(review: ReviewInput) {
 }
 
 export function aggregateRatings(
-	reviews: Array<Pick<ReviewInput, "acidity" | "sweetness" | "body" | "aroma" | "balance">>,
+	reviews: Array<Pick<ReviewInput, "acidity" | "sweetness" | "body" | "aroma" | "balance" | "star_rating">>,
 ): RatingAggregate {
 	if (reviews.length === 0) {
 		return {
-			overall: 0,
+			flavor_avg: 0,
+			star_avg: 0,
 			acidity: 0,
 			sweetness: 0,
 			body: 0,
@@ -27,8 +28,12 @@ export function aggregateRatings(
 	const aroma = Number(average(reviews.map((review) => review.aroma)).toFixed(2));
 	const balance = Number(average(reviews.map((review) => review.balance)).toFixed(2));
 
+	const starValues = reviews.map((r) => r.star_rating).filter((v): v is number => v != null);
+	const star_avg = starValues.length > 0 ? Number(average(starValues).toFixed(2)) : 0;
+
 	return {
-		overall: Number(average([acidity, sweetness, body, aroma, balance]).toFixed(2)),
+		flavor_avg: Number(average([acidity, sweetness, body, aroma, balance]).toFixed(2)),
+		star_avg,
 		acidity,
 		sweetness,
 		body,

@@ -1,9 +1,9 @@
 import { apiError, apiOk } from "@/lib/api";
-import { requireSessionContext } from "@/lib/auth";
+import { requireSessionContextOrNull } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-	const session = await requireSessionContext().catch(() => null);
+	const session = await requireSessionContextOrNull();
 	if (!session) {
 		return apiError("Unauthorized", 401);
 	}

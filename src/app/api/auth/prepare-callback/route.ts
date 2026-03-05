@@ -4,6 +4,7 @@ import {
 	AUTH_CALLBACK_NONCE_TTL_SECONDS,
 	isAuthPrepareFlow,
 	normalizeAuthCallbackNextPath,
+	ONE_TAP_NONCE_TTL_SECONDS,
 } from "@/lib/auth-callback";
 import { consumeDbRateLimit } from "@/lib/rate-limit";
 import { persistRateLimitAuditLog } from "@/lib/rate-limit-audit";
@@ -12,7 +13,7 @@ import { getRequestIp } from "@/lib/request-ip";
 export async function POST(request: Request) {
 	const { origin } = new URL(request.url);
 	const requestOrigin = request.headers.get("origin");
-	if (requestOrigin && requestOrigin !== origin) {
+	if (!requestOrigin || requestOrigin !== origin) {
 		return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
 	}
 
@@ -54,7 +55,19 @@ export async function POST(request: Request) {
 	const nonce = crypto.randomUUID();
 
 	if (flow === "one_tap") {
-		return NextResponse.json({ oneTapNonce: nonce, next: safePath, flow });
+		// The nonce is returned in the JSON body for the Google One Tap SDK to use.
+		// It must also be stored in a cookie so the callback route can verify it.
+		const response = NextResponse.json({ oneTapNonce: nonce, next: safePath, flow });
+		response.cookies.set({
+			name: AUTH_CALLBACK_NONCE_COOKIE,
+			value: nonce,
+			httpOnly: true,
+			secure: true,
+			sameSite: "lax",
+			path: "/api/auth/callback",
+			maxAge: ONE_TAP_NONCE_TTL_SECONDS,
+		});
+		return response;
 	}
 
 	const callbackUrl = `${origin}/api/auth/callback?next=${encodeURIComponent(safePath)}&cb_nonce=${encodeURIComponent(nonce)}`;
@@ -64,7 +77,7 @@ export async function POST(request: Request) {
 		name: AUTH_CALLBACK_NONCE_COOKIE,
 		value: nonce,
 		httpOnly: true,
-		secure: process.env.NODE_ENV === "production",
+		secure: true,
 		sameSite: "lax",
 		path: "/api/auth/callback",
 		maxAge: AUTH_CALLBACK_NONCE_TTL_SECONDS,

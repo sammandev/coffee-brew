@@ -1,10 +1,10 @@
 import { apiError, apiOk } from "@/lib/api";
-import { requireSessionContext } from "@/lib/auth";
+import { requireSessionContextOrNull } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { superuserCreateUserSchema } from "@/lib/validators";
 
 export async function POST(request: Request) {
-	const session = await requireSessionContext().catch(() => null);
+	const session = await requireSessionContextOrNull();
 	if (!session) {
 		return apiError("Unauthorized", 401);
 	}
@@ -46,6 +46,7 @@ export async function POST(request: Request) {
 	);
 
 	if (profileError) {
+		await admin.auth.admin.deleteUser(createResult.user.id);
 		return apiError("Could not create profile", 400, profileError.message);
 	}
 
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
 	});
 
 	if (roleError) {
+		await admin.auth.admin.deleteUser(createResult.user.id);
 		return apiError("Could not assign role", 400, roleError.message);
 	}
 

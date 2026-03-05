@@ -10,7 +10,7 @@ export async function GET() {
 	const supabase = await createSupabaseServerClient();
 	const { data: reviewRows, error: reviewError } = await supabase
 		.from("brew_reviews")
-		.select("brew_id, overall, updated_at")
+		.select("brew_id, star_rating, updated_at")
 		.eq("reviewer_id", session.userId)
 		.order("updated_at", { ascending: false })
 		.limit(200);
@@ -38,7 +38,7 @@ export async function GET() {
 			if (!brew) return null;
 			return {
 				brew,
-				my_overall: Number(review.overall),
+				my_overall: review.star_rating != null ? Number(review.star_rating) : null,
 				last_brewed_at: review.updated_at,
 			};
 		})

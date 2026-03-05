@@ -1,10 +1,10 @@
 import { apiError, apiOk } from "@/lib/api";
-import { requireSessionContext } from "@/lib/auth";
+import { requireSessionContextOrNull } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { forumDraftSchema } from "@/lib/validators";
 
 export async function GET(request: Request) {
-	const session = await requireSessionContext().catch(() => null);
+	const session = await requireSessionContextOrNull();
 	if (!session) {
 		return apiError("Unauthorized", 401);
 	}
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-	const session = await requireSessionContext().catch(() => null);
+	const session = await requireSessionContextOrNull();
 	if (!session) {
 		return apiError("Unauthorized", 401);
 	}

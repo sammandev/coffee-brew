@@ -33,6 +33,11 @@ export async function requireRole(options: RequireRoleOptions = {}) {
 		forbidden();
 	}
 
+	// Passing both exactRole and minRole simultaneously is a caller error — exactRole takes precedence.
+	if (options.exactRole && options.minRole) {
+		console.warn("[requireRole] exactRole and minRole were both supplied; exactRole takes precedence.");
+	}
+
 	if (options.exactRole && context.role !== options.exactRole) {
 		handleUnauthorized(options);
 	}
@@ -50,6 +55,10 @@ export async function requireRole(options: RequireRoleOptions = {}) {
 	if (options.minRole === "superuser" && context.role !== "superuser") {
 		handleUnauthorized(options);
 	}
+
+	// minRole: "user" is the baseline authenticated role and is always satisfied at this point.
+	// It is documented here intentionally — passing minRole: "user" is a no-op beyond requiring
+	// the user to be authenticated (which is enforced above by the !context check).
 
 	return context;
 }

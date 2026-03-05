@@ -9,13 +9,7 @@ import { isMissingColumnError } from "@/lib/supabase-errors";
 import type { Role } from "@/lib/types";
 import { brewSchema } from "@/lib/validators";
 
-const BREW_OPTIONAL_COLUMNS = [
-	"image_url",
-	"image_alt",
-	"tags",
-	"bean_process",
-	"recommended_methods",
-] as const;
+const BREW_OPTIONAL_COLUMNS = ["image_url", "image_alt", "tags", "bean_process", "recommended_methods"] as const;
 
 type BrewRecord = Record<string, unknown>;
 
@@ -47,6 +41,9 @@ function normalizeTags(raw: unknown) {
 	return normalized.slice(0, 10);
 }
 
+const BREW_COLUMNS =
+	"id, owner_id, name, brew_method, bean_process, coffee_beans, brand_roastery, water_type, water_ppm, temperature, temperature_unit, grind_size, grind_clicks, brew_time_seconds, brewer_name, notes, status, image_url, image_alt, tags, recommended_methods, grind_reference_image_url, grind_reference_image_alt, created_at, updated_at";
+
 async function updateAndLoadBrew(
 	supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
 	id: string,
@@ -58,7 +55,7 @@ async function updateAndLoadBrew(
 		return { brew: null as BrewRecord | null, error: updateResult.error };
 	}
 
-	const refreshed = await supabase.from("brews").select("*").eq("id", id).maybeSingle();
+	const refreshed = await supabase.from("brews").select(BREW_COLUMNS).eq("id", id).maybeSingle();
 	if (refreshed.error) {
 		return {
 			brew: {
@@ -85,7 +82,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 	const supabase = await createSupabaseServerClient();
 	const session = await getSessionContext();
 
-	const { data: brew, error } = await supabase.from("brews").select("*").eq("id", id).maybeSingle();
+	const { data: brew, error } = await supabase.from("brews").select(BREW_COLUMNS).eq("id", id).maybeSingle();
 
 	if (error || !brew) {
 		return apiError("Brew not found", 404);
@@ -122,7 +119,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 	}
 	const payload = body as Record<string, unknown>;
 
-	const { data: current } = await supabase.from("brews").select("*").eq("id", id).maybeSingle();
+	const { data: current } = await supabase.from("brews").select(BREW_COLUMNS).eq("id", id).maybeSingle();
 
 	if (!current) {
 		return apiError("Brew not found", 404);
@@ -242,7 +239,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 	}
 
 	if (error) {
-		return apiError("Could not update brew", 400, error.message);
+		return apiError("Could not update brew", 500, error.message);
 	}
 
 	if (imageColumnsApplied) {
@@ -269,7 +266,7 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 		return apiError("Unauthorized", 401);
 	}
 
-	const { data: current } = await supabase.from("brews").select("*").eq("id", id).maybeSingle();
+	const { data: current } = await supabase.from("brews").select(BREW_COLUMNS).eq("id", id).maybeSingle();
 
 	if (!current) {
 		return apiError("Brew not found", 404);
@@ -295,12 +292,12 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
 	const { error } = await supabase.from("brews").delete().eq("id", id);
 
 	if (error) {
-		return apiError("Could not delete brew", 400, error.message);
+		return apiError("Could not delete brew", 500, error.message);
 	}
 
-	const removedPaths = [
-		toManagedBrewImagePath(typeof current.image_url === "string" ? current.image_url : null),
-	].filter((value): value is string => Boolean(value));
+	const removedPaths = [toManagedBrewImagePath(typeof current.image_url === "string" ? current.image_url : null)].filter(
+		(value): value is string => Boolean(value),
+	);
 	if (removedPaths.length > 0) {
 		await createSupabaseAdminClient().storage.from(BREW_IMAGE_BUCKET).remove(removedPaths);
 	}

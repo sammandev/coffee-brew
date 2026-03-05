@@ -18,10 +18,10 @@ export default async function DashboardProfilePage() {
 			.select("display_name, avatar_url, status, is_profile_private, show_online_status, dm_privacy")
 			.eq("id", session.userId)
 			.maybeSingle(),
-		supabase.from("newsletter_subscriptions").select("consent").eq("email", session.email).maybeSingle(),
+		supabase.from("newsletter_subscriptions").select("consent").eq("email", session.email ?? "").maybeSingle(),
 	]);
 
-	const displayName = profile?.display_name?.trim() || session.email.split("@")[0] || "User";
+	const displayName = profile?.display_name?.trim() || session.email?.split("@")[0] || "User";
 
 	return (
 		<div className="space-y-5">
@@ -29,7 +29,7 @@ export default async function DashboardProfilePage() {
 			<ProfileSettingsPanel
 				avatarUrl={profile?.avatar_url ?? null}
 				displayName={displayName}
-				email={session.email}
+				email={session.email ?? ""}
 				accountRole={session.role}
 				labels={{
 					displayName: locale === "id" ? "Nama Tampilan" : "Display Name",

@@ -1,13 +1,13 @@
 import { apiError } from "@/lib/api";
 import { logAuditEvent, logTransactionalEmailEvent } from "@/lib/audit";
-import { requireSessionContext } from "@/lib/auth";
+import { requireSessionContextOrNull } from "@/lib/auth";
 import { sendTransactionalEmail } from "@/lib/email/resend";
 import { assertPermission } from "@/lib/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function requireManageUsersPermission() {
-	const session = await requireSessionContext().catch(() => null);
+	const session = await requireSessionContextOrNull();
 	if (!session) {
 		return { response: apiError("Unauthorized", 401) };
 	}

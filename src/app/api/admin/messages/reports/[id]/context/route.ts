@@ -1,10 +1,10 @@
 import { apiError, apiOk } from "@/lib/api";
-import { requireSessionContext } from "@/lib/auth";
+import { requireSessionContextOrNull } from "@/lib/auth";
 import { sanitizeForRender } from "@/lib/rich-text";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 async function requireSuperuser() {
-	const session = await requireSessionContext().catch(() => null);
+	const session = await requireSessionContextOrNull();
 	if (!session) {
 		return { response: apiError("Unauthorized", 401) };
 	}

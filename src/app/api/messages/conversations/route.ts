@@ -1,5 +1,6 @@
 import { apiError, apiOk } from "@/lib/api";
-import { canCreateDirectConversation, requireActiveDmSession, resolveDirectKey } from "@/lib/dm-service";
+import { buildDirectMessageKey } from "@/lib/direct-messages";
+import { canCreateDirectConversation, requireActiveDmSession } from "@/lib/dm-service";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { dmConversationListQuerySchema, dmConversationStartSchema } from "@/lib/validators";
 
@@ -26,7 +27,11 @@ export async function GET(request: Request) {
 
 	const { view, q, limit, cursor } = parsed.data;
 	const searchQuery = (q ?? "").trim().toLowerCase();
-	const fetchLimit = Math.max(limit * 4, 40);
+	// Over-fetch by 2× to account for JS-side cursor and search filtering.
+	// The Supabase JS client does not support filtering on FK-joined columns,
+	// so the cursor comparison must remain in JS. 2× is a reasonable bound
+	// because most pages will have few cursor-discarded rows.
+	const fetchLimit = Math.max(limit * 2, 20);
 
 	const participantsQuery = supabase
 		.from("dm_participants")
@@ -169,19 +174,43 @@ export async function GET(request: Request) {
 		]),
 	);
 
+	// Batch unread counts in one query instead of one COUNT per conversation.
+	// We fetch unread message IDs (minimal payload) for all conversations at once,
+	// then tally per-conversation in JS. last_read_at varies per row so we use the
+	// earliest last_read_at as a conservative lower bound for the WHERE clause —
+	// messages older than every last_read_at are definitively read everywhere.
 	const unreadCountByConversationId = new Map<string, number>();
-	await Promise.all(
-		rows.map(async (row) => {
-			const query = supabase
-				.from("dm_messages")
-				.select("id", { count: "exact", head: true })
-				.eq("conversation_id", row.conversation_id)
-				.neq("sender_id", context.userId);
-			const scopedQuery = row.last_read_at ? query.gt("created_at", row.last_read_at) : query;
-			const { count } = await scopedQuery;
-			unreadCountByConversationId.set(row.conversation_id, count ?? 0);
-		}),
-	);
+	const earliestLastReadAt =
+		rows
+			.map((row) => row.last_read_at)
+			.filter((ts): ts is string => Boolean(ts))
+			.sort()
+			.at(0) ?? null;
+
+	let unreadQuery = supabase
+		.from("dm_messages")
+		.select("conversation_id, created_at")
+		.in("conversation_id", conversationIds)
+		.neq("sender_id", context.userId);
+	if (earliestLastReadAt) {
+		unreadQuery = unreadQuery.gt("created_at", earliestLastReadAt);
+	}
+	const { data: unreadMessages } = await unreadQuery;
+
+	// Initialise all to 0 so conversations with no unread messages are included.
+	for (const row of rows) {
+		unreadCountByConversationId.set(row.conversation_id, 0);
+	}
+	// Build a per-row last_read_at lookup for the per-conversation filter.
+	const lastReadByConversationId = new Map(rows.map((row) => [row.conversation_id, row.last_read_at]));
+	for (const message of unreadMessages ?? []) {
+		const lastReadAt = lastReadByConversationId.get(message.conversation_id) ?? null;
+		if (lastReadAt && message.created_at <= lastReadAt) continue;
+		unreadCountByConversationId.set(
+			message.conversation_id,
+			(unreadCountByConversationId.get(message.conversation_id) ?? 0) + 1,
+		);
+	}
 	const unreadCount = Array.from(unreadCountByConversationId.values()).reduce((total, value) => total + value, 0);
 
 	const filteredConversations = rows
@@ -280,7 +309,7 @@ export async function POST(request: Request) {
 		return apiError("Could not start conversation", 403, "Recipient does not accept direct messages from this account.");
 	}
 
-	const directKey = resolveDirectKey(context.userId, recipientId);
+	const directKey = buildDirectMessageKey(context.userId, recipientId);
 
 	const { data: existingConversation } = await supabaseAdmin
 		.from("dm_conversations")
@@ -290,6 +319,8 @@ export async function POST(request: Request) {
 		.maybeSingle<{ id: string }>();
 
 	if (existingConversation) {
+		// Only un-archive the initiator's own row. Never touch the recipient's
+		// participant row — they may have intentionally archived this conversation.
 		await supabaseAdmin.from("dm_participants").upsert(
 			[
 				{
@@ -297,10 +328,6 @@ export async function POST(request: Request) {
 					user_id: context.userId,
 					archived_at: null,
 					last_seen_at: new Date().toISOString(),
-				},
-				{
-					conversation_id: existingConversation.id,
-					user_id: recipientId,
 				},
 			],
 			{ onConflict: "conversation_id,user_id" },

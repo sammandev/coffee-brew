@@ -1,5 +1,5 @@
 import { apiError, apiOk } from "@/lib/api";
-import { requireSessionContext } from "@/lib/auth";
+import { requireSessionContextOrNull } from "@/lib/auth";
 import { revalidatePublicCache } from "@/lib/cache-invalidation";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import { getSiteSettings } from "@/lib/site-settings";
@@ -9,7 +9,7 @@ import { TAB_ICON_BUCKET, toManagedTabIconPath } from "@/lib/tab-icons";
 import { siteSettingsSchema } from "@/lib/validators";
 
 async function requireSuperuser() {
-	const session = await requireSessionContext().catch(() => null);
+	const session = await requireSessionContextOrNull();
 	if (!session) {
 		return { response: apiError("Unauthorized", 401) };
 	}

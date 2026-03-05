@@ -10,6 +10,7 @@ export interface NewsletterResult {
 }
 
 export interface NewsletterProvider {
+	readonly name: string;
 	subscribe(payload: SubscribePayload): Promise<NewsletterResult>;
 	unsubscribe(email: string): Promise<NewsletterResult>;
 }

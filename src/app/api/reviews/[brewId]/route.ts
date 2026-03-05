@@ -1,7 +1,7 @@
 import { apiError, apiOk } from "@/lib/api";
-import { getSessionContext } from "@/lib/auth";
 import { revalidatePublicCache } from "@/lib/cache-invalidation";
 import { CACHE_TAGS } from "@/lib/cache-tags";
+import { isLikelyUuid } from "@/lib/forum";
 import { requirePermission } from "@/lib/guards";
 import { createNotifications } from "@/lib/notifications";
 import { toOverallScore } from "@/lib/rating";
@@ -11,16 +11,19 @@ import { reviewSchema } from "@/lib/validators";
 
 export async function GET(_: Request, { params }: { params: Promise<{ brewId: string }> }) {
 	const { brewId } = await params;
+	if (!isLikelyUuid(brewId)) {
+		return apiError("Invalid brew ID", 400);
+	}
 	const supabase = await createSupabaseServerClient();
 
 	const { data, error } = await supabase
 		.from("brew_reviews")
-		.select("acidity, sweetness, body, aroma, balance, notes, reviewer_id, updated_at")
+		.select("acidity, sweetness, body, aroma, balance, star_rating, notes, reviewer_id, updated_at")
 		.eq("brew_id", brewId)
 		.order("updated_at", { ascending: false });
 
 	if (error) {
-		return apiError("Could not fetch reviews", 400, error.message);
+		return apiError("Could not fetch reviews", 500, error.message);
 	}
 
 	return apiOk({ reviews: data });
@@ -28,6 +31,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ brewId: st
 
 export async function PUT(request: Request, { params }: { params: Promise<{ brewId: string }> }) {
 	const { brewId } = await params;
+	if (!isLikelyUuid(brewId)) {
+		return apiError("Invalid brew ID", 400);
+	}
 
 	const permission = await requirePermission("reviews", "create");
 	if (permission.response) return permission.response;
@@ -53,11 +59,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ brew
 	}
 
 	const supabase = await createSupabaseServerClient();
-	const session = await getSessionContext();
-
-	if (!session) {
-		return apiError("Unauthorized", 401);
-	}
 
 	const { data: brew } = await supabase
 		.from("brews")
@@ -65,7 +66,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ brew
 		.eq("id", brewId)
 		.maybeSingle();
 
-	if (!brew || brew.status === "hidden") {
+	if (!brew || brew.status === "hidden" || brew.status === "draft") {
 		return apiError("Brew not available for review", 404);
 	}
 
@@ -74,38 +75,41 @@ export async function PUT(request: Request, { params }: { params: Promise<{ brew
 		.upsert(
 			{
 				brew_id: brewId,
-				reviewer_id: session.userId,
+				reviewer_id: permission.context.userId,
 				acidity: parsed.data.acidity,
 				sweetness: parsed.data.sweetness,
 				body: parsed.data.body,
 				aroma: parsed.data.aroma,
 				balance: parsed.data.balance,
 				overall: toOverallScore(parsed.data),
+				star_rating: parsed.data.star_rating,
 				notes: parsed.data.notes ?? null,
 			},
 			{
 				onConflict: "brew_id,reviewer_id",
 			},
 		)
-		.select("*")
+		.select(
+			"id, brew_id, reviewer_id, acidity, sweetness, body, aroma, balance, overall, star_rating, notes, created_at, updated_at",
+		)
 		.single();
 
 	if (error) {
-		return apiError("Could not save review", 400, error.message);
+		return apiError("Could not save review", 500, error.message);
 	}
 
 	const { data: actorProfile } = await supabase
 		.from("profiles")
 		.select("display_name")
-		.eq("id", session.userId)
+		.eq("id", permission.context.userId)
 		.maybeSingle<{ display_name: string | null }>();
-	const actorName = actorProfile?.display_name?.trim() || session.email.split("@")[0] || "Someone";
+	const actorName = actorProfile?.display_name?.trim() || permission.context.email?.split("@")[0] || "Someone";
 
-	if (brew.owner_id !== session.userId) {
+	if (brew.owner_id !== permission.context.userId) {
 		await createNotifications([
 			{
 				recipientId: brew.owner_id,
-				actorId: session.userId,
+				actorId: permission.context.userId,
 				eventType: "review",
 				title: `${actorName} reviewed your brew`,
 				body: `Your brew "${brew.name}" has a new rating update.`,
